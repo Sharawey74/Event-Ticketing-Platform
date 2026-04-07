@@ -1,0 +1,898 @@
+--- PAGE 1 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+PHASE 1A: EVENT TICKETING PLATFORM
+Sections 13, 14, 15 & 16 — Practices, Resources, Troubleshooting & Transition
+TDD & Clean Code • All Dependencies & Resources • 7 Troubleshooting Guides • Phase 1B
+Transition
+This document covers the four closing sections of Phase 1A: the engineering practices that apply to
+every feature, the complete dependency and resource reference, a structured troubleshooting guide for
+the seven most common failure modes, and the full Phase 1A → 1B transition checklist. All code blocks
+have been converted to structured prose, visual cards, and reference tables.
+April 4–24, 2026 • 1 / 25
+
+--- PAGE 2 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+SECTION 13
+Practices Track Detail
+TDD workflow, Clean Code checklist, Git branching strategy, commit conventions, and PR
+template
+Practices are not optional polish — they are the habits that make complex codebases maintainable
+under time pressure. Every rule here has a specific reason. Each subsection explains not just what to
+do but why it matters for a project of this complexity.
+13.1 TDD Workflow — Applied to Every Feature
+Test-Driven Development (TDD) means writing the test before writing the implementation. This is not
+just about coverage — it forces you to design the method's contract (inputs, outputs, exceptions) before
+worrying about implementation details. The result is cleaner APIs and fewer edge-case bugs.
+Why TDD for This Project Specifically
+• The state machine has 11 states and 9 events — without tests written first, it is easy to wire a
+transition incorrectly and not notice until a user's booking gets stuck. TDD makes every
+transition a verifiable specification.
+• The PricingEngine has 4 compounding rules — without a test for every combination, a
+pricing bug would only surface in production when a user is overcharged or undercharged.
+• The concurrency test is the only way to know the locking works — you cannot reason
+about 100 simultaneous threads manually. The test is the specification.
+The 6-Step Red-Green-Refactor Cycle
+Write the Test First
+Step
+Before writing any production code, write a test that describes what the method
+1
+SHOULD do. Use @DisplayName with a full English sentence. The test will not compile
+yet — that is correct.
+Run the Test — Watch It Fail (RED)
+Step
+Run the test suite. It should fail — either a compilation error (method does not exist yet)
+2
+or a runtime assertion failure. A test that passes before you write the implementation is
+a useless test.
+Step Write the Minimum Code to Pass
+3
+April 4–24, 2026 • 2 / 25
+
+--- PAGE 3 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+Write only enough production code to make the test pass. Resist the urge to add logic
+for other cases — that comes in later steps. If you write more than the minimum, you
+are not doing TDD.
+Step Run the Test — Watch It Pass (GREEN)
+4 Run the test suite again. The test should now pass. If it does not, fix the implementation
+until it does. Do not move on until the test is green.
+Step Refactor — Clean Up Without Breaking
+5 Now improve the code: rename variables, extract helper methods, remove duplication.
+Run the tests after every refactor to verify nothing broke. The tests are your safety net.
+Step Repeat for the Next Behaviour
+6 Return to Step 1 for the next requirement. Each loop adds one testable behaviour. After
+5–8 cycles, you have a fully tested, well-structured method.
+TDD in Practice — calculateRefundAmount() Example
+This walkthrough shows how TDD builds the calculateRefundAmount() method one behaviour at a
+time:
+1. Write the test: Write a test named
+calculateRefundAmount_fiveDaysBeforeEvent_shouldReturn50Percent() annotated
+@Test @DisplayName("calculateRefundAmount: should return 50% when cancelled 5
+days before event"). Arrange: build a Booking with totalAmount =
+BigDecimal.valueOf(100.00) and an Event whose startDate =
+LocalDateTime.now().plusDays(5). Act: call
+pricingEngine.calculateRefundAmount(booking, LocalDateTime.now()). Assert:
+assertThat(refund).isEqualByComparingTo("50.00").
+2. Run it — RED: Compilation error — calculateRefundAmount does not exist yet. Create a stub
+that returns BigDecimal.ZERO. Now it compiles. Run again — assertion fails (0.00 ≠ 50.00). Still
+RED — correct.
+3. Implement — minimum: Add the 3-to-7-day branch: if daysUntilEvent >= 3 &&
+daysUntilEvent < 7, return
+booking.getTotalAmount().multiply(BigDecimal.valueOf(0.50)).
+4. Run it — GREEN: Test passes. The 5-day case now returns 50.00.
+5. Repeat for other branches: Write the ≥ 7-day test (full refund), then the < 3-day test (zero
+refund). Each follows the same RED → GREEN cycle.
+13.2 Clean Code Checklist — Run Before Every Commit
+April 4–24, 2026 • 3 / 25
+
+--- PAGE 4 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+These 14 rules apply to every commit pushed in Phase 1A. Most can be checked in under 5 minutes
+with a quick scan. Do not merge code that violates these rules — technical debt compounds quickly
+in a project of this complexity.
+Rule Pass Why It Matters
+Condition
+No method exceeds 20 lines Extract Methods over 20 lines are doing more than one
+methods thing. Extract named helper methods — each
+name documents intent.
+No class exceeds 200 lines Split class A 300-line service class has multiple
+responsibilities. Split by extracting a new
+@Service class.
+Every variable name describes what it No a, b, temp, Code is read 10x more than written. Descriptive
+holds data names make the reviewer's (and your future
+self's) job faster.
+No magic numbers — use named No raw When the business rule changes from 10 to 15,
+constants literals you find and fix one constant, not 8 scattered
+(MAX_TICKETS_PER_BOOKING = 10) occurrences.
+No raw Strings for status values — use Enums only Raw strings cause silent bugs: a typo like
+enums (BookingState.RESERVED, not "RESEVED" compiles fine and causes a null
+"RESERVED") comparison at runtime.
+Single Responsibility: each class does One reason If you need to change BookingService both when
+ONE thing to change the pricing logic changes AND when the email
+format changes, it has two responsibilities.
+No code duplication — if copied > 3 times, DRY principle Duplicate logic means bugs get fixed in one copy
+extract to method/utility and not the other.
+All exceptions have meaningful messages Include Stack traces without context waste hours of
+— "Booking not found: id=" + context debugging time. Include the ID, the state, the
+id user — whatever makes the error self-
+explanatory.
+@Transactional only on service layer — Service layer Repositories are already transactional.
+never on controllers or repositories only Controllers are not the place for transaction
+boundaries. Misplaced @Transactional silently
+has no effect (proxy bypass).
+No @Autowired on fields — use Constructor Field injection cannot be used in tests without
+constructor injection with injection Spring context. Constructor injection makes
+@RequiredArgsConstructor dependencies explicit and testable with plain
+new.
+All DTOs use @Builder (for readable test @Builder Builder pattern makes test setup readable:
+assertions) present Booking.builder().totalAmount(...).event(...).build()
+vs multiple setter calls.
+No System.out.println — use @Slf4j: No sysout System.out bypasses log level configuration and
+log.info(), log.debug(), log.error() is invisible in production log aggregators.
+Structured logs are searchable.
+Swagger @Operation annotation on every @Operation Swagger UI only shows useful documentation if
+controller method present every endpoint has a summary. This is part of the
+portfolio — reviewers will check it.
+All non-obvious public methods have a Javadoc Future contributors (and your Phase 1B self)
+brief Javadoc comment present should not need to reverse-engineer what a
+method does from its internals.
+April 4–24, 2026 • 4 / 25
+
+--- PAGE 5 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+13.3 Git Branching Strategy
+All feature development happens on feature branches cut from develop. The main branch is protected
+— direct pushes are disabled. Every merge to main triggers the CI/CD pipeline and deploys to Railway.
+Branch Hierarchy
+Branch Protected? Purpose and Rules
+main YES — Production branch. Only receives merges from develop via
+protected pull request after CI passes. Every push to main triggers
+Railway deployment.
+develop Soft protection Integration branch. All feature branches merge here first.
+Run ./mvnw test locally before opening a PR to develop.
+feature/event-crud No Cut from develop. One branch per feature. Merged back to
+develop via PR when the feature is complete and all tests
+pass.
+feature/booking- No State machine implementation branch.
+state-machine
+feature/stripe- No Stripe checkout and webhook handler.
+integration
+feature/rabbitmq- No RabbitMQ publishers and listeners.
+notifications
+feature/redis- No DistributedLockService and concurrency tests.
+distributed-
+locking
+feature/pricing- No PricingEngine and RefundService.
+engine
+feature/frontend- No Next.js home page and EventCard component.
+home-page
+feature/frontend- No Event detail, cart, and confirmation pages.
+event-detail
+feature/ci-cd- No GitHub Actions workflows and Dockerfile.
+pipeline
+13.4 Conventional Commit Format
+Every commit must follow the Conventional Commits specification: <type>(<optional scope>):
+<description>. This enables automatic changelog generation, makes git log readable, and signals
+to reviewers what kind of change a commit represents.
+April 4–24, 2026 • 5 / 25
+
+--- PAGE 6 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+Type Example Commit Message When to Use
+feat feat: implement booking Adding new functionality — a new feature,
+state machine with guards endpoint, service, or component.
+and actions
+feat feat: add stripe checkout Each distinct integration gets its own feat commit.
+session creation
+feat feat: add rabbitmq booking Infrastructure additions that introduce new
+confirmation queue capability count as features.
+test test: add concurrent Adding or updating tests only. No production code
+booking test with 100 changes in this commit.
+threads
+fix fix: release redis lock on Correcting a bug in existing code. Should reference
+payment failure what was broken.
+fix fix: n+1 query in event Performance bug fixes use fix, not perf (perf is for
+list endpoint non-bug optimisations).
+perf perf: add composite index Non-bug performance improvement — new index,
+on ticket_tiers(event_id, connection pool tuning, caching.
+tier_name)
+refactor refactor: extract pricing Code restructuring with no behaviour change. Tests
+rules to dedicated should still pass unchanged.
+PricingEngine class
+docs docs: add state machine Documentation-only changes — README updates,
+diagrams to readme Javadoc, architecture diagrams.
+ci ci: add github actions Changes to CI/CD configuration files — GitHub
+workflow for test and Actions, Dockerfile, scripts.
+build
+chore chore: upgrade spring boot Maintenance tasks — dependency upgrades, build
+to 3.2.4 config, project setup.
+13.5 Pull Request Description Template
+Every PR to develop or main must include a description covering five sections. A well-written PR
+description is part of your portfolio — future employers may look at your GitHub PRs. It also makes
+code review faster because the reviewer understands the intent before reading a single line of code.
+Section Example Content
+## What — Implemented BookingStateMachine with Spring State Machine — Added 8 state
+Changed transitions: AVAILABLE → RESERVED → PAYMENT_PENDING → CONFIRMED —
+Added timer expiration job (runs every 30s, expires stale RESERVED bookings)
+## Why Part of the Phase 1A booking flow. This is the core business logic that prevents double-
+bookings and manages the ticket lifecycle.
+April 4–24, 2026 • 6 / 25
+
+--- PAGE 7 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+Section Example Content
+## Key — Used Spring State Machine over manual if/else for maintainability and auditability —
+Decisions Guard pattern validates seat availability before transition (cleaner than throwing inside
+the service) — State persisted to DB after each transition (stateless between requests
+— horizontally scalable)
+## How to 1. Start the app: docker-compose up 2. POST /api/bookings/reserve (expect: 200,
+Test state=RESERVED) 3. Wait 5+ minutes without checkout 4. GET /api/bookings/{id}
+(expect: state=EXPIRED) OR: ./mvnw test -Dtest=BookingStateMachineTest
+## Tests — BookingStateMachineTest: 5 tests — ConcurrentBookingTest: 1 test (100 threads →
+Added exactly correct outcome) — BookingServiceIntegrationTest: 3 tests
+## Coverage Before: 45% | After: 58%
+Delta
+✔ TIP: Add a PR template file at .github/pull_request_template.md so the five sections appear
+automatically when opening a new PR on GitHub. This ensures every PR follows the same format
+without relying on memory.
+April 4–24, 2026 • 7 / 25
+
+--- PAGE 8 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+SECTION 14
+Tools & Resources
+Complete Maven dependency reference, curated resource list by topic, and external tool
+links
+This section is the single reference for every dependency and external resource needed during Phase
+1A. The dependency table shows all 20+ Maven dependencies with their purpose and scope. The
+resource list is curated and prioritised — not a dump of search results.
+14.1 Maven Dependencies — Complete pom.xml Reference
+Spring Boot parent version: 3.2.4. Set this in the <parent> block of pom.xml. All spring-boot-starter-*
+dependencies inherit their version from the parent — do not specify versions for these manually.
+Spring Boot Core Starters
+artifactId groupId Version Scope Purpose
+spring-boot- org.springframework.boot (parent) compile REST API, embedded
+starter-web Tomcat, Jackson JSON
+serialization
+spring-boot- org.springframework.boot (parent) compile Hibernate ORM, @Entity,
+starter-data-jpa @Repository, Spring Data
+repositories
+spring-boot- org.springframework.boot (parent) compile Spring Security — JWT
+starter-security filter chain,
+@PreAuthorize, role-
+based access
+spring-boot- org.springframework.boot (parent) compile RedisTemplate,
+starter-data- RedisCacheManager,
+redis @Cacheable,
+@CacheEvict
+spring-boot- org.springframework.boot (parent) compile RabbitTemplate,
+starter-amqp @RabbitListener,
+RabbitMQ connection
+management
+spring-boot- org.springframework.boot (parent) compile Bean Validation —
+starter- @NotBlank, @NotNull,
+validation @Future, @Min on DTOs
+spring-boot- org.springframework.boot (parent) compile /actuator/health endpoint
+starter-actuator — used by Docker health
+checks and Railway
+spring-boot- org.springframework.boot (parent) compile JavaMailSender for
+starter-mail sending HTML
+confirmation emails via
+Mailhog/SMTP
+April 4–24, 2026 • 8 / 25
+
+--- PAGE 9 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+Spring State Machine
+artifactId groupId Versio Scope Purpose
+n
+spring- org.springframework.statemachi 3.2.1 compil @EnableStateMachineFactory,
+statemachine ne e StateMachineConfigurerAdapte
+-core r, guards, actions
+Database
+artifactId groupId Version Scope Purpose
+postgresql org.postgresql (parent) runtime PostgreSQL JDBC driver —
+loaded at runtime by Hibernate
+flyway-core org.flywaydb (parent) compile Database migration — runs
+V1__...sql through V9__...sql
+on startup
+JWT Authentication
+artifactId groupId Version Scope Purpose
+jjwt-api io.jsonwebtoken 0.11.5 compile JWT token API — JwtBuilder,
+JwtParserBuilder interface
+jjwt-impl io.jsonwebtoken 0.11.5 runtime JWT implementation — loaded
+at runtime via ServiceLoader
+jjwt-jackson io.jsonwebtoken 0.11.5 runtime Jackson-based JWT
+serialization — required for
+claims handling
+Stripe Payment Integration
+artifactId groupId Version Scope Purpose
+stripe-java com.stripe 24.3.0 compile Stripe SDK — Session.create(),
+Webhook.constructEvent(),
+Refund.create()
+QR Code Generation
+artifactId groupId Version Scope Purpose
+core com.google.zxing 3.5.2 compile ZXing core — QRCodeWriter,
+BarcodeFormat, BitMatrix
+javase com.google.zxing 3.5.2 compile ZXing Java SE —
+MatrixToImageWriter for
+Base64 PNG encoding
+API Documentation
+April 4–24, 2026 • 9 / 25
+
+--- PAGE 10 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+artifactId groupId Version Scope Purpose
+springdoc-openapi- org.springdoc 2.3.0 compile Swagger UI at /swagger-
+starter-webmvc-ui ui.html — @Operation,
+@ApiResponse, @Schema
+Utilities
+artifactId groupId Version Scope Purpose
+lombok org.projectlombok (parent) optional @Data, @Builder,
+@RequiredArgsConstructor,
+@Slf4j — compile-time
+annotation processing
+Testing (scope: test only)
+artifactId groupId Version Scope Purpose
+spring-boot- org.springframework.boot (parent) test JUnit 5, Mockito, AssertJ,
+starter-test @SpringBootTest,
+@WebMvcTest — all-in-one
+test starter
+spring-rabbit- org.springframework.amqp (parent) test RabbitMQ test utilities —
+test @RabbitListenerTest for
+listener verification
+junit-jupiter org.testcontainers (parent) test @Testcontainers,
+@Container lifecycle
+management for JUnit 5
+postgresql org.testcontainers (parent) test PostgreSQLContainer —
+real PostgreSQL in Docker
+during integration tests
+rabbitmq org.testcontainers (parent) test RabbitMQContainer — real
+RabbitMQ in Docker during
+integration tests
+awaitility org.awaitility (parent) test Awaitility.await().atMost(5,
+SECONDS) — async
+assertion without
+Thread.sleep()
+April 4–24, 2026 • 10 / 25
+
+--- PAGE 11 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+14.2 Critical Resources — Organised by Topic
+These resources are curated, not exhaustive. Each entry is here because it directly helps with a
+specific Phase 1A implementation task. Read or watch each one at the point in the schedule when
+you are building that feature — not all at once at the start.
+Spring State Machine
+URL / Search Term Format What to Focus On
+https://docs.spring.io/spring- Official Read before Day 8. Focus on
+statemachine/docs/current/reference/ reference docs StateMachineConfigurerAdapter, guards, actions, and
+@EnableStateMachineFactory vs
+@EnableStateMachine.
+https://www.baeldung.com/spring- Baeldung Practical walkthrough. Read the "Events and Transitions"
+state-machine tutorial and "Actions and Guards" sections specifically.
+https://github.com/spring-attic/spring- Spring SM Working code examples for complex state machines.
+statemachine-samples samples on Use as reference if the config structure is unclear.
+GitHub
+YouTube — search "Spring State YouTube (~45 Video walkthrough. Watch after reading the docs for a
+Machine Tutorial" by Amigoscode min) different perspective on the same concepts.
+Stripe Integration (Java)
+URL / Search Term Format What to Focus On
+https://stripe.com/docs/checkout/quickstart?lang=java Checkout The step-by-step guide for creating
+quickstart Checkout Sessions in Java. Follow this
+(Java) exactly on Day 9.
+https://stripe.com/docs/webhooks Webhooks Signature verification, event types,
+guide idempotency. Read before implementing
+StripeWebhookController.
+https://stripe.com/docs/testing Test mode All test card numbers, webhook trigger
+reference commands, and test clock tools. Keep this
+open during Day 9–10.
+https://stripe.com/docs/stripe-cli Stripe CLI Install before Day 9. The listen --forward-to
+docs command is required for local webhook
+testing.
+RabbitMQ
+URL / Search Term Format What to Focus On
+https://docs.spring.io/spring- Spring AMQP Complete reference for @RabbitListener,
+amqp/docs/current/reference/html/ reference RabbitTemplate, exchange/queue declarations, and
+manual ACK.
+April 4–24, 2026 • 11 / 25
+
+--- PAGE 12 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+URL / Search Term Format What to Focus On
+https://www.rabbitmq.com/tutorials/tutorial- RabbitMQ Official step-by-step tutorials covering topic
+one-java Java tutorials exchanges, dead letters, and message persistence.
+https://www.rabbitmq.com/dlx.html Dead Letter Read before configuring queues on Day 5. Explains
+Exchanges the x-dead-letter-exchange argument and failure
+(DLX) routing.
+YouTube — search "Spring Boot YouTube (~30 Good visual explanation of exchanges, queues, and
+RabbitMQ Tutorial" by TechPrimers min) bindings before implementing them.
+Redis
+URL / Search Term Format What to Focus On
+https://redis.io/docs/manual/patterns/distributed- Distributed The authoritative explanation of SET NX EX vs
+locks/ locks pattern SETNX + EXPIRE, and the Lua release script.
+Read before Day 11.
+https://redis.io/docs/manual/patterns/distributed- Redlock Read the trade-offs of single-node vs multi-
+locks/#the-redlock-algorithm algorithm node locks. Document your decision in the
+README.
+https://docs.spring.io/spring- Spring Data RedisTemplate configuration, @Cacheable,
+data/redis/reference/redis.html Redis RedisCacheManager. Read before Day 5.
+reference
+https://redis.io/commands/ Redis Bookmark this. Use it to look up exact syntax
+command for SET, ZADD, ZPOPMIN, HSET, INCR,
+reference DECR as needed.
+YouTube — search "Redis Distributed Lock YouTube Visual walkthrough of the lock/release pattern.
+Explained" by ByteByteGo (~12 min) Excellent 12-minute primer before Day 11.
+Testing
+URL / Search Term Format What to Focus On
+https://testcontainers.com/guides/testing-spring- Testcontainers The canonical getting-started guide.
+boot-rest-api-using-testcontainers/ Spring Boot Follow this to set up BaseIntegrationTest
+guide on Day 6.
+https://www.jacoco.org/jacoco/trunk/doc/maven.html JaCoCo Configuration reference for the prepare-
+Maven plugin agent, report, and check executions. Use
+on Day 16.
+https://k6.io/docs/ k6 Complete reference for writing load test
+documentation scripts, configuring thresholds, and
+interpreting output.
+https://k6.io/docs/get-started/installation/ k6 installation Install before Day 17. Available via
+Homebrew (macOS) or binary download
+for Linux/Windows.
+System Design
+April 4–24, 2026 • 12 / 25
+
+--- PAGE 13 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+URL / Search Term Format What to Focus On
+Designing Data-Intensive Applications Book The best software book for understanding
+(DDIA) — Chapters 1–3 distributed systems. Read Ch. 1 on Day 1, Ch. 2
+before Week 2, Ch. 3 before Week 3.
+https://systemdesign.one/ticketmaster- System Reference solution for the Design Ticketmaster
+system-design/ Design One — exercise (Day 14). Compare with your own diagram
+Ticketmaster after completing it.
+https://www.educative.io/courses/grokking- Grokking Structured course with design problems and
+the-system-design-interview System solutions. Use for additional practice after
+Design Ticketmaster and Eventbrite.
+(Educative)
+YouTube — search "Stripe Checkout YouTube (~20 Stripe's own tutorial video for Java checkout
+Java" on Stripe official channel min) integration. Watch alongside Day 9 work.
+14.3 External Accounts and Tooling Setup
+These accounts and tools must be set up before their respective implementation days:
+Tool/Account Setup URL Needed By What You Need From It
+GitHub github.com Day 1 Public repository for the project. Enable branch
+protection on main.
+Stripe (test stripe.com Day 9 sk_test_... secret key and webhook signing
+mode) secret (from Stripe CLI)
+Stripe CLI stripe.com/docs/stripe-cli Day 9 Local webhook forwarding: stripe listen --
+forward-to localhost:8080/...
+Railway railway.app Day 18 Free hosting with PostgreSQL, Redis,
+RabbitMQ plugins. RAILWAY_TOKEN for
+CI/CD.
+Vercel (frontend) vercel.com Day 18 Free Next.js hosting. Links to the Railway
+backend via NEXT_PUBLIC_API_URL.
+Loom loom.com Day 20 3-minute demo video recording for README
+and LinkedIn portfolio.
+Excalidraw excalidraw.com Day 1 Free online diagramming for the DB ERD and
+system architecture diagrams.
+April 4–24, 2026 • 13 / 25
+
+--- PAGE 14 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+SECTION 15
+Troubleshooting Guide
+The 7 most common failure modes — each with symptom, root cause, diagnosis steps,
+and fix
+Every issue listed here was identified as a likely failure point during Phase 1A development. The
+structure for each issue is: Symptom (what you observe), Root Cause (why it happens), Fix (exact
+steps to resolve). Severity levels: HIGH = blocks all progress, MEDIUM = blocks a feature, LOW =
+irritant but workable.
+#1 — Stripe Webhook Not Receiving Events [ HIGH ]
+Symptom Payment completes successfully on Stripe's hosted page but the booking remains in
+PAYMENT_PENDING state. The confirmation page never loads.
+Root Cause Stripe cannot reach localhost:8080 from the internet. Webhooks require a publicly
+accessible URL or a local forwarding tool. Without forwarding, Stripe delivers the
+event to a URL that points nowhere.
+Fix 6. Option A — Stripe CLI (recommended): Install with brew install
+stripe/stripe-cli/stripe. Login with stripe login. Run stripe
+listen --forward-to localhost:8080/api/webhooks/stripe.
+Copy the whsec_... signing secret printed to the console and set it
+as STRIPE_WEBHOOK_SECRET in application-local.yml.
+7. Option B — ngrok: Run ngrok http 8080. Copy the
+https://xxxxx.ngrok.io URL. In Stripe Dashboard → Developers
+→ Webhooks → Add endpoint, paste the URL with
+/api/webhooks/stripe appended. Subscribe to events
+checkout.session.completed and checkout.session.expired.
+8. Verify: Stripe CLI prints each delivered event. After completing a test
+payment, you should see checkout.session.completed appear in
+the CLI output within 2 seconds.
+Note The Stripe CLI is preferred because it handles the signing secret automatically and
+does not require a Stripe Dashboard webhook endpoint configuration. Restart the
+CLI whenever STRIPE_WEBHOOK_SECRET is not set correctly.
+#2 — RabbitMQ Connection Refused on App Startup [ HIGH ]
+Symptom Spring Boot fails to start with AmqpConnectException: Connection refused to
+localhost:5672. All RabbitMQ-dependent features are broken.
+Root Cause The RabbitMQ container is not running, is still starting, or did not pass its health
+check before the app tried to connect.
+Fix 9. Verify RabbitMQ container status: run docker ps | grep rabbit. If
+the container is absent, run docker-compose up -d rabbitmq.
+April 4–24, 2026 • 14 / 25
+
+--- PAGE 15 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+10. Check container health: run docker ps and look at the STATUS
+column. It should say (healthy). If it shows (starting), wait 30
+seconds and check again.
+11. Check container logs if unhealthy: docker logs
+ticketing_rabbitmq_1. Look for errors about disk space, port
+conflicts, or memory limits.
+12. Verify queue declarations: once healthy, open the RabbitMQ
+Management UI at http://localhost:15672 (user: ticketing, pass:
+ticketing_pass). Click Queues tab — all 3 queues and 3 DLQs should
+appear automatically on app startup.
+13. If queues are missing: the RabbitMQConfig.java beans may not be
+loading. Check Spring logs for AmqpAdmin errors or missing
+@Configuration annotation.
+Note Add condition: service_healthy to the app's depends_on block in docker-
+compose.yml. This prevents the app from starting until RabbitMQ passes its health
+check.
+#3 — Redis Lock Deadlock — Lock Never Released [ HIGH ]
+Symptom After a failed booking attempt, all subsequent reservations for the same tier
+immediately fail with LockAcquisitionException. The tier appears permanently locked.
+Root Cause The releaseLock() method was not called because the code crashed before reaching
+the finally block, or the lock was acquired without a TTL (missing NX EX — lock
+persists forever).
+Fix 14. Inspect live lock keys: run redis-cli keys "seat:lock:*". If lock
+keys are present, check their TTL with redis-cli ttl
+"seat:lock:tier:1:user:123". A TTL of -1 means the key was set
+without an expiry — this confirms the root cause.
+15. Manually remove a stuck lock (dev only): redis-cli del
+"seat:lock:tier:1:user:123".
+16. Fix the root cause — verify executeWithLock() has a finally block: the
+structure must be try { return operation.get(); } finally {
+releaseLock(key, value); }. The finally block runs even if the operation
+throws an exception.
+17. Verify atomic acquisition: confirm the acquireLock() method uses
+redisTemplate.opsForValue().setIfAbsent(key, value,
+Duration.ofSeconds(ttl)) — the single atomic SET NX EX
+command. If it uses separate SETNX and EXPIRE calls, replace them.
+Note In redis-commander (http://localhost:8081), filter keys by seat:lock: prefix to monitor
+locks in real time during development. All lock keys should disappear within 300
+seconds even if never explicitly released, because the TTL acts as a dead-man's
+switch.
+#4 — N+1 Query Still Present After Attempted Fix [ MEDIUM ]
+April 4–24, 2026 • 15 / 25
+
+--- PAGE 16 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+Symptom Loading a list of 10 events generates 31 or more SQL statements in the logs, even after
+adding @EntityGraph or JOIN FETCH.
+Root Cause The fix was applied to the wrong repository method, or the controller/service is calling a
+different method than the one with the fix. Spring JPA proxies mean a method called on
+the same class (self-invocation) bypasses @Transactional and @EntityGraph.
+Fix 18. Enable SQL logging first: add spring.jpa.show-sql=true and
+spring.jpa.properties.hibernate.format_sql=true to
+application-local.yml. Restart the app and count the SQL
+statements for a list fetch. The target is ≤ 3 queries for 10 events.
+19. Fix 1 — @EntityGraph on the repository method called by the service:
+@EntityGraph(attributePaths = {"organizer", "category",
+"venue"}) List<Event> findByStatus(EventStatus status).
+Confirm it is the exact method signature the service calls.
+20. Fix 2 — JPQL with JOIN FETCH: @Query("SELECT e FROM Event e
+JOIN FETCH e.organizer JOIN FETCH e.category JOIN FETCH
+e.venue WHERE e.status = :status") List<Event>
+findByStatusWithDetails(@Param("status") EventStatus
+status).
+21. Fix 3 — for @OneToMany collections (tickets in booking): enable batch
+fetching with
+spring.jpa.properties.hibernate.default_batch_fetch_size=10.
+This replaces N+1 with (N/10)+1 queries — much better for collections.
+22. Run EXPLAIN ANALYZE in PostgreSQL on the query: connect to the DB
+(psql or pgAdmin), run EXPLAIN ANALYZE <the query>, and verify it
+shows Index Scan not Seq Scan.
+Note Document the before and after query counts in the README Performance section. This
+is concrete evidence for interviewers that you understand the N+1 problem and know
+how to fix it.
+#5 — @Transactional Not Rolling Back on External Service Failure [
+MEDIUM ]
+Symptom When a Stripe API call fails, the seat inventory in the database has already been
+decremented and is not rolled back. Tickets are permanently lost.
+Root Cause Spring @Transactional only rolls back changes to the Spring-managed DataSource.
+Redis operations, Stripe API calls, and RabbitMQ publishes are external — they are
+not part of the DB transaction and do not roll back automatically.
+Fix 23. Understand the proxy bypass problem: @Transactional uses Spring
+AOP proxies. If reserveTickets() calls reduceInventory() on the SAME
+class, it goes through the same object (not the proxy) —
+@Transactional on the inner method is silently ignored.
+24. Fix — move the inner method to a separate @Service class:
+BookingService injects InventoryService as a dependency. When
+bookingService.reserveTickets() calls
+inventoryService.releaseSeat(), it goes through the Spring
+proxy — @Transactional applies.
+April 4–24, 2026 • 16 / 25
+
+--- PAGE 17 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+25. For external services (Stripe, Redis): use compensating transactions.
+Wrap the Stripe call in a try-catch. In the catch block, manually
+reverse the DB change: call inventoryService.releaseSeat()
+before rethrowing the exception. Log the compensating action.
+26. Add Spring Retry for optimistic locking failures: annotate
+reserveTickets() with @Retryable(value =
+OptimisticLockingFailureException.class, maxAttempts =
+3, backoff = @Backoff(delay = 100, multiplier = 2)). Add
+@EnableRetry to the main application class and add spring-retry
+to pom.xml.
+Note The ObjectOptimisticLockingFailureException from the @Version field is EXPECTED
+— it means the optimistic locking is working correctly. Handle it with @Retryable
+rather than removing the @Version field.
+#6 — Docker Compose Services Start Out of Order [ MEDIUM ]
+Symptom Spring Boot starts before PostgreSQL, Redis, or RabbitMQ is ready. The app throws
+Connection refused on startup and exits.
+Root Cause Docker Compose depends_on without condition only waits for the container to
+START, not for it to be ready. PostgreSQL takes ~3 seconds to accept connections
+after starting. Spring Boot attempts connection within ~1 second of the container
+starting.
+Fix 27. Add condition: service_healthy to the app's depends_on in docker-
+compose.yml:
+28. depends_on: with sub-keys postgres: condition:
+service_healthy, redis: condition: service_healthy,
+rabbitmq: condition: service_healthy.
+29. Verify each service has a healthcheck defined: PostgreSQL should
+use pg_isready -U ticketing, Redis should use redis-cli ping,
+RabbitMQ should use rabbitmq-diagnostics ping.
+30. Add HikariCP retry to application.yml as a second safety net:
+spring.datasource.hikari.connection-timeout: 30000 and
+spring.datasource.hikari.initialization-fail-timeout:
+60000. This gives HikariCP 60 seconds to acquire the first connection
+before failing.
+Note Run docker-compose up --build and observe the logs. The app container should print
+"Waiting for postgres to be healthy..." before the Spring Boot startup banner appears.
+If it starts immediately, the depends_on condition is not configured correctly.
+#7 — ObjectOptimisticLockingFailureException Under Concurrent Load
+[ LOW ]
+Symptom Concurrent POST /api/bookings/reserve requests intermittently throw
+ObjectOptimisticLockingFailureException. Some booking attempts fail unexpectedly.
+April 4–24, 2026 • 17 / 25
+
+--- PAGE 18 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+Root Cause This is the optimistic locking working as designed — two threads read the same
+@Version value and one of them wins the DB update while the other gets rejected.
+This is a correct safety mechanism, not a bug. The application needs retry logic to
+handle the rejected thread gracefully.
+Fix 31. Add the spring-retry dependency to pom.xml: spring-
+retry:spring-retry with no explicit version (inherited from Spring
+Boot parent).
+32. Add @EnableRetry to TicketingApplication.java.
+33. Annotate reserveTickets() with @Retryable(value =
+{OptimisticLockingFailureException.class}, maxAttempts =
+3, backoff = @Backoff(delay = 100, multiplier = 2.0)).
+This retries the method up to 3 times with 100ms, 200ms, 400ms
+delays between attempts.
+34. Verify the concurrent booking test still passes: the @Retryable
+annotation should not change the outcome of ConcurrentBookingTest
+— exactly 50 threads should succeed and 50 should fail (after
+exhausting retries).
+Note ObjectOptimisticLockingFailureException appearing in logs during the concurrent test
+is NORMAL and expected. The @Version field on Booking is the second line of
+defence after Redis locks. Do not remove it — it is the safety net when Redis fails.
+April 4–24, 2026 • 18 / 25
+
+--- PAGE 19 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+SECTION 16
+Phase 1A → Phase 1B Transition
+Completion checklist, portfolio artifacts, self-assessment, code cleanup, documentation,
+and Phase 1B direction
+Phase 1A is complete when every item in this section is checked off. The transition to Phase 1B should
+not happen until the codebase is clean, the deployment is live, and the portfolio artifacts are published.
+A rushed Phase 1A closeout creates technical debt that makes Phase 1B harder.
+16.1 Technical Deliverables — Required Before Phase 1B
+GitHub Repository
+□ Repository is public with the full commit history visible (not a single squashed commit).
+□ README.md is complete with all sections from Section 19 plan: architecture diagram, state
+machine diagrams, screenshots, quick-start guide, env vars table, load test results, What I Learned.
+□ At least 5 UI screenshots are embedded in the README — home page, event detail, cart with
+countdown, confirmation with QR code, and organizer dashboard.
+□ Architecture diagram (Excalidraw or draw.io) embedded in README — CDN, LB, API servers,
+DB, Redis, RabbitMQ.
+□ State machine diagram (visual, not just code) embedded in README — all 11 states and 9
+transitions.
+Live Deployment
+□ https://{your-app}.up.railway.app/actuator/health returns {"status":"UP"}.
+□ Swagger UI accessible at https://{your-app}.up.railway.app/swagger-ui.html with all
+endpoints documented.
+□ Live deployment stays up without sleeping (Railway free tier stays active unless there is zero
+traffic for a long period — ping it periodically).
+□ End-to-end booking flow works on live URL: browse → select → cart → Stripe test payment →
+confirmation with QR code.
+Quality Gates
+□ ./mvnw clean verify passes with JaCoCo coverage ≥ 80% (build fails otherwise).
+□ All 13 test classes pass — ./mvnw clean test with zero failures and zero test errors.
+□ k6 load test results documented in README: P95 < 500ms, zero double-bookings, error rate <
+1%.
+April 4–24, 2026 • 19 / 25
+
+--- PAGE 20 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+□ All 33 success criteria checkboxes from Section 2's weekly checkpoints are verified.
+16.2 Portfolio Artifacts
+Required Before Phase 1B
+□ 3-minute Loom demo video showing the full flow: browse events → select tier → cart
+countdown → Stripe payment → confirmation with QR code → organizer dashboard showing
+revenue. Share the URL in the README.
+□ LinkedIn project entry created: title "Event Ticketing Platform", description (2–3 sentences),
+tech stack, links to GitHub repo and live demo URL.
+□ "What I Built" paragraph written and ready for resume, cover letters, and interviews.
+Approximately 3 sentences covering the system, the hardest technical challenge, and the
+measurable outcome.
+Resume Bullet Point Examples
+Use these as starting points — personalise with your actual numbers and decisions:
+• "Designed and implemented a high-concurrency event ticketing platform handling 1,000
+concurrent users with Redis distributed locking and Spring State Machine, achieving P95
+response time < 500ms with zero oversell incidents."
+• "Built end-to-end Stripe payment integration with webhook idempotency, partial refund
+processing, and a 5-tier booking state machine enforcing legal state transitions across 11
+states."
+• "Achieved 80%+ JaCoCo test coverage across a Java Spring Boot backend with 13 test
+classes, including a 100-thread concurrent booking test verifying zero race conditions in Redis-
+backed inventory management."
+16.3 Self-Assessment — Rate Yourself 1–5 Per Skill
+Rate yourself honestly on each skill before starting Phase 1B. This is not for external review — it
+shapes which Phase 1B project to choose and where to focus early in Phase 1B. A 1 means "I need to
+look this up every time". A 5 means "I can explain this clearly in an interview and implement it from
+scratch".
+Transaction Management 1 2 3 4 5
+□ □ □ □ □
+□ □ □ □ □
+□ □ □ □ □
+April 4–24, 2026 • 20 / 25
+
+--- PAGE 21 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+State Machines 1 2 3 4 5
+□ □ □ □ □
+□ □ □ □ □
+□ □ □ □ □
+Payment Integration 1 2 3 4 5
+□ □ □ □ □
+□ □ □ □ □
+□ □ □ □ □
+Message Queues 1 2 3 4 5
+□ □ □ □ □
+□ □ □ □ □
+□ □ □ □ □
+Redis Patterns 1 2 3 4 5
+□ □ □ □ □
+□ □ □ □ □
+□ □ □ □ □
+Concurrency & Performance 1 2 3 4 5
+□ □ □ □ □
+□ □ □ □ □
+□ □ □ □ □
+16.4 Code Cleanup Checklist — Run Before Closing Phase 1A
+Run these commands in sequence. All must pass before Phase 1B begins:
+• ./mvnw clean verify — runs all tests AND enforces JaCoCo ≥ 80% coverage. The build must
+succeed.
+• ./mvnw spring-boot:run — app must start cleanly with no WARN or ERROR lines in the
+startup log (info-level startup is fine).
+April 4–24, 2026 • 21 / 25
+
+--- PAGE 22 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+• docker-compose up --build — full Docker build must succeed and all services must reach
+(healthy) status within 2 minutes.
+• grep -r "TODO\|FIXME\|HACK\|System.out" src/main/java — must return nothing. All
+TODOs must be resolved or removed before Phase 1B.
+• grep -r "sk_test_\|sk_live_" src/ — must return nothing. No Stripe secrets in source
+code. All secrets go through environment variables.
+ℹ NOTE: Tag the Phase 1A release: git tag -a v1.0.0 -m "Phase 1A complete: Event Ticketing
+Platform" then git push --tags. This creates a permanent reference point on GitHub and makes the
+portfolio entry look professional.
+16.5 Documentation to Finalise
+These documentation files must exist in the repository by April 24:
+File Required Contents
+README.md Project title and description, live demo URL, tech stack badges,
+architecture diagram, state machine diagrams, quick start (git clone →
+docker-compose up → localhost:3000), env vars table, running tests, load
+test results and screenshot, project structure tree, What I Learned section,
+UI screenshots (5+), Loom video link
+docs/architecture.md System architecture description — CDN, API, databases, Redis, RabbitMQ.
+Explain why each component exists and what it does. Link to the
+architecture diagram image.
+docs/state- Visual diagrams for both the Booking state machine (11 states, 9 events)
+machines.md and the Event status lifecycle. Explain each transition in one sentence. This
+is frequently asked in interviews.
+docs/api.md Link to the live Swagger UI at /swagger-ui.html. List of all API endpoints
+with method, path, auth requirement, and brief description.
+docs/deployment.md Step-by-step instructions for setting up the project from scratch:
+prerequisites, local dev (docker-compose up), and Railway production
+deployment. Written for someone who has never seen the project.
+docs/load-testing.md k6 test script summary, command to run the test, screenshot of k6 output,
+P50/P95/P99 response times, throughput (req/sec), error rate, and the SQL
+verification query confirming zero oversell.
+16.6 Phase 1B Direction — Decide by April 25
+Three options are available for Phase 1B. Choose based on what you want to learn next, not just what
+you feel comfortable with. The goal is to expand the skill set.
+April 4–24, 2026 • 22 / 25
+
+--- PAGE 23 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+Option Project Recommendation New Skills Introduced
+A Social Media RECOMMENDED — Spring Batch, data pipelines, graph
+Analytics Platform builds directly on relationships (followers/following), event
+Phase 1A async sourcing, deeper Redis patterns, analytics
+patterns aggregation
+C E-Commerce Platform RECOMMENDED — Inventory management (deeper), product
+reinforces and search with Elasticsearch, recommendation
+extends payment engine, order management, vendor
+patterns from Phase onboarding flow
+1A
+B Real-Time DEFER to Phase 3+ Spring WebFlux (reactive), WebSockets,
+Collaborative — reactive and CRDT concepts, operational transformation,
+Whiteboard WebSocket concepts more advanced frontend state management
+need more foundation
+first
+▶ IMPORTANT: Before choosing: write down honestly what Phase 1A left unfinished and what
+was hardest. If distributed concurrency and async messaging felt shaky, Option A deepens exactly
+those patterns. If payment flows and inventory felt weak, Option C reinforces them.
+April 4–24, 2026 • 23 / 25
+
+--- PAGE 24 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+SECTION APPENDIX
+Daily Hours Log Template
+Track actual vs planned hours daily — this data shapes Phase 1B planning and reveals
+patterns in your productivity
+Track hours honestly every day. The target totals are: Project 62–68 hrs | Fundamentals (System
+Design) 22–27 hrs | Practices (TDD, docs, Git) 14–17 hrs | Total 105–122 hrs. If actual hours
+consistently fall short of plan, that tells you something important about the schedule assumptions for
+Phase 1B.
+ℹ NOTE: Update this log at end of each day before closing your laptop. Estimated hours
+recorded the next morning are inaccurate — memory compresses unproductive time.
+Date Day Focus Est Hrs Project Hrs Fundmtls Practices
+Hrs Hrs
+WEEK 1 — April 4–10 (Target: 35–40 hrs)
+Apr 4 (Sat) Project init + DB schema 8
+Apr 5 (Sun) Auth + Event Service (TDD) 7
+Apr 6 (Mon) Category + Venue + Search 5
+Apr 7 (Tue) Next.js init + Home page 5
+Apr 8 (Wed) Inventory + Redis cache + 5
+RabbitMQ config
+Apr 9 (Thu) Integration tests + N+1 fixes 5
+Apr 10 (Fri) Week 1 cleanup + code review 5
+WEEK TOTAL Target Project Fundmtls Practices
+WEEK 2 — April 11–17 (Target: 35–40 hrs)
+Apr 11 (Sat) Booking state machine (core) 8
+Apr 12 (Sun) Stripe integration 7
+Apr 13 (Mon) RabbitMQ queues + email 5
+notifications
+Apr 14 (Tue) Redis distributed locking + 5
+concurrent tests
+Apr 15 (Wed) Pricing engine + refund logic + 5
+waitlist
+Apr 16 (Thu) Frontend — Event Detail + 5
+Cart + Checkout
+Apr 17 (Fri) Week 2 integration tests + 5
+system design
+April 4–24, 2026 • 24 / 25
+
+--- PAGE 25 ---
+Phase 1A: Event Ticketing Platform — Sections 13, 14, 15 & 16: Practices, Resources, Troubleshooting & Transition
+Date Day Focus Est Hrs Project Hrs Fundmtls Practices
+Hrs Hrs
+WEEK TOTAL Target Project Fundmtls Practices
+WEEK 3 — April 18–24 (Target: 28–32 hrs)
+Apr 18 (Sat) Remaining frontend pages 7
+Apr 19 (Sun) Test coverage push to 80%+ 7
+Apr 20 (Mon) k6 load testing + performance 5
+tuning
+Apr 21 (Tue) CI/CD + Docker optimisation 5
+Apr 22 (Wed) Documentation + Swagger + 5
+README
+Apr 23 (Thu) Bug bash + demo preparation 5
+Apr 24 (Fri) Final checkpoint + Phase 1B 3
+planning
+WEEK TOTAL Target Project Fundmtls Practices
+PHASE 1A TOTAL 105–122 62–68 hrs 22–27 hrs 14–17 hrs
+hrs
+Phase 1A • Sections 13, 14, 15, 16 & Appendix • April 4–24, 2026 | See Section 2 for the day-by-day execution map
+April 4–24, 2026 • 25 / 25
