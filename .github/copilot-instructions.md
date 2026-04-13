@@ -6,7 +6,7 @@
 ## Project Identity
 
 - **Project:** Event Ticketing Platform (Phase 1A)
-- **Stack:** Java 21, Spring Boot 3.x, PostgreSQL 15, Redis 7, RabbitMQ 3.12, Stripe, Next.js 14
+- **Stack:** Java 21, Spring Boot 3.x, PostgreSQL 17, Redis 7, RabbitMQ 4.2.5, Stripe, Next.js 14
 - **Architecture:** Modular monolith — each domain is independently extractable to a microservice
 - **Timeline:** April 4–24, 2026 | 21 days | 105–122 hours
 - **Base package:** `com.ticketing`
