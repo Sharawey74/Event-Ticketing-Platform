@@ -1,0 +1,3 @@
+ALTER TABLE events
+    ADD COLUMN waitlist_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN dynamic_pricing_enabled BOOLEAN NOT NULL DEFAULT FALSE;
