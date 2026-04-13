@@ -365,3 +365,303 @@ YOUR ARGUMENT TO THE AGENT:
 | `Phase1A_Adjustments_and_Fixes.md` | Fixes overlay | 📎 Manual (attach) | Corrections applied to all code |
 | Plan PDFs / extracted text | Source of truth | 📎 Manual (attach) | WHAT to build each day/section |
 | Your session prompt | Your writing | ✍️ You write it | Context + day + fixes for the agent |
+
+---
+
+## PART 6 — Missing Setup Items: Answers and Actions
+
+### Item 1 — Run `@speckit.constitution` to fill `constitution.md`
+
+**Status: REQUIRED before Day 1. This is a Day 0 task.**
+
+`.specify/memory/constitution.md` currently has blank `[PLACEHOLDER]` tokens. Every SpecKit agent reads this file as its permanent project memory. Without filling it, `speckit.implement` generates code with no knowledge of your architectural rules.
+
+**Steps:**
+1. Open GitHub Copilot Chat in VS Code
+2. Select `@speckit.constitution` from the agent dropdown
+3. Paste the full content of `intsructions.txt` as your arguments
+4. Attach `Phase1A_Adjustments_and_Fixes.md`
+5. Say: "Fill the project constitution for the Event Ticketing Platform using these documents."
+6. Agent writes filled content back to `.specify/memory/constitution.md`
+
+**Verify:** Open `.specify/memory/constitution.md` — zero `[PLACEHOLDER]` tokens remain.
+
+---
+
+### Item 2 — Verify `create-new-feature.ps1` exists and is executable
+
+**Status: ALREADY EXISTS. No action needed.**
+
+All 5 SpecKit scripts are present in `.specify/scripts/powershell/`:
+- `check-prerequisites.ps1` (4,805 bytes)
+- `common.ps1` (9,670 bytes)
+- `create-new-feature.ps1` (13,667 bytes)
+- `setup-plan.ps1` (1,866 bytes)
+- `update-agent-context.ps1` (23,280 bytes)
+
+On Windows, scripts run without chmod. If you get an execution policy error:
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+```
+
+---
+
+### Item 3 — Create `PROGRESS.md` at project root
+
+**Status: DONE. Created at `Event-Ticketing-Platform/PROGRESS.md`**
+
+Tracks day-by-day status and all 23 overlay fix statuses. Update at the end of every session.
+
+---
+
+### Item 4 — `MEMORY.md` — needed or auto-created?
+
+**Status: NOT NEEDED. Do not create it.**
+
+SpecKit's project memory IS `.specify/memory/constitution.md`. That is the only persistent memory file SpecKit agents read. There is no `MEMORY.md` concept in SpecKit.
+
+What you DO maintain manually: `Docs/AI_Sessions/day-{N}-handoff.md` session handoffs. These are saved by you from the SESSION HANDOFF block printed at session end. They are NOT auto-created.
+
+---
+
+## PART 7 — Your Complete Daily Workflow (The Exact Protocol Every Day)
+
+---
+
+### PHASE A — Before Opening VS Code (2 minutes)
+
+```
+1. Open PROGRESS.md → confirm which day and what is pending
+2. Open Docs/AI_Sessions/day-{N-1}-handoff.md → read "Next session start" line
+3. Open Plans/session-prompts/day-{N}-*.md → read the entire day plan
+4. Note today's fixes from the Fixes table in the session prompt
+5. Know your TDD gate: what is the first test you will write today?
+```
+
+---
+
+### PHASE B — Session Setup (3 minutes, in this exact order)
+
+#### Step 1 — Paste `intsructions.txt` as your VERY FIRST MESSAGE
+
+Open Copilot Chat. Before selecting any agent or attaching any file, paste the full
+content of `intsructions.txt`. This sets the AI's behavior, rules, and architecture
+decisions for the entire session. Raw paste — no subject line needed.
+
+#### Step 2 — Attach Files (Maximum 3 slots)
+
+| Session Type | Slot 1 (always) | Slot 2 (plan context) | Slot 3 (skill) |
+|---|---|---|---|
+| Backend implement | `Phase1A_Adjustments_and_Fixes.md` | Relevant Plan `.txt` | `java-springboot.SKILL.md` |
+| DB + Migrations | `Phase1A_Adjustments_and_Fixes.md` | Relevant Plan `.txt` | `sql-optimization.SKILL.md` |
+| N+1 / Query work | `Phase1A_Adjustments_and_Fixes.md` | Relevant Plan `.txt` | `postgresql-optimization.SKILL.md` |
+| Frontend (Next.js) | Relevant Plan `.txt` | — | — (nextjs.instructions.md auto-injects) |
+| Testing session | `Phase1A_Adjustments_and_Fixes.md` | Relevant Plan `.txt` | `java-junit.SKILL.md` |
+| Docker / CI-CD | `Phase1A_Adjustments_and_Fixes.md` | Relevant Plan `.txt` | `multi-stage-dockerfile.SKILL.md` |
+
+**Which Plan `.txt` file maps to which days:**
+
+| Days | Plan File to Attach |
+|------|---------------------|
+| Days 1–7 | `Plans/Text/Phase1A_Section 2_ExecutionMap.txt` |
+| Days 5–6 (Redis/RabbitMQ deep) | Add: `Plans/Text/Phase1A_Sections 6,7,8,9_ImplementationGuides.txt` |
+| Days 8–10 | `Plans/Text/Phase1A_Sections 6,7,8,9_ImplementationGuides.txt` |
+| Days 11–12 | `Plans/Text/Phase1A_Sections 10,11,12_EventMgmt_Pricing_Refund.txt` |
+| Days 13–15 | `Plans/Text/Phase1A_Sections 3,4,5_Frontend_Calendar_Admin.txt` |
+| Days 16–18 | `Plans/Text/Phase1A_Section 16_Testing_Deployment_And_devOps.txt` |
+| Days 19–21 | `Plans/Text/Phase1A_Sections 13,14,15_16_Practices_Troubleshooting.txt` |
+
+#### Step 3 — Select the SpecKit Agent from Dropdown
+
+For most implementation days, use this chain:
+```
+speckit.tasks → speckit.implement
+```
+(Skip `speckit.analyze` and `speckit.plan` — the session prompts have already done that layer for you.)
+
+For end-of-day or end-of-week validation:
+```
+speckit.checklist
+```
+
+#### Step 4 — Type Your First Prompt (Fill In the Template)
+
+```
+We are on Day {N} — {Theme}.
+Feature folder: {feature-name} (e.g., booking-state-machine)
+
+Active fixes for today (from Phase1A_Adjustments_and_Fixes.md):
+- Fix {X.X} — CRITICAL: {one-line description}
+- Fix {X.X} — IMPORTANT: {one-line description}
+Cross-cutting (always active): Fix CC-1 (Correlation-ID), Fix CC-2 (BusinessConstants)
+
+Pre-conditions from yesterday:
+- ./mvnw test all green ✅
+- {specific pre-condition from session prompt} ✅
+
+TDD instruction — MANDATORY:
+Write ALL test methods for today's service BEFORE any implementation code.
+Run them and confirm they FAIL (red phase) before writing the service.
+Tell me: what is the name of the first test class and first test method?
+
+Non-negotiable rules — apply silently, do not ask:
+- @RequiredArgsConstructor + private final (zero @Autowired)
+- Instant everywhere (zero LocalDateTime)
+- All constants via BusinessConstants (zero magic numbers)
+- {day-specific rule from Anti-Pattern table, e.g., @EnableStateMachineFactory on Day 8}
+
+Start with: the first test class. State its name and all test method signatures before coding.
+```
+
+---
+
+### PHASE C — During the Session
+
+Repeat this loop for each feature or task in the day:
+
+```
+STEP 1 — RED (Write Tests)
+  Write the full test class with all test methods (bodies empty or throwing NotImplemented)
+  Run: ./mvnw test -Dtest={TestClassName}
+  ALL tests must FAIL. If any pass accidentally, the test is wrong.
+
+STEP 2 — GREEN (Implement)
+  Write the service/repository/controller
+  Apply ALL overlay fixes inline — not as a separate step after
+  Run: ./mvnw test -Dtest={TestClassName}
+  ALL tests must pass.
+
+STEP 3 — REFACTOR (Clean)
+  No method > 20 lines → extract helpers
+  No raw strings for states → use enums
+  No magic numbers → use BusinessConstants
+  Run tests again to confirm green still holds.
+
+STEP 4 — COMPILE CHECK
+  Run: ./mvnw compile
+  Zero errors before moving to the next task.
+
+STEP 5 — CONFIRM FIX APPLIED
+  For each CRITICAL fix applied, state explicitly:
+  "Fix {X.X} applied in {ClassName}.java at {method name}"
+```
+
+> **The Red phase is non-negotiable.** Tests written after implementation are verification tests,
+> not design tests. They do not catch architecture problems. The Red phase does.
+
+---
+
+### PHASE D — End of Session (10 minutes)
+
+#### Step 1 — Full test suite
+```powershell
+./mvnw test
+# ALL tests must pass. Zero failures. Zero skips.
+```
+
+#### Step 2 — Git commit (conventional commit format)
+```powershell
+git add .
+git commit -m "feat(day-{N}): {what was built}
+
+Fixes applied: Fix {X.X}, Fix {X.X}
+Tests added: {N} new tests, {M} total passing"
+```
+
+Commit message examples by day type:
+- `feat(day-1): scaffold modular monolith with flyway migrations v1-v9`
+- `feat(day-5): implement inventory service with lua atomic floor guard`
+- `perf(day-6): eliminate n+1 queries with entity graph on event queries`
+- `feat(day-8): implement booking state machine with toctou guard`
+- `test(day-16): achieve 82 percent test coverage across all domains`
+
+#### Step 3 — Save the SESSION HANDOFF
+
+The AI prints a SESSION HANDOFF block at session end (defined in `intsructions.txt`).
+Copy the entire block and save it:
+```
+Docs/AI_Sessions/day-{N}-handoff.md
+```
+If you skip this step, the next session starts with no knowledge of what was built.
+
+#### Step 4 — Update `PROGRESS.md`
+- Day row: ⬜ → ✅
+- Each applied fix: ⬜ → ✅
+- Metrics: update test count and coverage %
+
+---
+
+## PART 8 — TDD Alignment Audit (All 10 Session Prompts)
+
+Result of verifying every prompt places tests BEFORE implementation (Red → Green → Refactor):
+
+| Day | Status | Evidence |
+|-----|--------|---------|
+| Day 1 | ✅ No service logic | Entities + migrations only. No TDD layer needed. |
+| Day 2 | ✅ Correct | "Step 3 — EventService Tests FIRST (Red → Green TDD)" before implementation |
+| Day 3 | ✅ Correct | "3 tests each (Red first, then implement Green)" explicit in tasks |
+| Day 4 | ✅ N/A | Frontend only. No Java tests. Coverage on Day 16. |
+| Day 5 | ✅ Fixed | Tests now in STEP 1 (Red) before STEP 2 (implement). Concurrency test is gate. |
+| Day 6 | ✅ Correct | Integration tests set up before N+1 fix is verified. Query count validates fix. |
+| Day 7 | ✅ N/A | Cleanup day. All green test run is the gate — no new services. |
+| Day 8 | ✅ Correct | "Write BookingStateMachineTest FIRST — 5 tests, all failing" is explicit. |
+| Day 9 | ✅ Fixed | Tests written in Morning (Red) before Afternoon implementation (Green). |
+| Day 10 | ⚠️ Review | Verify NotificationListenerTest is written before listener implementation. |
+
+**All prompts for Days 1–9 are now correctly TDD-ordered.**
+
+---
+
+## PART 9 — The 3 Session Types
+
+### Type A — Backend Implement (Days 1–3, 5, 7–12)
+- Paste `intsructions.txt` → attach overlay + plan + skill → agent: `speckit.implement`
+- TDD: Red → Green → Refactor mandatory for every service
+
+### Type B — Frontend (Days 4, 13, 14, 15)
+- Paste `intsructions.txt` → attach plan → standard Copilot (no SpecKit needed)
+- `nextjs.instructions.md` auto-injects for `.tsx` files
+- TDD: Not applicable for scaffold days; React component tests on Day 16
+
+### Type C — Testing / Quality (Days 6, 16, 19, 20)
+- Paste `intsructions.txt` → attach overlay + plan + `java-junit.SKILL.md`
+- Agent: `speckit.checklist` for gap analysis, `speckit.implement` to fill missing tests
+- Goal: reach and maintain 80%+ test coverage
+
+---
+
+## PART 10 — Quick-Reference Card
+
+```
+╔══════════════════════════════════════════════════════════════╗
+║  EVERY SESSION — IN THIS ORDER                              ║
+╠══════════════════════════════════════════════════════════════╣
+║  1. Read PROGRESS.md + last day's handoff doc               ║
+║  2. Read today's Plans/session-prompts/day-{N}-*.md         ║
+║  3. Open Copilot Chat                                       ║
+║  4. PASTE intsructions.txt as message 1                     ║
+║  5. Attach: overlay + plan section + skill (max 3 files)    ║
+║  6. Select speckit.tasks → speckit.implement from dropdown  ║
+║  7. Type Day N prompt using the template in Part 7          ║
+╠══════════════════════════════════════════════════════════════╣
+║  DURING SESSION — THE TDD LOOP                              ║
+╠══════════════════════════════════════════════════════════════╣
+║  Write tests → run (ALL FAIL) → implement → run (ALL PASS)  ║
+║  Apply overlay fixes inline → compile → confirm fix applied  ║
+╠══════════════════════════════════════════════════════════════╣
+║  END OF SESSION — ALL 4 STEPS                               ║
+╠══════════════════════════════════════════════════════════════╣
+║  ./mvnw test → ALL green                                    ║
+║  git commit (conventional commit format)                    ║
+║  Save handoff → Docs/AI_Sessions/day-{N}-handoff.md         ║
+║  Update PROGRESS.md (day + fixes + metrics)                 ║
+╠══════════════════════════════════════════════════════════════╣
+║  NEVER DO THESE                                             ║
+╠══════════════════════════════════════════════════════════════╣
+║  Skip the Red phase (tests before code — always)            ║
+║  Attach more than 3 files (context degrades past 3)         ║
+║  Use @Autowired / LocalDateTime / magic numbers             ║
+║  Use @EnableStateMachine (always @EnableStateMachineFactory) ║
+║  Skip saving the session handoff (next day starts blind)     ║
+╚══════════════════════════════════════════════════════════════╝
+```

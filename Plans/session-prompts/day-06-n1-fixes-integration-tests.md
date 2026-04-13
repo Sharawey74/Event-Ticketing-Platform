@@ -3,6 +3,40 @@
 
 ---
 
+## YOUR FIRST MESSAGE TO COPILOT
+> After pasting `intsructions.txt` content, send this as your next message:
+
+```
+We are on Day 6 — N+1 Query Fixes + Integration Testing.
+Feature: n1-fixes-integration-tests
+
+Active fixes today:
+- No new overlay fixes today.
+- Cross-cutting: Fix CC-1 (Correlation-ID) and Fix CC-2 (BusinessConstants).
+
+Pre-conditions confirmed:
+- Day 5 complete: InventoryService and Redis Lua script fully operational ✅
+- Docker Desktop is RUNNING ✅
+
+TDD MANDATORY — Integration Tests FIRST (Red phase):
+Write EventIntegrationTest and BookingIntegrationTest using Testcontainers before fixing N+1.
+  @Container postgres = new PostgreSQLContainer<>("postgres:17")
+  @Container redis = new GenericContainer<>("redis:7").withExposedPorts(6379)
+
+Run tests and profile query counts.
+Then fix the N+1 queries using @EntityGraph or JOIN FETCH.
+Run tests again to verify query count dropped.
+
+Non-negotiable rules:
+- Testcontainers images must use postgres:17 and redis:7 exactly.
+- Do NOT use FetchType.EAGER on any entity associations. Always use @EntityGraph.
+- @RequiredArgsConstructor everywhere.
+
+Start with: write the EventIntegrationTest to verify the EventService creates and retrieves an event with its venue and category.
+```
+
+---
+
 ## Context Briefing
 
 **What we're building today:**

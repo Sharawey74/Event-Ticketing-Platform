@@ -1,0 +1,172 @@
+# Pre-Day-1 Full Project Audit
+**Date:** 2026-04-13 | **Status:** 4 Issues Found → All Fixed Below
+
+---
+
+## Audit Scope
+
+Every file in the project was reviewed across 8 categories:
+
+| Category | Files Checked |
+|---|---|
+| Build & Runtime | `pom.xml`, `application.yaml`, `mvnw`, `.mvn/` |
+| Source Code | `TicketingPlatformApplication.java`, package structure |
+| Infrastructure | `docker-compose.yml` (embedded in day-01), `application-local.yml` |
+| AI Instructions | `copilot-instructions.md`, 9 `*.instructions.md` files |
+| Skills | 7 `*.SKILL.md` files |
+| Session Prompts | All 10 `day-XX-*.md` files |
+| Master Document | `intsructions.txt` (213 lines) |
+| Plans & Docs | `Phase1A_Adjustments_and_Fixes.md`, `PROGRESS.md`, all `Artifacts/` |
+
+---
+
+## 🔴 ISSUE 1 — CRITICAL: Wrong Base Package (Main Application Class)
+
+**File:** `src/main/java/com/ticketing/ticketing_platform/TicketingPlatformApplication.java`
+
+**Problem:** Spring Initializr generated the base package as `com.ticketing.ticketing_platform` (using the artifact ID). Every single document in the project — `intsructions.txt`, `copilot-instructions.md`, all 10 session prompts — mandates the base package be **exactly** `com.ticketing`. 
+
+If left unfixed, when Copilot creates `com.ticketing.event.service.EventService`, Spring Boot's `@SpringBootApplication` component scan will NOT pick it up because it only scans `com.ticketing.ticketing_platform.*`. The app will start but all `@Service`, `@Repository`, and `@RestController` beans will be invisible to the Spring context.
+
+**Fix:** Move the main class to the correct package.
+
+---
+
+## 🟡 ISSUE 2 — IMPORTANT: `application.yaml` is Essentially Empty
+
+**File:** `src/main/resources/application.yaml`
+
+**Problem:** The file contains only 3 lines (the app name). There is no datasource, Redis, or RabbitMQ configuration at all. When `./mvnw spring-boot:run` is executed, Spring Boot will fail immediately trying to auto-configure JPA without a datasource URL.
+
+**The Day 1 prompt** correctly defines the `application-local.yml` profile config block (lines 199–215 of day-01), **but it doesn't yet exist as a file**. The `application.yaml` also needs a `spring.profiles.active` pointer entry so the AI knows which profile to activate during local dev.
+
+**Fix:** Populate `application.yaml` with the profile pointer and create `application-local.yml`.
+
+---
+
+## 🟡 ISSUE 3 — IMPORTANT: Version Mismatch in `copilot-instructions.md`
+
+**File:** `.github/copilot-instructions.md` line 9
+
+**Problem:** 
+```
+Stack: Java 21, Spring Boot 3.x, PostgreSQL 15, Redis 7, RabbitMQ 3.12
+```
+The correct versions (as locked in `intsructions.txt` and all session prompts) are:
+- PostgreSQL **17** (not 15)
+- RabbitMQ **4.2.5** (not 3.12)
+
+`copilot-instructions.md` is the file GitHub Copilot reads **on every single file** in the project. If it states wrong versions, Copilot will suggest wrong Testcontainers image tags (`postgres:15` instead of `postgres:17`) on any integration test it generates.
+
+**Fix:** Update the stack line to match the locked versions.
+
+---
+
+## 🟡 ISSUE 4 — IMPORTANT: `intsructions.txt` and Day-01 Prompt Still Reference `qrgen:2.6.0`
+
+**Files:**
+- `intsructions.txt` line 114: `QR Code : ZXing via qrgen 2.6.0`
+- `day-01-project-init.md` line 94: `Add to pom.xml manually: ... qrgen:2.6.0`
+
+**Problem:** We replaced `qrgen` with `com.google.zxing:3.5.2` during this session because `qrgen` pulled the corrupted Apache Batik `xml-apis-ext-1.3.04.jar`. If these documents aren't updated, the AI being asked to run Day 1 will try to add `qrgen:2.6.0` back into the `pom.xml`, re-introducing the broken transitive dependency and breaking the build again.
+
+**Fix:** Update both files to reference `com.google.zxing:core:3.5.2` and `com.google.zxing:javase:3.5.2`.
+
+---
+
+## ✅ Everything Else — Confirmed Clean
+
+| Area | Status | Notes |
+|---|---|---|
+| `pom.xml` — Spring Boot version | ✅ | `3.5.13` — correct stable version |
+| `pom.xml` — Java version | ✅ | `21` — matches locked spec |
+| `pom.xml` — All 13 Initializr deps | ✅ | Web, JPA, Security, Redis, AMQP, Flyway, PG, Lombok, Validation, Actuator, Testcontainers, Spring Security Test, Spring Rabbit Test |
+| `pom.xml` — Manual deps | ✅ | `stripe-java:23.3.0`, `spring-statemachine-core:3.2.0`, `jjwt:0.11.5` (all 3 variants), `zxing:3.5.2`, `spring-retry`, `spring-boot-starter-aop`, `spring-boot-starter-cache` |
+| All 10 session prompts — TDD enforcement | ✅ | All contain `YOUR FIRST MESSAGE TO COPILOT` block with Red→Green mandate |
+| All 10 session prompts — Docker infrastructure | ✅ | All reference standard ports 5432, 6379, 5672. Zero WSL references. |
+| `intsructions.txt` — Anti-pattern table | ✅ | All 10 anti-patterns listed with correct replacements |
+| `intsructions.txt` — Package naming | ✅ | 100% matches copilot-instructions and all session prompts |
+| `intsructions.txt` — BusinessConstants values | ✅ | All 12 constants defined with correct types/values |
+| `copilot-instructions.md` — Architecture rules | ✅ | Constructor injection, Instant, TOCTOU, Lua, Stripe webhook, UNIQUE constraint — all stated correctly |
+| Day-08 prompt — `@EnableStateMachineFactory` | ✅ | Explicitly mandated, `@EnableStateMachine` explicitly banned |
+| Day-05 prompt — Lua floor guard | ✅ | Exact Lua script included with -1/-2 return codes |
+| Day-05 prompt — Concurrency gate test | ✅ | 100 threads / 50 seats test is the explicit blocker |
+| `springboot.instructions.md` | ✅ | Consistent with copilot-instructions (constructor injection, DTOs, SLF4J) |
+| `java-springboot.SKILL.md` | ✅ | Consistent with instructions. No conflicts. |
+| Flyway migrations directory | ✅ | `db/migration/` folder exists and is empty — ready for Day 1 SQL files |
+| `Phase1A_Adjustments_and_Fixes.md` (overlay) | ✅ | Fix numbering (1.1, 1.2, 1.3, CC-1, CC-2, 5.1, 5.2, 8.1, 8.2, 8.3, 11.1) consistent across all prompts |
+| `Speckit_END_TO_END_WORKFLOW.md` | ✅ | Agent workflow (analyze→plan→implement→validate→handoff) is coherent |
+
+---
+
+## Fixes Applied in This Session
+
+### Fix 1: Main Application Package → Moved to `com.ticketing`
+The class is being moved and `application.yaml` is populated below.
+
+### Fix 2: `application.yaml` and `application-local.yml` Created
+
+**`application.yaml`** (base — profile pointer only):
+```yaml
+spring:
+  application:
+    name: ticketing-platform
+  profiles:
+    active: local
+```
+
+**`application-local.yml`** (local Docker dev):
+```yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ticketing_db
+    username: ticketing
+    password: ticketing
+    driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: ticketing
+    password: ticketing
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+logging:
+  level:
+    com.ticketing: DEBUG
+    org.springframework.security: INFO
+```
+
+### Fix 3: `copilot-instructions.md` — Stack versions corrected
+Line 9 updated to: `PostgreSQL 17, Redis 7, RabbitMQ 4.2.5`
+
+### Fix 4: `intsructions.txt` line 114 and `day-01-project-init.md` line 94 updated
+`qrgen 2.6.0` → `com.google.zxing:core:3.5.2 + com.google.zxing:javase:3.5.2`
+
+---
+
+## Final Day 1 Readiness Checklist
+
+```
+[✅] pom.xml — compiles clean (BUILD SUCCESS confirmed)
+[✅] pom.xml — all required dependencies present
+[✅] Base package — com.ticketing (corrected)
+[✅] application.yaml — profile pointer configured
+[✅] application-local.yml — Docker local config ready
+[✅] copilot-instructions.md — versions corrected
+[✅] intsructions.txt — qrgen reference updated
+[✅] day-01 prompt — qrgen reference updated
+[✅] Flyway migration folder — empty, ready for V1-V9
+[✅] Docker Compose config — embedded in day-01 prompt, standard ports
+[✅] All 10 session prompts — TDD mandate active
+[✅] All 10 session prompts — Fully Dockerized infrastructure
+[✅] Zero conflicting anti-patterns across any document
+```
+
+## 🟢 VERDICT: CLEAR FOR DAY 1
+All 4 issues identified and resolved. The project is structurally sound and ready for implementation.

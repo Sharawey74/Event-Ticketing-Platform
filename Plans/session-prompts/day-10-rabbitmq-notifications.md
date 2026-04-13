@@ -3,6 +3,40 @@
 
 ---
 
+## YOUR FIRST MESSAGE TO COPILOT
+> After pasting `intsructions.txt` content, send this as your next message:
+
+```
+We are on Day 10 — RabbitMQ Consumers + Notifications.
+Feature: rabbitmq-notifications
+
+Active fixes today:
+- Fix 10.1 — IMPORTANT: Create DenyRefundNotificationAction so denied refunds notify users.
+- Fix 10.2 — IMPORTANT: QR Code generation is ASYNC via ticket.generation.queue, not inside webhook handler.
+- Cross-cutting: Fix CC-1 (Propagate X-Correlation-ID in message headers), Fix CC-2.
+
+Pre-conditions confirmed:
+- Day 9 complete: Stripe webhook functional and idempotent ✅
+- Docker Desktop is RUNNING ✅
+
+TDD MANDATORY — Integration Tests FIRST (Red phase):
+Write NotificationListenerIntegrationTest using Testcontainers (rabbitmq:4-management) BEFORE implementing the listener.
+  publishBookingConfirmedEvent_shouldGenerateQRCodeAsync_andSendEmail()
+  publishRefundDeniedEvent_shouldSendEmail()
+  publishTicketGenerationEvent_shouldSaveQRCodeToTicket()
+
+Run ./mvnw test -Dtest=NotificationListenerIntegrationTest — ALL must FAIL before coding.
+
+Non-negotiable rules:
+- QR codes MUST be generated inside the queue consumer, never in the HTTP thread handling the request/webhook.
+- X-Correlation-ID must be added to RabbitMQ message attributes.
+- Use postgres:17, redis:7, rabbitmq:4-management Testconsumers.
+
+Start with: Write NotificationListenerIntegrationTest class with test method signatures and Testcontainers setup for RabbitMQ.
+```
+
+---
+
 ## Context Briefing
 
 **What we're building today:**

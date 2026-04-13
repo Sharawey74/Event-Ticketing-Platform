@@ -1,0 +1,303 @@
+# Breakdown 1 — System Architecture & Design
+## Event Ticketing Platform — Phase 1A
+
+---
+
+## Architecture Style Classification
+
+This system uses a **Modular Monolith** architecture with **Event-Driven** messaging.  
+It is deployed as a single deployable unit (one Spring Boot JAR) but internally partitioned  
+into 7 independently extractable domain modules, connected through RabbitMQ for async  
+side-effects and sharing a single PostgreSQL database.
+
+**Secondary styles present:**
+- **Layered Architecture** within each domain (Controller → Service → Repository)
+- **Event-Driven Architecture** for notifications, QR generation, and audit trails
+- **Domain-Driven Design (lite)** — bounded contexts per domain without a full DDD implementation
+
+---
+
+## A) Principles Used in This Project
+
+---
+
+### 1. Single Responsibility Principle (SRP)
+**Definition:** Every class has exactly one reason to change.  
+**In this project:** `DistributedLockService` does one thing — acquire and release Redis locks using a Lua script. `InventoryService` manages only seat counts. `NotifyRefundDeniedAction` only publishes one RabbitMQ message. No class mixes concerns. `CorrelationIdFilter` only propagates `X-Correlation-ID` — it does not log, authenticate, or validate.
+
+---
+
+### 2. Open/Closed Principle (OCP)
+**Definition:** A class is open for extension but closed for modification.  
+**In this project:** The state machine transition table in `BookingStateMachineConfig` is built using Spring's `StateMachineConfigurerAdapter`. Adding a new state (e.g., `WAITLISTED`) or a new transition (e.g., `REFUND_APPROVED → REFUNDED`) requires only a new `.and().withExternal()` block — existing transitions are untouched. Similarly, new pricing strategies (early bird, group, dynamic) each implement a `PricingStrategy` interface — adding surge pricing for weekends requires a new class, not modifying `PricingEngineService`.
+
+---
+
+### 3. Liskov Substitution Principle (LSP)
+**Definition:** Subtypes must be substitutable for their base types without breaking behavior.  
+**In this project:** All state machine `Guard<BookingState, BookingEvent>` implementations (`CheckInGuard`, `SeatsAvailableGuard`) are interchangeable in the state machine config wiring. `HealthIndicator` implementations (`InventoryWarmupHealthIndicator`) are substitutable anywhere Spring Actuator expects a `HealthIndicator`. Anywhere a `JpaRepository` is expected, Spring's generated proxy is substituted at runtime.
+
+---
+
+### 4. Interface Segregation Principle (ISP)
+**Definition:** Clients should not be forced to depend on methods they do not use.  
+**In this project:** `Guard<S, E>` and `Action<S, E>` are narrow Spring State Machine interfaces — guards implement only `evaluate()`, actions implement only `execute()`. `HealthIndicator` requires only `health()`. Rather than one large `BookingOperations` interface, responsibilities are split: `BookingService` (reservation logic), `BookingStateMachineService` (state transitions), `DistributedLockService` (locking) — callers depend only on the interface they need.
+
+---
+
+### 5. Dependency Inversion Principle (DIP)
+**Definition:** High-level modules depend on abstractions, not concrete implementations.  
+**In this project:** Every `@Service` class depends on `JpaRepository` interfaces, not concrete Hibernate implementations. `BookingService` depends on `InventoryService` (a Spring bean interface), not on `RedisInventoryServiceImpl`. Constructor injection via `@RequiredArgsConstructor` enforces this at compile time — the field type is always the interface, Spring provides the implementation.
+
+---
+
+### 6. DRY — Don't Repeat Yourself
+**Definition:** Every piece of knowledge has a single, authoritative representation.  
+**In this project:** `BusinessConstants.java` is the single definition for every numeric business rule: `RESERVATION_TTL_SECONDS = 300`, `FULL_REFUND_DAYS_THRESHOLD = 7`, `DYNAMIC_PRICING_THRESHOLD = 0.80`. No service hardcodes `300` or `0.80` — all reference `BusinessConstants`. The `CorrelationIdFilter` is one class that covers every HTTP request — the correlation ID logic is not repeated in each controller.
+
+---
+
+### 7. Separation of Concerns (SoC)
+**Definition:** Different logical responsibilities live in different, non-overlapping layers.  
+**In this project:** Controllers (`EventController`) handle HTTP only — they do not call repositories directly. Services (`EventService`) hold business logic — they do not construct `ResponseEntity`. Repositories (`BookingRepository`) handle data access — they do not validate business rules. DTOs decouple the API schema from JPA entity structure. `CorrelationIdFilter` handles observability. `JwtFilter` handles authentication. No concern bleeds into another layer.
+
+---
+
+### 8. Fail Fast
+**Definition:** Detect and surface errors as early as possible before they propagate.  
+**In this project:** The fast-fail availability check in `BookingService.reserveTickets()` (before acquiring the Redis lock) rejects requests with zero inventory immediately — before any lock acquisition, DB write, or state machine transition. `@Valid` on all controller DTOs fails the request at the HTTP boundary before reaching the service layer. `Flyway` fails application startup if any migration is invalid — the app never boots into a broken DB state.
+
+---
+
+### 9. Defense in Depth (Two-Layer Correctness)
+**Definition:** Critical paths are protected by multiple independent safety mechanisms, so a single failure does not cause a correctness bug.  
+**In this project:** Inventory oversell prevention has two independent guards: (1) the Redis Lua floor guard in `InventoryService.reserveSeat()` — atomically rejects decrements below zero, and (2) the TOCTOU double-check inside the distributed lock body in `BookingService.reserveTickets()`. Either alone is insufficient; both together guarantee correctness. Stripe idempotency similarly has two guards: an application-level `existsBy` check plus a DB `UNIQUE` constraint on `processed_stripe_events.stripe_event_id`.
+
+---
+
+### 10. Idempotency
+**Definition:** Performing an operation multiple times produces the same result as performing it once.  
+**In this project:** The Stripe webhook handler is idempotent: if Stripe delivers the same `checkout.session.completed` event twice, the second delivery hits the `UNIQUE` constraint on `stripe_event_id`, throws `DataIntegrityViolationException`, is caught, logged, and silently ignored — no duplicate booking, no duplicate state transition. The `releaseSeat()` operation on expiry is also idempotent: if the expiry job runs twice on the same booking, the second state machine send fails gracefully because `EXPIRED` is a terminal state with no further outgoing transitions.
+
+---
+
+### 11. Immutability by Default
+**Definition:** Fields that do not change after construction are marked as unchangeable, preventing accidental mutation.  
+**In this project:** All injected dependencies are `private final` (enforced by `@RequiredArgsConstructor`). The Lua script strings in `InventoryService` and `DistributedLockService` are `private static final String`. `BusinessConstants` has a private constructor and all fields are `static final` — it is un-instantiable and un-mutable.
+
+---
+
+### 12. Explicit Over Implicit
+**Definition:** Behavior should be declared clearly in code, not rely on hidden defaults or side effects.  
+**In this project:** Every service class is annotated `@Transactional(readOnly = true)` at the class level, with write methods explicitly overriding to `@Transactional` — the intent of every method (read vs. write) is visible without reading the implementation. `@PreAuthorize("hasRole('ORGANIZER')")` on `checkIn()` makes authorization requirements visible at the method signature level without requiring knowledge of Security config internals.
+
+---
+
+### 13. Single Source of Truth
+**Definition:** One canonical location holds authoritative data; all other representations are derived from it.  
+**In this project:** PostgreSQL is the source of truth for all booking, payment, and inventory state. Redis holds fast-read inventory counts but is always populated FROM PostgreSQL (warm-up on `@PostConstruct`). If Redis is unavailable, `getAvailableCount()` falls back to the DB. The DB `version` column (optimistic lock) is the authoritative lock counter — not an application variable.
+
+---
+
+---
+
+## B) Patterns Used in This Project
+
+---
+
+### 1. State Pattern
+**Definition:** An object changes its behavior based on its internal state, with each state represented as a distinct object.  
+**Layer:** Domain / Business Logic  
+**Implementing class:** `BookingStateMachineConfig` (Spring State Machine). The `Booking` entity has 11 possible states (`RESERVED`, `PAYMENT_PENDING`, `CONFIRMED`, `ATTENDED`, `EXPIRED`, `PAYMENT_FAILED`, `REFUND_REQUESTED`, `REFUND_APPROVED`, `REFUND_DENIED`, `CANCELLED`, `RELEASED`). The state machine config defines which transitions are valid from each state, what guards must pass, and what actions fire — the booking's behavior for any given event (e.g., `PAYMENT_SUCCESS`) depends entirely on its current state.
+
+---
+
+### 2. Repository Pattern
+**Definition:** Abstracts data persistence behind an interface, so the service layer works with domain objects without knowing how they are stored.  
+**Layer:** Data Access  
+**Implementing classes:** `EventRepository`, `BookingRepository`, `PaymentRepository`, `UserRepository`, `ProcessedStripeEventRepository` — all extend `JpaRepository<T, Long>`. Services call `bookingRepository.findByStateAndExpiresAtBefore(BookingState.RESERVED, Instant.now())` without any SQL knowledge.
+
+---
+
+### 3. Factory Pattern
+**Definition:** Delegates object creation to a factory rather than calling constructors directly, enabling runtime selection of the concrete type.  
+**Layer:** Infrastructure / State Machine  
+**Implementing class:** `BookingStateMachineConfig` uses `@EnableStateMachineFactory` — the factory creates a **new, isolated state machine instance per booking request**, preventing the shared-singleton race condition that `@EnableStateMachine` would cause. `BookingStateMachineService` calls `stateMachineFactory.getStateMachine(bookingId.toString())` to get a request-scoped machine.
+
+---
+
+### 4. Strategy Pattern
+**Definition:** A family of interchangeable algorithms is encapsulated behind a common interface; the correct algorithm is selected at runtime.  
+**Layer:** Business Logic  
+**Implementing classes:** `PricingEngineService` applies multiple pricing strategies in sequence: `EarlyBirdPricingStrategy` (checks `EARLY_BIRD_DAYS_THRESHOLD`), `GroupPricingStrategy` (checks `GROUP_DISCOUNT_MIN_QUANTITY`), `DynamicPricingStrategy` (checks `DYNAMIC_PRICING_THRESHOLD`). Each implements a common `PricingStrategy` interface with an `apply(PricingContext ctx)` method. New strategies are added without modifying the engine.
+
+---
+
+### 5. Observer Pattern (via Message Broker)
+**Definition:** When one object changes state, all registered dependents are notified automatically.  
+**Layer:** Infrastructure / Messaging  
+**Implementing classes:** `BookingStateMachineConfig` transition actions publish events to RabbitMQ (`ConfirmBookingAction`, `NotifyRefundDeniedAction`, `GenerateQRCodeAction`). `NotificationListener` and `QRCodeGenerationListener` observe these events asynchronously. Neither the state machine nor the service knows how many observers exist — RabbitMQ is the decoupling mechanism.
+
+---
+
+### 6. Command Pattern
+**Definition:** Encapsulates a request as an object, enabling queuing, logging, and parameterization of operations.  
+**Layer:** Messaging / State Machine  
+**Implementing classes:** `BookingEvent` enum values (`ADD_TO_CART`, `PAYMENT_SUCCESS`, `TIMER_EXPIRED`, `EVENT_CANCELLED`) are commands sent to the state machine via `bookingStateMachineService.sendEvent(bookingId, BookingEvent.PAYMENT_SUCCESS)`. `GenerateQRCodesCommand` is a command object published to `ticket.generation.queue` — it encapsulates the intent (generate QR codes for booking X) without the caller knowing how or when it executes.
+
+---
+
+### 7. Facade Pattern
+**Definition:** Provides a simplified interface to a complex subsystem, hiding its internal complexity.  
+**Layer:** Service / Integration  
+**Implementing class:** `PaymentService` is a facade over the Stripe Java SDK. Callers (`BookingService`, `WebhookController`) interact with `paymentService.createCheckoutSession()` and `paymentService.handleStripeWebhook()` — they never touch `com.stripe.model.checkout.Session`, `Webhook.constructEvent()`, or `StripeException` directly. All Stripe SDK complexity is contained within `PaymentService`.
+
+---
+
+### 8. Decorator / Filter Chain Pattern
+**Definition:** Adds behavior to an object by wrapping it in another object with the same interface, without changing the original.  
+**Layer:** Infrastructure / Web  
+**Implementing classes:** `CorrelationIdFilter extends OncePerRequestFilter` wraps every incoming HTTP request, adding `X-Correlation-ID` to MDC before the request chain runs and removing it after. `JwtFilter extends OncePerRequestFilter` wraps every request to extract and validate the JWT before reaching any controller. Both are transparent decorators on the servlet request.
+
+---
+
+### 9. Builder Pattern
+**Definition:** Constructs complex objects step by step, separating construction from representation.  
+**Layer:** DTO / Model  
+**Implementing classes:** Lombok `@Builder` on every DTO and domain event: `BookingResponse.builder().bookingId(id).state(state).build()`, `RefundDeniedEvent.builder().bookingId(...).userId(...).build()`, `GenerateQRCodesCommand.builder().bookingId(bookingId).build()`. Prevents telescoping constructor anti-pattern on objects with 8+ fields.
+
+---
+
+### 10. Template Method Pattern
+**Definition:** Defines the skeleton of an algorithm in a base class, with specific steps overridden by subclasses.  
+**Layer:** Infrastructure / Web Filters  
+**Implementing classes:** `OncePerRequestFilter` (Spring) defines the template: check if already filtered → call `doFilterInternal()` → continue chain. `CorrelationIdFilter` and `JwtFilter` implement only `doFilterInternal()` — the once-per-request guarantee is inherited from the template, not reimplemented.
+
+---
+
+### 11. Health Indicator Pattern (Spring-specific)
+**Definition:** A component reports its readiness status to an external health-check system, blocking traffic until it is ready.  
+**Layer:** Infrastructure / Observability  
+**Implementing class:** `InventoryWarmupHealthIndicator implements HealthIndicator`. Returns `Health.down()` during Redis warm-up, `Health.up()` after `@PostConstruct` completes. Railway's load balancer polls `/actuator/health/readiness` — no traffic is routed to the instance until warm-up is complete.
+
+---
+
+### 12. Outbox-Adjacent / Idempotency Table Pattern
+**Definition:** Tracks processed external events in a DB table so duplicate deliveries are silently rejected without duplicate processing.  
+**Layer:** Data / Integration  
+**Implementing class:** `ProcessedStripeEvent` entity + `processed_stripe_events` table with `UNIQUE(stripe_event_id)`. This is a lightweight version of the full Outbox Pattern — it solves the duplicate-delivery problem but not the at-least-once publishing problem (the full Outbox Pattern would also guarantee at-least-once delivery of outgoing messages).
+
+---
+
+### 13. Unit of Work Pattern
+**Definition:** Tracks all objects modified during a business operation and flushes all changes to the database in a single transaction.  
+**Layer:** Data Access  
+**Implementing class:** Hibernate / Spring's `@Transactional`. When `BookingService.reserveTickets()` runs inside a transaction, all entity changes (`booking.setState(RESERVED)`, `tier.setAvailableCount(n-1)`) accumulate in the Hibernate Session. They are flushed atomically to PostgreSQL when the `@Transactional` boundary commits.
+
+---
+
+### 14. Data Transfer Object (DTO) Pattern
+**Definition:** A plain object used exclusively to carry data across layer or process boundaries, with no business logic.  
+**Layer:** API Boundary  
+**Implementing classes:** `CreateEventRequest`, `EventResponse`, `ReserveTicketsRequest`, `BookingResponse`, `CheckoutSessionResponse`. JPA entities (`Event`, `Booking`, `User`) are never serialized to JSON directly — only DTOs cross the controller boundary. This prevents accidental exposure of lazy-loaded associations and internal fields.
+
+---
+
+### 15. Distributed Lock Pattern
+**Definition:** Uses an external, shared store (Redis) to coordinate mutual exclusion across multiple application instances.  
+**Layer:** Infrastructure / Concurrency  
+**Implementing class:** `DistributedLockService` — uses a Redis Lua script to atomically acquire a lock (`SET key value NX EX ttl`) and release it only if the lock value matches (ownership-checked release, preventing a process from releasing another process's lock). Used by `BookingService` and `ReservationExpirationJob`.
+
+---
+
+### 16. Scheduled Job Pattern
+**Definition:** A background task runs on a fixed time interval to perform maintenance operations without user interaction.  
+**Layer:** Infrastructure / Background Processing  
+**Implementing class:** `ReservationExpirationJob` annotated with `@Scheduled(fixedDelay = BusinessConstants.EXPIRY_JOB_INTERVAL_MS)`. Queries for bookings in `RESERVED` state where `expires_at < Instant.now()` every 30 seconds, sends `TIMER_EXPIRED` to the state machine for each, triggering `ReleaseSeatsAction`.
+
+---
+
+### 17. Retry Pattern
+**Definition:** Automatically retries a failed operation a limited number of times before giving up, handling transient failures gracefully.  
+**Layer:** Business Logic  
+**Implementing class:** `@Retryable(value = ObjectOptimisticLockingFailureException.class, maxAttempts = 3, backoff = @Backoff(delay = 100, multiplier = 2.0))` on `BookingService.reserveTickets()`. If two threads clash on the JPA `@Version` field, Spring Retry transparently retries the entire transaction up to 3 times with exponential backoff.
+
+---
+
+## Enterprise Patterns Present
+
+| Pattern | Enterprise Classification | Where in this project |
+|---------|--------------------------|----------------------|
+| Service Layer | P of EAA (Fowler) | All `@Service` classes |
+| Repository | P of EAA (Fowler) | All `JpaRepository` extensions |
+| Data Mapper | P of EAA (Fowler) | Hibernate ORM mapping entities to tables |
+| Unit of Work | P of EAA (Fowler) | Hibernate + `@Transactional` |
+| DTO | P of EAA (Fowler) | All `*Request` / `*Response` classes |
+| Value Object | DDD | `BookingState`, `BookingEvent` enums |
+| Aggregate Root | DDD (lite) | `Booking` entity (owns `Ticket`, `Payment`) |
+| Domain Event | DDD | `BookingConfirmedEvent`, `RefundDeniedEvent` RabbitMQ messages |
+| Anti-Corruption Layer | DDD | `PaymentService` wrapping Stripe SDK |
+
+---
+
+## C) Principles and Patterns NOT Used (But Relevant)
+
+---
+
+### 1. CQRS — Command Query Responsibility Segregation
+**Why not used:** CQRS separates read models from write models, typically using different storage or schemas for each. This project uses a single PostgreSQL database for both reads and writes, and the same JPA entities serve both purposes. The complexity overhead is unjustified for Phase 1A traffic levels.  
+**Phase 1B relevance:** YES — when event search volume (reads) vastly outpaces booking writes, a dedicated read model (Elasticsearch for events, denormalized Redis for booking summaries) becomes necessary.
+
+---
+
+### 2. Event Sourcing
+**Why not used:** Event sourcing stores every state change as an immutable event, rebuilding current state by replaying the log. This project stores only the current state in PostgreSQL (`booking.state = CONFIRMED`). The state machine transitions are ephemeral. Implementing event sourcing would require an event store table, a projection rebuild mechanism, and significantly more infrastructure.  
+**Phase 1B relevance:** PARTIAL — an audit log table (storing state transition records) gives most of the audit benefit at a fraction of the complexity. Full event sourcing is relevant if regulatory compliance requires full state reconstruction at any point in time.
+
+---
+
+### 3. Saga Pattern
+**Why not used:** Sagas coordinate multi-step distributed transactions across services with compensating actions. This project is a modular monolith — the booking, payment, and inventory operations happen within one Spring transaction + state machine, not across separate services. No cross-service compensation is needed.  
+**Phase 1B relevance:** YES — when the monolith is split into microservices (booking service, payment service, inventory service), each in its own DB, the Saga pattern becomes the only correct way to coordinate "reserve seat → create payment → confirm booking" across service boundaries.
+
+---
+
+### 4. Outbox Pattern (Full)
+**Why not used:** The full Outbox Pattern writes domain events to a DB table inside the same transaction as the state change, then a separate publisher process reliably sends them to the message broker. This project uses a lightweight version — it writes to `processed_stripe_events` for idempotency but publishes to RabbitMQ directly from within the `@Transactional` service method. If the RabbitMQ publish fails after the DB commits, the notification is lost.  
+**Phase 1B relevance:** YES — as notification reliability becomes a contractual SLA (e.g., guaranteed email delivery), the full Outbox Pattern prevents the "DB committed but message lost" gap.
+
+---
+
+### 5. Circuit Breaker
+**Why not used:** A circuit breaker stops calling a failing downstream service (e.g., Stripe API) when failures exceed a threshold, returning a fallback instead of waiting for timeouts. This project has no Resilience4j or similar library. Stripe failures currently propagate as exceptions to the controller.  
+**Phase 1B relevance:** YES — at production load, a Stripe API outage would cause cascading timeouts across all HTTP threads processing booking → checkout flows. A circuit breaker opens after a threshold of Stripe failures and returns `SERVICE_UNAVAILABLE` immediately.
+
+---
+
+### 6. Bulkhead Pattern
+**Why not used:** Bulkheads isolate thread pools per downstream dependency, preventing one slow service from exhausting all threads and taking down unrelated features. This project uses a single shared HikariCP connection pool and a single Spring thread pool for all requests.  
+**Phase 1B relevance:** YES — a slow Stripe API consuming all HTTP threads would block event browsing (which needs no Stripe). Separate thread pools for booking and event operations would isolate the blast radius.
+
+---
+
+### 7. API Gateway Pattern
+**Why not used:** An API gateway handles cross-cutting concerns (rate limiting, auth, routing) at the network edge before requests reach the application. This project handles JWT validation and rate limiting inside the Spring Boot app itself (`JwtFilter`, `SecurityConfig`).  
+**Phase 1B relevance:** YES — when the frontend, mobile app, and third-party integrators all need different auth strategies and rate limits, a dedicated API Gateway (Kong, AWS API Gateway) moves those concerns out of the application.
+
+---
+
+### 8. Strangler Fig Pattern
+**Why not used:** Used to incrementally migrate a monolith to microservices by routing specific routes to new services while the monolith handles the rest. Not applicable until Phase 1A is complete and there is a working monolith to strangle.  
+**Phase 1B relevance:** YES — the recommended extraction path is: inventory service first (highest concurrency requirements), then notification service (stateless, easiest), then payment service.
+
+---
+
+### 9. SOLID — Liskov on Entities
+**Why partially not applied:** JPA entity inheritance (`@Inheritance`) is not used. All 9 entities are flat, non-hierarchical. The refund logic for `REFUND_APPROVED` vs `REFUND_DENIED` is handled by the state machine, not by polymorphic entity types.  
+**Relevance:** Low for Phase 1A. If future ticket types (physical, digital, VIP bundle) need different behavior, a `Ticket` entity hierarchy would apply LSP correctly.
+
+---
+
+### 10. Hexagonal Architecture (Ports and Adapters)
+**Why not used:** Hexagonal architecture strictly isolates the domain from infrastructure by defining "ports" (interfaces) and "adapters" (implementations). This project uses a softer layered approach — services directly use `JpaRepository` and `RabbitTemplate`, not abstract ports. Pure hexagonal would require `BookingRepository` to be a domain-defined interface in `com.ticketing.booking.domain`, implemented by an adapter in `com.ticketing.booking.infrastructure`.  
+**Phase 1B relevance:** YES — if the project needs to support multiple DB backends (e.g., switch from PostgreSQL to CockroachDB for global distribution), hexagonal ports make the adapter the only thing that changes.

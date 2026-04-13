@@ -3,6 +3,42 @@
 
 ---
 
+## YOUR FIRST MESSAGE TO COPILOT
+> After pasting `intsructions.txt` content, send this as your next message:
+
+```
+We are on Day 3 — Venue, Category, and Event Search.
+Feature: venue-category-search
+
+Active fixes today:
+- Fix CC-1 — GOOD: X-Correlation-ID on all log statements
+- Fix CC-2 — IMPORTANT: BusinessConstants for all values (no magic numbers)
+
+Pre-conditions confirmed:
+- Day 2 complete: ./mvnw test passes 7/7 ✅
+- EventService + EventController fully operational ✅
+- GlobalExceptionHandler returning correct HTTP codes ✅
+- Docker Desktop is running ✅
+
+TDD MANDATORY:
+Write ALL VenueService and CategoryService test methods BEFORE implementing them.
+Run ./mvnw test -Dtest=VenueServiceTest,CategoryServiceTest — ALL must FAIL first.
+At minimum write 3 tests each (Red first, then implement Green):
+  createVenue_withValidData_shouldPersistAndReturn()
+  getVenue_withInvalidId_shouldThrowNotFoundException()
+  listVenues_shouldReturnPaginatedResult()
+
+Non-negotiable rules:
+- @Transactional(readOnly=true) at class level
+- @RequiredArgsConstructor + private final
+- Instant everywhere
+- EventSearchService uses @EntityGraph to prevent N+1
+
+Start with: write VenueServiceTest class with 3 failing test stubs.
+```
+
+---
+
 ## Context Briefing
 
 **What we're building today:**

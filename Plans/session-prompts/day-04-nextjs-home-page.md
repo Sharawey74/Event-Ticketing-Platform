@@ -3,6 +3,39 @@
 
 ---
 
+## YOUR FIRST MESSAGE TO COPILOT
+> After pasting `intsructions.txt` content, send this as your next message:
+
+```
+We are on Day 4 — Next.js Frontend Initialization + Home Page.
+Feature: nextjs-home-page
+
+Active fixes today:
+- No overlay fixes specifically for Day 4.
+- Cross-cutting: API_URL must come from NEXT_PUBLIC_API_URL env var (never hardcoded).
+
+Pre-conditions confirmed:
+- Day 3 complete: all backend services running ✅
+- GET /api/events returns paginated data ✅
+- GET /api/search/events?q= returns filtered data ✅
+- Docker Desktop is running ✅
+
+This is a FRONTEND day (Next.js/TypeScript). No Java TDD today.
+nextjs.instructions.md auto-injects for all .tsx files — no manual attachment needed.
+React Query handles server state. Zustand handles client state.
+
+Non-negotiable rules:
+- NEXT_PUBLIC_API_URL env var for all API calls (never hardcode Railway URL)
+- Axios instance in lib/api.ts with base URL + JWT interceptor
+- All fetches via React Query (useQuery, useMutation) — no raw fetch()
+- TypeScript strict mode: no 'any' types
+
+Start with: scaffold the Next.js 14 project with npx create-next-app@latest.
+Confirm the project compiles (npm run build) before implementing any page.
+```
+
+---
+
 ## Context Briefing
 
 **What we're building today:**

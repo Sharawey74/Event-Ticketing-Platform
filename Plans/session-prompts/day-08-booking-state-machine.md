@@ -3,6 +3,46 @@
 
 ---
 
+## YOUR FIRST MESSAGE TO COPILOT
+> After pasting `intsructions.txt` content, send this as your next message:
+
+```
+We are on Day 8 — Booking State Machine.
+Feature: booking-state-machine
+
+Active fixes today:
+- Fix 8.1 — CRITICAL: reserveTickets() inside-lock double availability check
+- Fix 8.2 — IMPORTANT: CHECK_IN has two guards (@PreAuthorize AND IsEventOrganizerGuard)
+- Fix 8.3 — IMPORTANT: ReservationExpirationJob distributed lock
+- Fix 11.1 — IMPORTANT: Add CANCELLED state and EVENT_CANCELLED event
+- Cross-cutting: Fix CC-1, Fix CC-2
+
+Pre-conditions confirmed:
+- Week 1 complete: ./mvnw test all green ✅
+- Docker Desktop is RUNNING ✅
+
+TDD MANDATORY — Start with tests FIRST (Red phase):
+Write BookingStateMachineTest BEFORE wiring up the BookingStateMachineConfig or BookingService.
+  transition_fromAvailableToReserved_shouldLockSeatsInRedis()
+  transition_fromReservedToExpired_afterFiveMinutes_shouldReleaseSeats()
+  transition_fromPaymentPendingToConfirmed_shouldGenerateQRCode()
+  transition_toConfirmed_shouldFireConfirmBookingAction()
+  invalidTransition_fromConfirmedToReserved_shouldThrowException()
+
+Run ./mvnw test -Dtest=BookingStateMachineTest — ALL 5 must FAIL before coding.
+
+Non-negotiable rules:
+- @EnableStateMachineFactory MUST be used — NEVER @EnableStateMachine
+- Constructor injection via @RequiredArgsConstructor
+- All timestamps: Instant (UTC)
+- BookingState enum values from enums only — no raw strings
+- Use BusinessConstants.RESERVATION_TTL_SECONDS and EXPIRY_JOB_INTERVAL_MS
+
+Start by: Write BookingStateMachineTest with 5 tests, starting with bodies throwing NotImplemented. Confirm they all fail.
+```
+
+---
+
 ## Context Briefing
 
 **What we're building today:**

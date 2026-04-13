@@ -1,0 +1,305 @@
+# Breakdown 2 — Database
+## Event Ticketing Platform — Phase 1A
+
+The system uses one PostgreSQL 15 database with 9 tables, managed entirely by Flyway  
+migrations (V1–V9), with Redis as a fast read/lock cache layer. PostgreSQL is the  
+authoritative source of truth for all data; Redis holds derived, re-computable state.
+
+---
+
+## A) Schema Concepts Used
+
+---
+
+### 1. Surrogate Primary Key (BIGSERIAL / BIGINT AUTO_INCREMENT)
+**Definition:** A system-generated numeric identifier used as the row's unique identity, independent of any business data.  
+**In this project:** Every table uses `id BIGSERIAL PRIMARY KEY`: `users.id`, `events.id`, `bookings.id`, `tickets.id`, `payments.id`. Business identifiers (Stripe session IDs, QR codes) are stored as separate columns, never used as primary keys. This prevents primary key instability when business data changes.
+
+---
+
+### 2. Foreign Keys with Referential Integrity
+**Definition:** A column in one table that references the primary key of another table, enforced at the database level to prevent orphaned rows.  
+**In this project:**
+- `bookings.user_id` → `users.id`
+- `bookings.event_id` → `events.id`
+- `tickets.booking_id` → `bookings.id`
+- `ticket_tiers.event_id` → `events.id`
+- `payments.booking_id` → `bookings.id`
+- `refunds.payment_id` → `payments.id`
+
+PostgreSQL enforces these — attempting to delete an `event` row that has `bookings` will be rejected unless cascade rules are defined.
+
+---
+
+### 3. Cascade Rules
+**Definition:** When a parent row is deleted or updated, cascade rules define whether child rows are automatically deleted, updated, or rejected.  
+**In this project:** `tickets` uses `ON DELETE CASCADE` relative to `bookings` — when a booking is hard-deleted (test cleanup only; production uses soft delete), its tickets are automatically removed. `payments` and `refunds` do NOT use cascade delete — payment records must survive event cancellation for financial audit.
+
+---
+
+### 4. TIMESTAMPTZ (Timestamp With Time Zone)
+**Definition:** A PostgreSQL column type that stores a UTC timestamp — all values are normalized to UTC on write, eliminating timezone ambiguity.  
+**In this project:** Every date/time column uses `TIMESTAMPTZ`, not `TIMESTAMP WITHOUT TIME ZONE`: `bookings.expires_at`, `bookings.created_at`, `events.start_date`, `events.end_date`, `payments.paid_at`, `processed_stripe_events.processed_at`. Enforced by Fix 1.1 across all 9 Flyway migrations. Corresponds to `java.time.Instant` in JPA entities.
+
+---
+
+### 5. PostgreSQL ENUM Type
+**Definition:** A database-native enumerated type that restricts a column to a predefined set of string values, enforced at the database level.  
+**In this project:** `CREATE TYPE user_role AS ENUM ('USER', 'ORGANIZER', 'ADMIN')` in `V1__create_users_table.sql`. The `users.role` column uses `user_role`, not `VARCHAR(20)`. An application transmitting `"ORGANISER"` (British spelling typo) would receive a DB-level error rather than silently storing bad data.
+
+---
+
+### 6. Unique Constraints
+**Definition:** A database constraint that ensures no two rows in a column (or column combination) have the same value.  
+**In this project:**
+- `CONSTRAINT uq_stripe_event_id UNIQUE (stripe_event_id)` on `processed_stripe_events` — the hard idempotency guard for concurrent Stripe webhook delivery (see Fix 9.2)
+- `UNIQUE(email)` on `users` — no two accounts share an email address
+- `UNIQUE(tier_id, booking_id)` on `tickets` — if applicable per tier policy
+
+---
+
+### 7. Optimistic Locking Version Column
+**Definition:** A numeric column that increments on every update; if two concurrent transactions read the same version and both try to update, only the first succeeds — the second sees a stale version and fails with a concurrency exception.  
+**In this project:** `bookings.version BIGINT DEFAULT 0` in `V5__create_bookings_and_tickets.sql`. Mapped in `Booking.java` as `@Version Long version`. JPA/Hibernate manages the version increment automatically. On conflict, Spring throws `ObjectOptimisticLockingFailureException`, caught by `@Retryable` in `BookingService.reserveTickets()`.
+
+---
+
+### 8. Soft Delete Column
+**Definition:** Rather than physically removing a row (which destroys the audit trail), a `deleted_at` timestamp column marks the row as logically deleted; all queries filter it out.  
+**In this project:** `bookings.deleted_at TIMESTAMPTZ NULL DEFAULT NULL` added in `V5__create_bookings_and_tickets.sql` (Fix 1.3). `Booking.java` has `private Instant deletedAt`. The cancellation flow sets `deletedAt = Instant.now()` instead of calling `bookingRepository.delete()`. `@Where(clause = "deleted_at IS NULL")` on the entity ensures normal queries never see cancelled bookings.
+
+---
+
+### 9. Composite Indexes
+**Definition:** An index on two or more columns together, optimizing queries that filter on all indexed columns simultaneously.  
+**In this project:** `V7__create_indexes.sql` defines:
+- `CREATE INDEX idx_bookings_user_state ON bookings(user_id, state)` — optimizes `GET /api/users/{id}/bookings?state=CONFIRMED`
+- `CREATE INDEX idx_events_status_date ON events(status, start_date)` — optimizes the event listing page filter
+- `CREATE INDEX idx_tickets_booking ON tickets(booking_id)` — optimizes eager-loading all tickets for a booking
+
+---
+
+### 10. Partial Indexes
+**Definition:** An index that only indexes rows satisfying a `WHERE` condition, making the index smaller and faster than a full column index.  
+**In this project:** `CREATE INDEX idx_bookings_reserved_expiry ON bookings(expires_at) WHERE state = 'RESERVED'` in `V7__create_indexes.sql`. The `ReservationExpirationJob` queries `WHERE state = 'RESERVED' AND expires_at < now()` every 30 seconds. This partial index only contains rows in the `RESERVED` state — far smaller than an index on all bookings, and the query uses it directly.
+
+---
+
+### 11. Junction / Association Table Pattern
+**Definition:** A table that resolves a many-to-many relationship by holding foreign keys from both sides plus any relationship-specific attributes.  
+**In this project:** `bookings` acts as the junction between `users` and `events` (a user attends many events through many bookings; an event has many users). `tickets` extends this with per-seat line items. `ticket_tiers` connects `events` to pricing configurations.
+
+---
+
+### 12. Normalization (3NF)
+**Definition:** Organizing data so every non-key attribute depends only on the primary key, not on other non-key attributes, eliminating redundancy.  
+**In this project:** Event information is stored once in `events`; `bookings` reference `event_id` rather than copying event title, date, or venue. `venues` and `categories` are normalized into separate tables rather than denormalized into `events`. `ticket_tiers` holds pricing per tier rather than repeating prices in each `ticket` row. The system is in approximately 3NF.
+
+---
+
+### 13. Flyway Migration Versioning
+**Definition:** Database schema changes are stored as numbered, sequential, immutable SQL scripts that Flyway applies in order and tracks in its own `flyway_schema_history` table.  
+**In this project:** 9 migration files (`V1__create_users_table.sql` through `V9__seed_data.sql`). Once applied to any environment, a migration is immutable — modifying V3 after it's been applied causes `FlywayValidateException` and prevents app startup. New changes (e.g., Fix 12.1's `refund_denial_reason`) always use the next available version number (`V10__add_refund_denial.sql`).
+
+---
+
+### 14. Seed Data Migration
+**Definition:** A migration that populates reference/master data required for the system to function correctly from the first boot.  
+**In this project:** `V9__seed_data.sql` inserts 5 event categories and 3 venues. These rows are required before any event can be created (due to the `events.category_id` and `events.venue_id` foreign keys).
+
+---
+
+## B) Database Theorems and Consistency Concepts
+
+---
+
+### 1. ACID — Atomicity, Consistency, Isolation, Durability
+**Definition:** The four properties that guarantee database transactions are processed reliably: all operations in a transaction succeed together or all are rolled back; the DB moves from one valid state to another; concurrent transactions don't see each other's partial work; committed data survives crashes.  
+**In this project:** PostgreSQL provides ACID for all operations. Atomicity: the booking creation + inventory decrement inside `@Transactional` either both commit or both roll back — no booking exists with inventory not decremented. Durability: once Stripe webhook returns 200 (after the transaction commits), the booking state change survives a server crash. JPA's `@Transactional` annotation demarcates the ACID boundary.
+
+---
+
+### 2. CAP Theorem (Brewer's Theorem)
+**Definition:** A distributed system can guarantee at most two of three properties: Consistency (all nodes see the same data), Availability (every request gets a response), and Partition tolerance (the system works despite network splits).  
+**In this project:** PostgreSQL chooses **CP** (Consistency + Partition tolerance) — under a network partition, it refuses writes rather than serving potentially stale data. Redis (used for inventory cache and distributed locks) chooses **AP** by default — if Redis becomes unavailable, `InventoryService.getAvailableCount()` falls back to the DB (the CP source of truth). This is why the architecture rule states "PostgreSQL is the source of truth; Redis is the fast cache layer."
+
+---
+
+### 3. Eventual Consistency
+**Definition:** In a distributed system, after a write, replicas may temporarily serve stale data but will converge to the same value eventually.  
+**In this project:** The Redis inventory cache is eventually consistent with PostgreSQL. When a seat is reserved, the Lua script decrements Redis immediately, and the DB is updated within the same `@Transactional` call. However, if Redis is cold (just restarted) and warm-up is in progress, reads from Redis may be stale until `@PostConstruct` completes — hence `InventoryWarmupHealthIndicator` blocks readiness during this window.  
+The notification system is also eventually consistent: a booking is `CONFIRMED` in the DB before the confirmation email is delivered (it travels through RabbitMQ asynchronously).
+
+---
+
+### 4. Optimistic Locking
+**Definition:** Allows concurrent reads without blocking, but rejects a write if the data was modified since it was read — detected via a version counter.  
+**In this project:** `@Version Long version` on `Booking` and `TicketTier`. Two users reading `TicketTier.availableCount = 1` would both get optimistic reads. The first to commit increments `version` from 0 to 1. The second's UPDATE includes `WHERE version = 0` — PostgreSQL finds version = 1, the update affects 0 rows, and JPA throws `ObjectOptimisticLockingFailureException`. `@Retryable` retries up to 3 times.
+
+---
+
+### 5. Pessimistic Locking
+**Definition:** Acquires an exclusive database lock on read, blocking all other reads and writes until the lock is released.  
+**In this project:** Intentionally NOT used for inventory. `SELECT FOR UPDATE` on `ticket_tiers` would work but serializes all inventory reads globally, creating a bottleneck under concurrent load. The chosen approach (Redis distributed lock + Lua floor guard) is far more scalable — it locks at the Redis level per tier, not at the PostgreSQL row level.
+
+---
+
+### 6. Idempotency at the Database Layer
+**Definition:** A DB-level guarantee that processing the same input multiple times produces the same outcome, enforced by constraints rather than application logic.  
+**In this project:** The `UNIQUE(stripe_event_id)` constraint on `processed_stripe_events` is the DB-layer idempotency guard. In `PaymentService.handleStripeWebhook()`, the application ATTEMPTS to insert a `ProcessedStripeEvent` row for every webhook call. If the row already exists (duplicate delivery), the DB throws a unique constraint violation, caught as `DataIntegrityViolationException`. No application-level `existsBy()` check can provide this guarantee under concurrent delivery.
+
+---
+
+### 7. Read vs. Write Transaction Isolation
+**Definition:** Read-only transactions skip dirty checking and can signal intent to the database for read-replica routing; write transactions require full isolation guarantees.  
+**In this project:** `@Transactional(readOnly = true)` at the class level on all service classes (`EventService`, `BookingService`, etc.). Write methods override with plain `@Transactional`. The `readOnly=true` flag: (1) tells Hibernate to skip dirty checking (CPU saving), (2) sets JDBC `Connection.setReadOnly(true)` (hint to the connection pool), (3) is the prerequisite for read-replica routing in Phase 1B.
+
+---
+
+### 8. Serializable Isolation Level
+**Definition:** The strictest isolation level — concurrent transactions execute as if they ran sequentially, preventing all anomalies (dirty reads, non-repeatable reads, phantom reads).  
+**In this project:** Not explicitly configured — default PostgreSQL isolation is `READ COMMITTED`. The system achieves correctness not through serializable isolation (which would serialize ALL concurrent bookings globally) but through targeted Redis distributed locks per tier+user combination. The Lua script provides atomicity for the specific inventory counter without global serialization overhead.
+
+---
+
+### 9. Database as Source of Truth
+**Definition:** The relational database holds the authoritative, correct state of all data; all other systems (caches, message queues) hold derived or temporary representations.  
+**In this project:** PostgreSQL holds the authoritative booking state, user data, payment records, and ticket information. Redis holds derived inventory counts (loaded from PostgreSQL on startup). State machine transitions update PostgreSQL as their primary action; Redis is updated as a secondary effect. If Redis is wiped and restarted, the warm-up `@PostConstruct` method reconstructs all inventory counts from PostgreSQL — no data is lost.
+
+---
+
+## C) Optimization Techniques Used
+
+---
+
+### 1. Read-Only Transactions (`@Transactional(readOnly = true)`)
+**Definition:** Hints to the ORM and database that no writes will occur in this transaction, enabling optimizations such as skipping dirty checking.  
+**In this project:** Applied as the class-level default on all service classes. `EventService.getEventById()`, `BookingService.getBookingHistory()`, all `find*` and `get*` methods skip Hibernate's dirty-check phase. Measured impact on read-heavy endpoints (event listing, ticket history) is typically 5–15% CPU reduction. See Breakdown 1, DIP for the pattern.
+
+---
+
+### 2. Partial Index for Expiry Query
+**Definition:** An index covering only a subset of rows that satisfy a WHERE clause, reducing index size and improving query speed for that specific condition.  
+**In this project:** `CREATE INDEX idx_bookings_reserved_expiry ON bookings(expires_at) WHERE state = 'RESERVED'`. The `ReservationExpirationJob` runs this query every 30 seconds. Without the partial index, PostgreSQL would scan all bookings (including millions of CONFIRMED/CANCELLED rows) to find RESERVED ones. The partial index contains only the small set of currently-reserved bookings.
+
+---
+
+### 3. Entity Graph / JOIN FETCH (N+1 Prevention)
+**Definition:** Forces JPA to load associated entities in a single SQL JOIN rather than issuing one query per parent row.  
+**In this project (Day 6):** Without JOIN FETCH, `GET /api/events` loading 20 events would issue 1 query for events + 20 queries for each event's `category` + 20 queries for each event's `venue` = 41 queries. With `@EntityGraph(attributePaths = {"category", "venue"})` on the repository method, it collapses to 1 JOIN query. `@BatchSize(size = 50)` on collection associations handles one-to-many ticket lists.
+
+---
+
+### 4. Composite Index for Multi-Column Filter
+**Definition:** An index spanning multiple columns, used when queries filter on all those columns simultaneously.  
+**In this project:** `CREATE INDEX idx_bookings_user_state ON bookings(user_id, state)` serves `GET /api/users/{id}/bookings?state=CONFIRMED`. PostgreSQL can satisfy this query entirely from the index without touching heap pages — an index-only scan. Column order matters: `user_id` first (equality filter) then `state` (range filter).
+
+---
+
+### 5. HikariCP Connection Pool Tuning
+**Definition:** Configures the database connection pool size and timeout parameters to balance throughput, latency, and resource consumption.  
+**In this project:**
+```yaml
+spring.datasource.hikari:
+  connection-timeout: 30000      # max wait for a connection before failing
+  initialization-fail-timeout: 60000  # wait up to 60s on startup for DB
+  maximum-pool-size: 10          # default; tune based on PostgreSQL max_connections
+```
+The `initialization-fail-timeout: 60000` (Fix 7.1) prevents Spring Boot from crashing during Docker Compose startup before PostgreSQL is fully ready.
+
+---
+
+### 6. Redis Atomic Lua Scripts (Latency Optimization)
+**Definition:** Lua scripts execute on the Redis server as a single atomic operation, eliminating round-trip latency of multi-command sequences.  
+**In this project:** `InventoryService.reserveSeat()` uses a Lua script that executes GET + conditional DECRBY in one Redis round trip. Without Lua, the equivalent two-command sequence (`GET` then `DECRBY`) requires two network round trips AND has a race condition between them. One round trip (Lua) vs. two (sequential commands) is both faster and correct.
+
+---
+
+### 7. Hibernate Batch Fetch Size
+**Definition:** Tells Hibernate to load a collection of lazy-loaded entities in batches of N rather than one SQL query per entity.  
+**In this project (via `application.yml`):**
+```yaml
+spring.jpa.properties.hibernate.default_batch_fetch_size: 50
+```
+When loading a booking's tickets collection lazily, Hibernate groups all pending ticket fetches into batches of 50 SQL `IN (?)` queries rather than N individual SELECTs. Reduces the N+1 problem without requiring explicit JOIN FETCH on every query.
+
+---
+
+### 8. PostgreSQL EXPLAIN ANALYZE (Day 6, Optimization Sessions)
+**Definition:** A PostgreSQL command that executes a query and displays the execution plan with actual timing, enabling identification of sequential scans, missing indexes, and slow joins.  
+**In this project:** Used during Day 6 (N+1 fixes and integration tests) to identify which queries are hitting sequential scans. Typical usage during development:
+```sql
+EXPLAIN ANALYZE SELECT * FROM bookings 
+WHERE user_id = 42 AND state = 'CONFIRMED';
+```
+The output reveals whether `idx_bookings_user_state` is being used. If not, the index definition or the query's parameter types need adjustment.
+
+---
+
+### 9. Redis Cache for Event Data
+**Definition:** Storing the result of an expensive read operation in memory, serving subsequent identical requests from the cache rather than re-querying the database.  
+**In this project:**
+- `@Cacheable(value = "events", key = "#id")` on `EventService.getEventById()` — caches event data for 10 minutes
+- `@CacheEvict(value = "events", key = "#id")` on `updateEvent()` and `deleteEvent()` — invalidates the specific event's cache entry on write
+- `@CacheEvict(value = "events", allEntries = true)` on `publishEvent()` — invalidates all cached event list pages when an event is published
+- Cache storage: Redis via `RedisCacheManager` with 10-minute default TTL
+
+---
+
+### 10. Flyway Migration Ordering (Dependency-Aware Schema Evolution)
+**Definition:** Database schema migrations must be applied in a specific order because later migrations depend on tables or types created by earlier ones.  
+**In this project:** The migration order reflects dependency chains:
+- V1 (users) must precede V5 (bookings references users.id)
+- V2 (venues, categories) must precede V3 (events references them)
+- V3 (events) must precede V4 (ticket_tiers references events.id)
+- V4 (ticket_tiers) must precede V5 (bookings references ticket_tiers.id)
+- V7 (indexes) must follow all table-creating migrations
+- V9 (seed data) must be last — inserts into tables created by V1–V6
+
+Flyway aborts if a migration is missing, modified, or out of order.
+
+---
+
+## D) Database Concepts NOT Used (But Relevant)
+
+---
+
+### 1. Read Replicas
+**Why not used:** Read replicas stream PostgreSQL WAL logs to one or more standby databases that handle read-only queries, offloading the primary. This project uses a single PostgreSQL instance for all reads and writes. The `@Transactional(readOnly = true)` annotations are future-compatible with read-replica routing but no replica exists yet.  
+**Phase 1B relevance:** YES — when event listing and ticket history queries dominate traffic (100K+ concurrent users browsing events), read replicas take all `@Transactional(readOnly = true)` workload off the primary.
+
+---
+
+### 2. Database Sharding
+**Why not used:** Sharding partitions rows across multiple database instances by a shard key (e.g., `event_id % 4`), enabling horizontal scaling beyond a single PostgreSQL instance's capacity. The complexity is substantial: cross-shard queries require application-level joins; foreign keys cannot span shards.  
+**Phase 1B relevance:** LOW — PostgreSQL vertical scaling (more CPU/RAM) and read replicas handle most ticketing workloads. Sharding is relevant only at 10M+ events with 1B+ bookings.
+
+---
+
+### 3. Materialized Views
+**Why not used:** A materialized view pre-computes and stores the result of a complex query as a table, refreshed periodically. Useful for dashboards showing "total revenue by event" or "top 10 events by bookings." This project serves such data through direct queries in `@Transactional(readOnly = true)` service methods.  
+**Phase 1B relevance:** YES — the analytics dashboard (revenue reports, seat fill rates, waitlist stats) would benefit from materialized views refreshed every 5 minutes rather than re-running GROUP BY queries on millions of booking rows per request.
+
+---
+
+### 4. Full-Text Search
+**Why not used:** PostgreSQL full-text search (using `tsvector` and `tsquery`) enables efficient search queries like "events near me matching 'jazz concert'." This project uses simple `ILIKE '%keyword%'` filtering on event title and description, which does not use any index and performs a sequential scan.  
+**Phase 1B relevance:** YES — the event search feature requires full-text ranking, typo tolerance, and faceted filtering (category + date + location). PostgreSQL `tsvector` + GIN index handles this without an external search engine for Phase 1B; Elasticsearch becomes relevant at Phase 2 scale.
+
+---
+
+### 5. Table Partitioning
+**Why not used:** PostgreSQL partitioning splits a large table into smaller child tables by a partition key (e.g., `bookings` partitioned by `created_at` month). Queries on a specific month only scan that month's partition. Not needed at Phase 1A data volumes.  
+**Phase 1B relevance:** MEDIUM — `bookings` and `tickets` tables at multi-million-row scale benefit from monthly partitioning. The `ReservationExpirationJob`'s expiry query specifically would benefit from time-range partitioning on `expires_at`.
+
+---
+
+### 6. Event Store Table
+**Why not used:** An event store is an append-only table of all state transitions — `(booking_id, from_state, to_state, event, timestamp)` — enabling full audit trails and state reconstruction. This project stores only the current booking state in `bookings.state`. The state machine transitions are not persisted.  
+**Phase 1B relevance:** YES — regulatory audit requirements (PCI-DSS for payments, consumer protection for refunds) require a full audit trail of every state change. Adding a `booking_state_history` append-only table to the state machine's transition actions provides this.
+
+---
+
+### 7. JSONB Columns
+**Why not used:** PostgreSQL `JSONB` columns store schemaless JSON with full query support. Useful for flexible event metadata (e.g., seating maps, artist bios) that varies per event type. This project uses normalized columns for all structured data.  
+**Phase 1B relevance:** MEDIUM — if different event types (concert, conference, sports) need different metadata fields, `JSONB` avoids an ever-growing list of nullable columns on the `events` table.

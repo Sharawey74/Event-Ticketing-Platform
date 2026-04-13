@@ -1,0 +1,420 @@
+# Client-Facing Feature Guide
+## Event Ticketing Platform — What Users See & How It Works
+
+---
+
+## WHO USES THIS SYSTEM? — 3 Roles
+
+| Role | Who They Are | What They Can Do |
+|------|-------------|-----------------|
+| **Guest** | Anyone visiting the site without an account | Browse events, view event details, see pricing |
+| **User (Attendee)** | Registered and logged-in person | Everything a guest can do + buy tickets, manage bookings, request refunds |
+| **Organizer** | Registered user with Organizer status | Everything a user can do + create/manage events, check in attendees at the door |
+
+> There is also an **Admin** role for platform management (user management, oversight), but this is a back-office concern and not part of the user-facing journey.
+
+---
+
+## THE 7 UI PAGES
+
+---
+
+### PAGE 1 — Home / Event Discovery (`/`)
+**Who sees it:** Everyone (guest, user, organizer)
+
+This is the landing page — the first thing anyone sees when they visit the platform.
+
+**What's on this page:**
+- **Hero Section** — A large banner with a featured/upcoming event, call-to-action button ("Find Tickets")
+- **Search Bar** — Search events by keyword (artist name, event title, venue)
+- **Filter Panel** — Filter by: Category (Music, Sports, Conference, Theatre), Date range, City/Venue, Price range
+- **Event Cards Grid** — A paginated grid of event cards. Each card shows:
+  - Event cover image
+  - Event title
+  - Date and time
+  - Venue name and city
+  - Starting price ("From $29")
+  - Availability badge ("Selling Fast", "Limited", "Sold Out")
+
+**What a user does here:** Browse, search, filter, click an event card to learn more.
+
+---
+
+### PAGE 2 — Event Detail Page (`/events/[id]`)
+**Who sees it:** Everyone
+
+This is the full information page for a specific event. It is the most content-rich page.
+
+**What's on this page:**
+- **Event Header** — Large cover image, event title, organizer name, event status badge
+- **Date, Time & Venue Section** — Full date, start time, venue name, address, map embed
+- **Event Description** — Full text description, lineup, agenda, or program
+- **Ticket Tier Selection Panel** — This is the most important component:
+  - Lists all available ticket tiers (e.g., "General Admission", "VIP", "Early Bird")
+  - For each tier: name, price, seats remaining, description
+  - Dynamic pricing indicator ("🔥 High demand — price increased 25%") if surge is active
+  - Quantity selector (how many tickets to buy)
+  - "Add to Cart" / "Reserve Now" button
+- **Social Share** — share buttons for spreading the event
+
+**What a user does here:** Read about the event → choose a ticket tier → select quantity → click Reserve.
+
+---
+
+### PAGE 3 — Cart / Reservation Pending (`/cart`)
+**Who sees it:** Logged-in users only
+
+After clicking "Reserve Now," the user lands here. This page represents the **5-minute reservation window** — seats are held for this user, but no payment has been taken yet.
+
+**What's on this page:**
+- **Countdown Timer** — A live countdown (e.g., "Your seats are held for 4:32 — complete checkout before time expires")
+- **Booking Summary Card** — Event name, date, tier selected, quantity, price breakdown
+- **Price Breakdown Panel**:
+  - Base price
+  - Applied discount (Early Bird / Group Discount) if any
+  - Surge indicator if dynamic pricing is active
+  - Total amount
+- **Proceed to Checkout Button** — Takes the user to Stripe payment
+- **Cancel / Release Seats Button** — Releases the hold if the user changes their mind
+
+**The urgency:** If the user walks away without paying and the 5-minute timer hits zero, the system automatically releases the held seats back to inventory. The cart empties and the user must start over.
+
+**What a user does here:** Review their selection → confirm the price → click Proceed to Checkout before the timer runs out.
+
+---
+
+### PAGE 4 — Checkout (Stripe-Hosted, `/checkout` → Stripe Page)
+**Who sees it:** Logged-in users who click "Proceed to Checkout"
+
+This is NOT a page built by the platform. The user is **redirected to Stripe's secure, hosted payment page**. Stripe handles:
+- Credit/debit card entry
+- Card validation and fraud checks
+- 3D Secure authentication if required
+- Payment processing
+
+**What a user does here:** Enter card details on Stripe's page → click Pay.
+
+**Two outcomes after payment:**
+1. ✅ **Payment succeeds** → Stripe sends a webhook to the platform → user is redirected to the Confirmation page
+2. ❌ **Payment fails** → User is redirected back to the cart page with an error → the booking returns to "Available" and seats are released
+
+---
+
+### PAGE 5 — Booking Confirmation (`/bookings/[id]/confirmation`)
+**Who sees it:** Users whose payment has been confirmed
+
+This is the success page — proof that the booking is complete and payment was received.
+
+**What's on this page:**
+- **Success Banner** — "🎉 You're going! Booking confirmed."
+- **Booking Reference Number** — A unique booking ID for support queries
+- **Event Summary** — Event name, date, venue, number of tickets
+- **Ticket Cards** (one per ticket) — Each ticket card shows:
+  - Seat/ticket details
+  - **QR Code** (may show a loading spinner briefly — QR codes are generated asynchronously after payment, so the page polls until they appear)
+  - Download / Save to Wallet button
+- **"View My Bookings" link** → goes to the My Bookings page
+
+**What a user does here:** Save/screenshot the QR code → optionally download tickets → share with friends.
+
+---
+
+### PAGE 6 — My Bookings (`/my-bookings`)
+**Who sees it:** Logged-in users
+
+The user's personal dashboard for all their ticket purchases, past and future.
+
+**What's on this page:**
+- **Booking List** — All bookings, filterable by status (Upcoming / Past / Cancelled)
+- **Each Booking Row** shows:
+  - Event name and date
+  - Number of tickets
+  - Total paid
+  - Booking status badge (`CONFIRMED`, `ATTENDED`, `CANCELLED`, `REFUND_REQUESTED`, etc.)
+  - Action buttons based on status:
+    - `CONFIRMED` → "View Tickets" + "Request Refund" (if eligible)
+    - `REFUND_REQUESTED` → "Refund Pending" (disabled)
+    - `REFUND_DENIED` → "Refund Denied — [reason]"
+    - `ATTENDED` → "View Tickets" (read-only)
+    - `CANCELLED` → "Event Cancelled — Refund Issued"
+- **Refund Request Modal** — When clicking "Request Refund":
+  - Shows the refund eligibility (full refund / 50% / not eligible)
+  - Confirmation button
+
+**What a user does here:** Review their booking history → re-download QR codes → request refunds → track refund status.
+
+---
+
+### PAGE 7 — Organizer / Admin Dashboard (`/admin`)
+**Who sees it:** Users with the Organizer or Admin role only
+
+The management interface for event organizers. Regular users cannot access this page.
+
+**What's on this page:**
+- **My Events List** — All events created by this organizer, with status (Draft, Published, Sales Open, Completed)
+- **Create Event Button** → Opens a form/wizard:
+  - Event title, description, category, venue
+  - Date and time
+  - Ticket tiers (name, price, quantity per tier)
+  - Enable/disable: Early Bird pricing, Dynamic Pricing, Waitlist
+- **Event Management Panel** (when an event is selected):
+  - Edit event details
+  - View real-time ticket sales and revenue
+  - View booking list for the event
+  - **Check-In Mode** — A QR code scanner interface:
+    - Organizer scans attendee's QR code at the event door
+    - System validates the code → marks booking as `ATTENDED` → shows ✅ or ❌
+  - Cancel Event button (triggers automatic refunds for all confirmed bookings)
+
+**What an organizer does here:** Create events → manage them → use check-in mode on event day → view sales analytics.
+
+---
+
+## COMPLETE CLIENT WORKFLOW — From First Visit to Attended Event
+
+---
+
+### CHAPTER 1 — Discovery (Guest, no account needed)
+
+```
+1. User visits the platform homepage (/)
+2. Sees the event grid — no login required to browse
+3. Searches "Jazz Festival" in the search bar
+4. Filters: Category = Music, Date = This month
+5. Sees 3 matching event cards
+6. Clicks on "New York Jazz Weekend"
+7. Lands on the Event Detail page (/events/42)
+8. Reads the description, lineup, venue details
+9. Sees two ticket tiers:
+   - General Admission: $49 (120 seats left)
+   - VIP: $149 (8 seats left — "Limited!")
+10. Decides they want 2x General Admission tickets = $98 total
+11. Clicks "Reserve Now" → prompted to log in
+```
+
+---
+
+### CHAPTER 2 — Registration & Login (One-time setup)
+
+```
+12. Clicks "Sign Up" → fills in name, email, password
+13. Account created → automatically logged in
+14. Returned to the Event Detail page they were viewing
+    (the system remembers where they came from)
+```
+
+---
+
+### CHAPTER 3 — Reservation (The 5-Minute Window Begins)
+
+```
+15. User is now logged in on /events/42
+16. Selects: 2 tickets, General Admission ($49 each)
+17. Clicks "Reserve Now"
+18. SYSTEM: In the background (invisible to the user):
+    - Acquires a Redis lock for this user+tier combo
+    - Checks that 2+ seats are available (Redis fast check)
+    - Decrements inventory from 120 → 118 (atomic Lua script)
+    - Creates a Booking record (status: RESERVED)
+    - Creates 2 Ticket records
+    - Sets a 5-minute expiry timer
+    - Releases the Redis lock
+19. User is redirected to the Cart page (/cart)
+20. Cart page shows:
+    - ⏱ "Your seats are held for 4:59"
+    - Event: New York Jazz Weekend
+    - 2x General Admission @ $49 = $98
+    - No early bird discount (event < 30 days away)
+    - No group discount (< 5 tickets)
+    - Total: $98.00
+```
+
+---
+
+### CHAPTER 4 — Checkout & Payment
+
+```
+21. User clicks "Proceed to Checkout"
+22. SYSTEM: Creates a Stripe Checkout Session
+    - Booking moves to status: PAYMENT_PENDING
+    - Seat hold timer continues counting down
+23. User is redirected to Stripe's secure payment page
+24. User sees: "New York Jazz Weekend — 2 tickets — $98"
+25. User enters card: 4242 4242 4242 4242 (test card)
+26. Clicks "Pay $98.00"
+27. Stripe processes the payment (1-2 seconds)
+28. Stripe sends a webhook to the platform:
+    "Payment for booking #1001 was successful"
+```
+
+---
+
+### CHAPTER 5 — Confirmation (Behind the Scenes → Then the Good Stuff)
+
+```
+BEHIND THE SCENES (user sees only the confirmation page):
+29. Stripe webhook arrives at the platform
+30. System verifies Stripe's signature (security check)
+31. System checks: "Have I processed this webhook before?" → No
+32. System records the Stripe event ID (idempotency guard)
+33. Booking status changes: PAYMENT_PENDING → CONFIRMED
+34. Payment record created (amount=$98, status=PAID)
+35. System publishes to RabbitMQ:
+    Message 1: "Send confirmation email to user@email.com"
+    Message 2: "Generate QR codes for booking #1001"
+36. Database transaction commits
+37. System returns HTTP 200 to Stripe (ONLY now, after DB commit)
+
+ASYNC (happening in parallel):
+38. Email notification listener:
+    Receives Message 1 → sends confirmation email to user
+39. QR code generation listener:
+    Receives Message 2 → generates 2 QR codes (one per ticket)
+    Saves QR codes to the database
+
+WHAT THE USER SEES:
+40. Stripe redirects the user to /bookings/1001/confirmation
+41. Page loads: "🎉 You're going! Booking Confirmed"
+42. Shows booking reference: #1001
+43. Ticket cards area shows a loading spinner briefly
+44. After 2-3 seconds, QR codes appear on each ticket card
+45. User screenshots / downloads their QR codes
+46. User also receives a confirmation email
+```
+
+---
+
+### CHAPTER 6 — Event Day / Check-In
+
+```
+ON THE DAY OF THE EVENT:
+47. User arrives at the venue
+48. Opens the confirmation page on their phone
+    OR opens the email with the QR code
+49. Shows QR code to the event staff (organizer)
+
+ON THE ORGANIZER'S DEVICE:
+50. Organizer is on the /admin page in "Check-In Mode"
+51. Organizer scans the user's QR code
+52. SYSTEM: 
+    - Validates the QR code belongs to a CONFIRMED booking
+    - Verifies the organizer owns this event
+    - Changes booking status: CONFIRMED → ATTENDED
+53. Organizer's screen shows: ✅ VALID — 2 tickets, John Smith
+54. User walks in
+```
+
+---
+
+### CHAPTER 7 — Requesting a Refund (If Plans Change)
+
+```
+SCENARIO: User bought tickets but can no longer attend.
+They do this 10 days before the event.
+
+55. User goes to /my-bookings
+56. Finds the "New York Jazz Weekend" booking (CONFIRMED)
+57. Clicks "Request Refund"
+58. Modal shows: "Event is 10 days away — Full refund eligible"
+59. User confirms
+60. SYSTEM:
+    - Booking status: CONFIRMED → REFUND_REQUESTED
+    - RefundService checks: 10 days away ≥ 7 days = FULL refund
+    - Stripe refund issued: $98 to the user's card
+    - Seats released back to inventory (120 again)
+    - Booking status: REFUND_REQUESTED → REFUND_APPROVED
+61. User receives refund confirmation email
+62. My Bookings page shows booking as "Refund Approved"
+63. Money returns to their card in 5-10 business days (Stripe standard)
+
+SCENARIO B: User requests refund 2 days before the event:
+- RefundService checks: 2 days < 3 days = DENIED
+- Booking status: REFUND_REQUESTED → REFUND_DENIED
+- User receives email explaining the refund policy
+- My Bookings page shows: "Refund Denied — Event starts in 2 days. 
+  Refund requests require at least 3 days' notice."
+```
+
+---
+
+### CHAPTER 8 — Event Cancellation by Organizer
+
+```
+SCENARIO: The organizer has to cancel the entire event.
+
+64. Organizer goes to /admin → My Events
+65. Opens "New York Jazz Weekend" event management panel
+66. Clicks "Cancel Event"
+67. Confirms the cancellation
+
+SYSTEM (for every confirmed booking, automatically):
+68. Finds all CONFIRMED bookings for this event (e.g., 50 bookings)
+69. For each confirmed booking:
+    - Booking status → CANCELLED
+    - Full Stripe refund issued automatically
+    - Notification email sent: "New York Jazz Weekend has been cancelled.
+      Full refund of $X has been issued to your card."
+70. For each RESERVED booking (people mid-checkout):
+    - Booking cancelled
+    - Seats released
+71. Event status → ARCHIVED
+
+WHAT THE USER SEES:
+72. User received a cancellation email
+73. Goes to My Bookings → booking shows "Event Cancelled"
+74. Shows: "Full refund of $98 issued — 5-10 business days"
+```
+
+---
+
+## SUMMARY — The 4 States Every User Cares About
+
+| Booking Status | What It Means for the User | Next Possible Action |
+|---------------|---------------------------|---------------------|
+| **RESERVED** | Seats held for you for 5 minutes | Pay now, or lose your seats |
+| **CONFIRMED** | Payment received, tickets valid | Download QR code, request refund |
+| **ATTENDED** | You checked in — event complete | Nothing, it's done ✅ |
+| **CANCELLED** | Event cancelled or refund approved | Wait for refund on your card |
+
+---
+
+## THE PRICING LAYERS — How the Final Price Is Calculated
+
+When a user selects tickets, the price shown goes through up to 3 adjustments:
+
+```
+Base Tier Price (set by organizer)
+         │
+         ├─ Early Bird? (buying 30+ days in advance)
+         │    → -50% discount applied
+         │
+         ├─ Group Discount? (buying 5+ tickets)
+         │    → -10% discount applied
+         │
+         └─ Dynamic Surge? (event is 80%+ sold out)
+              → +25% increase applied
+
+Final Price = (Base Price × applicable discounts/surges)
+```
+
+**Example:** $100 base tier, event is 85% sold out, user buys 6 tickets:
+- Group discount: -10% → $90 per ticket
+- Dynamic surge: +25% → $112.50 per ticket
+- Total for 6: $675
+
+The price shown on the Event Detail page and Cart page is always the final calculated price — no surprises at checkout.
+
+---
+
+## WHAT THE USER NEVER SEES (But Depends On)
+
+These happen invisibly and are what make the system reliable:
+
+| Invisible Feature | Why It Matters to the User |
+|------------------|-----------------------------|
+| **5-minute race protection** (Redis Lua guard) | If you and another user both try to buy the last seat at the same second, only ONE of you gets it — never both |
+| **Stripe webhook reliability** | Your booking is only confirmed after your payment is definitely in the system — not just after the browser redirect |
+| **QR code async generation** | You don't wait for your QR to be generated before seeing the confirmation — it appears within seconds automatically |
+| **Expiry job** (runs every 30 seconds) | Abandoned carts are cleaned up automatically — if someone reserves tickets and disappears, those seats become available again |
+| **Correlation ID tracing** | If something goes wrong and you contact support, they can trace your exact request through every system log |
+| **Organizer-only check-in guard** | Only the event's own organizer can mark YOUR ticket as attended — another organizer cannot accidentally check you in to the wrong event |

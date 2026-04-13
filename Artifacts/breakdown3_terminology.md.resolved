@@ -1,0 +1,340 @@
+# Breakdown 3 — Complete Terminology & Technology Inventory
+## Event Ticketing Platform — Phase 1A
+
+Every term defined below is tied to a specific component, class, or decision in this project.
+
+---
+
+## 1. Backend Frameworks and Libraries
+
+**Spring Boot 3.x** — The application container framework that auto-configures all infrastructure beans (DataSource, RabbitMQ, Redis, Security filters) from `application.yml`, allowing the project to start as a single executable JAR.
+
+**Spring Data JPA** — The abstraction layer that generates SQL queries from `JpaRepository` interface methods (e.g., `BookingRepository.findByStateAndExpiresAtBefore()`) without requiring handwritten SQL for standard operations.
+
+**Spring Security** — The framework that intercepts every HTTP request through `JwtFilter` and a `SecurityConfig` filter chain, enforcing authentication (`/api/auth/**` is public, all booking/payment routes require a valid JWT).
+
+**Spring State Machine 3.2.0** — The library that manages `Booking` lifecycle transitions. Configured in `BookingStateMachineConfig` using `@EnableStateMachineFactory` to create one independent state machine per booking request. Defines 11 states, 9 events, guards, and actions.
+
+**Spring AMQP / RabbitTemplate** — The Spring abstraction for publishing messages to RabbitMQ. Used in every state machine Action class (`ConfirmBookingAction`, `NotifyRefundDeniedAction`, `GenerateQRCodeAction`) to publish domain events to named exchanges.
+
+**Spring Retry** — The library providing `@Retryable` and `@EnableRetry`. Applied to `BookingService.reserveTickets()` to automatically retry up to 3 times with exponential backoff when `ObjectOptimisticLockingFailureException` occurs from a JPA version conflict.
+
+**Spring Actuator** — The library that exposes `/actuator/health`, `/actuator/metrics`, and `/actuator/health/readiness` endpoints. The readiness endpoint is what Railway polls before sending traffic; `InventoryWarmupHealthIndicator` controls its response during startup.
+
+**Spring Cache** — The abstraction used in `EventService` with `@Cacheable`, `@CacheEvict`, backed by `RedisCacheManager` with a 10-minute TTL. Sits between the service and Redis, transparently serving cached `EventResponse` objects.
+
+**Hibernate 6.x** — The JPA implementation that translates `@Entity` class annotations into SQL DDL (for validation), maps result sets to Java objects, and manages dirty checking, optimistic locking (`@Version`), and the first-level entity cache within a transaction.
+
+**Lombok** — The annotation processor that generates boilerplate at compile time: `@RequiredArgsConstructor` generates the constructor injection used on every `@Service` and `@Component`; `@Builder` generates fluent builders on all DTOs; `@Data` on entities generates getters, setters, equals, hashCode.
+
+**Flyway** — The database migration tool that applies numbered SQL scripts (`V1__create_users_table.sql` through `V9__seed_data.sql`) in order on application startup, tracking applied versions in `flyway_schema_history`. Prevents schema drift between environments.
+
+**Stripe Java SDK 23.3.0** — The official Stripe library used inside `PaymentService` to create `checkout.Session` objects and verify webhook signatures via `Webhook.constructEvent()`. Wrapped entirely within `PaymentService` — no other class touches Stripe classes directly.
+
+**jjwt 0.11.5** — The Java JWT library used in `JwtService` to sign JWTs on login (`Jwts.builder().signWith(secretKey)`) and verify them on each request (`Jwts.parserBuilder().setSigningKey(secretKey).build().parseClaimsJws(token)`).
+
+**ZXing (QRGen 2.6.0)** — The QR code generation library called inside `QRCodeGenerationListener`. Triggered asynchronously from the `ticket.generation.queue` — never called inline in the webhook handler (Fix 10.2).
+
+**Spring Validation (JSR 380)** — The validation framework using `@Valid`, `@NotNull`, `@NotBlank`, `@Min`, `@Size` on DTO fields. Applied at controller method parameters — validation failures return 400 before the service layer is invoked.
+
+**SLF4J + Logback** — The logging abstraction (`LoggerFactory.getLogger(MyClass.class)`) and its default Spring Boot implementation. Used with MDC for correlation ID propagation: `MDC.put("correlationId", id)` in `CorrelationIdFilter`, included in every log line automatically.
+
+**Maven Wrapper (mvnw)** — The project-local Maven script that ensures all developers and CI pipelines use the same Maven version without system-level Maven installation. The primary build command is `./mvnw compile` / `./mvnw test`.
+
+---
+
+## 2. Frontend Frameworks and Libraries
+
+**Next.js 14** — The React meta-framework running on Node.js, used for the 7-page frontend (`/`, `/events/[id]`, `/cart`, `/checkout`, `/bookings/[id]/confirmation`, `/my-bookings`, `/admin`). Uses the App Router for server-side rendering of event listing and client-side rendering for cart and checkout.
+
+**TypeScript** — The statically-typed superset of JavaScript used for all frontend code. Type definitions for API responses (e.g., `BookingResponse`, `EventResponse`) are generated to match the backend DTOs, preventing frontend-backend type mismatches.
+
+**Tailwind CSS** — The utility-first CSS framework used for all frontend styling. Avoids writing custom CSS files — styles are composed from utility classes (`flex`, `bg-blue-600`, `rounded-xl`) directly in JSX components.
+
+**Zustand** — The lightweight client-side state management library used for the ticket cart state. Stores selected tier, quantity, and active booking ID in memory. Simpler than Redux; no boilerplate reducers.
+
+**React Query (TanStack Query)** — The data-fetching and server state management library. Used for all API calls to the Spring Boot backend — handles loading states, error states, caching, and automatic refetching. `useQuery(['booking', id])` polls `GET /api/bookings/{id}` on the confirmation page until QR codes appear.
+
+**Axios** — The HTTP client used by React Query to make API calls to the Spring Boot backend, setting the `Authorization: Bearer {jwt}` header on authenticated requests and the `X-Correlation-ID` header for distributed tracing.
+
+---
+
+## 3. Infrastructure and DevOps Tools
+
+**Docker** — The containerization platform. Each infrastructure service (PostgreSQL 15, Redis 7, RabbitMQ 3.12) runs as a Docker container, isolated from the host OS and each other. The Spring Boot app itself is containerized for Railway deployment using a multi-stage Dockerfile.
+
+**Docker Compose** — The multi-container orchestration tool for local development. `docker-compose.yml` declares all 6 services (postgres, redis, rabbitmq, app, and future: prometheus, grafana) with health checks and `depends_on: condition: service_healthy` to enforce startup order (Fix 7.1).
+
+**Multi-Stage Dockerfile** — A Dockerfile with multiple `FROM` stages: Stage 1 (Build) uses a full JDK Maven image to compile and package the JAR; Stage 2 (Runtime) uses a slim JRE image and copies only the JAR — no source code, no Maven in the final image. Reduces production image size by ~70%.
+
+**Railway** — The cloud PaaS (Platform as a Service) where the Spring Boot application and all infrastructure services (PostgreSQL, Redis, RabbitMQ managed instances) are deployed. Railway uses the `/actuator/health/readiness` endpoint to determine when a new deployment is ready to receive traffic.
+
+**GitHub Actions** — The CI/CD pipeline platform. Runs on every push: `./mvnw verify` (compile + test + JaCoCo), Dockerfile build, and Railway deployment. Defined in `.github/workflows/`.
+
+**GitHub Copilot** — The AI coding assistant used throughout the project. Configured via `.github/copilot-instructions.md` (always-active master config) and `.github/instructions/*.instructions.md` (auto-injected per file type). SpecKit agents (`@speckit.implement`, `@speckit.plan`) drive the session workflow.
+
+**SpecKit** — The custom GitHub Copilot agent framework that manages the spec-driven development lifecycle. Provides agents: `speckit.constitution` (project memory), `speckit.plan` (feature plan), `speckit.tasks` (atomic task list), `speckit.implement` (code generation), `speckit.checklist` (validation). Stores state in `.specify/`.
+
+**k6** — The JavaScript-based load testing tool used in Day 19 sessions. Simulates concurrent virtual users performing the full booking flow (browse → reserve → checkout → confirm) and measures throughput, p95 latency, and error rates.
+
+**Stripe CLI** — The command-line tool used in local development to forward Stripe webhook events to `localhost:8080/api/webhooks/stripe`. Started with `stripe listen --forward-to localhost:8080/api/webhooks/stripe`. Prints a `whsec_*` webhook signing secret that must be set in `application-local.yml`.
+
+---
+
+## 4. Database and Caching Technologies
+
+**PostgreSQL 15** — The relational database that is the system's authoritative source of truth. Runs in Docker locally, as a managed Railway instance in production. Stores all 9 tables. Chosen over MySQL for its superior support for `TIMESTAMPTZ`, custom ENUM types, `UNIQUE` constraint behavior, and partial indexes.
+
+**Redis 7** — The in-memory data store serving two completely distinct roles: (1) Inventory cache — stores `inventory:tier:{tierId}:available` counters, (2) Distributed locks — stores `seat:lock:tier:{tierId}:user:{userId}` lock tokens. Runs in Docker locally. If wiped, all inventory counts are reconstructed from PostgreSQL on next startup via `@PostConstruct` warm-up.
+
+**RedisTemplate** — The Spring Data Redis low-level client used for Lua script execution in `InventoryService` and `DistributedLockService`. `redisTemplate.execute(script, keys, args)` runs the Lua script atomically on the Redis server.
+
+**RedisCacheManager** — The Spring-managed cache abstraction that wraps Redis for `@Cacheable` / `@CacheEvict` on `EventService`. Configured with 10-minute default TTL and Jackson JSON serialization.
+
+**Lua Script (Redis)** — An imperative script that executes atomically on the Redis server. In `InventoryService.reserveSeat()`: reads the available count, checks it against the requested quantity, decrements only if sufficient, and returns the result — all in one atomic operation with no possibility of race conditions between the read and the write.
+
+**HikariCP** — The JDBC connection pool that manages a pool of pre-established database connections shared across all HTTP request threads. Configured via `spring.datasource.hikari.*` with a `connection-timeout` of 30s and `initialization-fail-timeout` of 60s to survive Docker startup race conditions.
+
+**Flyway Schema History** — The `flyway_schema_history` table that Flyway creates and owns in PostgreSQL. Records every applied migration's version, checksum, and execution time. Flyway compares this table against the migration files on startup and refuses to start if any mismatch is found.
+
+---
+
+## 5. Messaging and Async Processing
+
+**RabbitMQ 3.12** — The message broker that decouples state machine actions from downstream consumers. Runs with the management plugin (UI at `:15672`). Three exchanges declared: `booking.exchange` (topic), `notification.exchange` (direct). Receives messages from Spring Boot actions; delivers to listener classes.
+
+**Topic Exchange** — A RabbitMQ exchange type where messages are routed to queues based on routing key patterns with wildcards (`*` matches one word, `#` matches zero or more). `booking.exchange` uses topic routing: `booking.confirmed` routes to `booking.confirmation.queue`, `booking.expired` routes to its own queue.
+
+**Direct Exchange** — A RabbitMQ exchange type where messages are routed to queues with an exact routing key match. `notification.exchange` uses direct routing — `refund.denied` routes to exactly the `refund.denied.queue`.
+
+**Dead Letter Queue (DLQ)** — A queue that receives messages rejected or unprocessable by their primary queue. Every queue in this project has a corresponding DLQ: `booking.confirmation.dlq`, `ticket.generation.dlq`. Messages that fail processing (consumer throws exception) after retry exhaustion land in the DLQ for manual inspection rather than being silently lost.
+
+**`@RabbitListener`** — The Spring AMQP annotation that marks a method as a consumer of a named RabbitMQ queue. `NotificationListener` uses `@RabbitListener(queues = BOOKING_CONFIRMED_QUEUE)` to receive `BookingConfirmedEvent` messages asynchronously.
+
+**RabbitTemplate** — The Spring AMQP template for publishing messages. Used in every state machine Action class to send domain events to RabbitMQ exchanges. Configured with a `MessagePostProcessor` that adds `X-Correlation-ID` as a message header.
+
+**`ticket.generation.queue`** — The dedicated async queue for QR code generation. `GenerateQRCodeAction` publishes a `GenerateQRCodesCommand` to this queue instead of generating QR codes inline during the Stripe webhook. The `QRCodeGenerationListener` processes it asynchronously, preventing 50-ticket webhooks from timing out.
+
+**Message Acknowledgement** — The RabbitMQ delivery guarantee mode where a consumer explicitly acknowledges a message (`ACK`) after processing it, or rejects it (`NACK`) on failure, triggering redelivery or DLQ routing. Spring AMQP defaults to auto-ACK on successful listener return; exceptions trigger NACK.
+
+**AMQP (Advanced Message Queuing Protocol)** — The open standard protocol that RabbitMQ implements. AMQP defines exchanges, queues, bindings, and message acknowledgement semantics. `spring-boot-starter-amqp` provides the Spring implementation.
+
+---
+
+## 6. Security Concepts and Implementations
+
+**JWT — JSON Web Token** — A compact, self-contained token used to authenticate API requests. Generated by `JwtService` on successful login, containing the user's ID, role, and expiry. Sent as `Authorization: Bearer {token}` header on every subsequent request. Verified by `JwtFilter` without a database lookup.
+
+**JwtFilter** — Extends `OncePerRequestFilter`. Extracts the JWT from the `Authorization` header, calls `JwtService.validateToken()`, and populates `SecurityContextHolder` with the authenticated user's principal. Runs before every controller method.
+
+**JwtService** — Manages JWT creation (`generateToken()`) and validation (`validateToken()`). Uses `jjwt` library with an HMAC-SHA256 signing key from `application.yml`. Expiry is stored as a `Date` in the JWT claims (converted from `Instant` to be standard-compliant with the JWT spec).
+
+**Spring Security Filter Chain** — The ordered sequence of security filters applied to every HTTP request: `JwtFilter` (authentication) → `AuthorizationFilter` (authorization) → controllers. Configured in `SecurityConfig` with `http.sessionManagement().sessionCreationPolicy(STATELESS)` — no server-side session storage.
+
+**`@PreAuthorize`** — A Spring Security annotation that enforces role-based access control at the method level. `@PreAuthorize("hasRole('ORGANIZER')")` on `POST /api/events` rejects requests from `USER`-role tokens before the service method executes. Requires `@EnableMethodSecurity` in `SecurityConfig`.
+
+**BCrypt** — The password hashing algorithm used by `UserService` to encode passwords before storing in `users.password_hash`. `BCryptPasswordEncoder.encode(rawPassword)` adds a random salt and applies 10 rounds of hashing. Verification uses `matches(rawPassword, encodedPassword)` — never decrypts.
+
+**OWASP (Open Web Application Security Project)** — The security guidelines driving `.github/instructions/security-and-owasp.instructions.md`. Rules enforced: no SQL injection (parameterized queries via JPA), no XSS (output encoding in Next.js), no hardcoded credentials (`application-local.yml` via `.gitignore`), `@PreAuthorize` on all sensitive endpoints.
+
+**Stripe Signature Verification** — `Webhook.constructEvent(payload, sigHeader, webhookSecret)` in `StripeWebhookController` verifies that the incoming HTTP request genuinely came from Stripe (not a forged request). Uses HMAC-SHA256 with the `whsec_*` secret. On failure, returns HTTP 400.
+
+**CORS (Cross-Origin Resource Sharing)** — The browser security mechanism that blocks a web page from making API calls to a different domain. Configured in Spring Boot's `SecurityConfig` to allow requests from `http://localhost:3000` (Next.js dev) and the production Railway frontend URL.
+
+**MDC — Mapped Diagnostic Context** — SLF4J's thread-local storage for logging context variables. `CorrelationIdFilter` puts `correlationId` into MDC at the start of every request and removes it at the end. Every subsequent log statement from any class within that request thread automatically includes `[correlationId=abc123]` in the log output.
+
+---
+
+## 7. Testing Tools and Strategies
+
+**JUnit 5** — The Java testing framework providing `@Test`, `@DisplayName`, `@BeforeEach`, `@ParameterizedTest`. All unit and integration tests in this project use JUnit 5. Test naming follows the project convention: `methodName_whenCondition_shouldExpectedBehavior`.
+
+**Mockito** — The mocking library used in unit tests. `@MockBean` and `@InjectMocks` replace real dependencies with mocks. `when(inventoryService.reserveSeat(tierId, 1)).thenReturn(false)` simulates insufficient inventory without needing a running Redis instance. All Stripe SDK calls in `PaymentServiceTest` are mocked — real Stripe is never called in tests.
+
+**Testcontainers** — The Java library that starts real Docker containers (PostgreSQL, Redis, RabbitMQ) during integration tests, guaranteeing tests run against the actual technology stack rather than in-memory fakes. `InventoryServiceTest` uses a real Redis container to verify the Lua floor guard with actual Redis behavior, not a mock.
+
+**`@SpringBootTest`** — The Spring Boot annotation that loads the full application context for integration tests. Used for controller tests (`@SpringBootTest(webEnvironment = RANDOM_PORT)`) and service integration tests that require wired Spring beans.
+
+**`@DataJpaTest`** — A Spring Boot test slice that loads only JPA-related components (repositories, entities, Flyway) without loading controllers or services. Used for repository-layer tests against an embedded or Testcontainers PostgreSQL.
+
+**`@WebMvcTest`** — A Spring Boot test slice that loads only the web layer (controllers, filters, security) without starting a full application context. Used for controller unit tests with mocked services.
+
+**JaCoCo** — The Java code coverage tool configured in `pom.xml`. Measures what percentage of lines, branches, and methods are covered by tests. Integrated with GitHub Actions CI — a coverage report is generated on every `./mvnw verify` run.
+
+**Arrange-Act-Assert (AAA)** — The test structure pattern used in all test methods: Arrange (set up test data and mocks), Act (call the method under test), Assert (verify the result). The project's `intsructions.txt` mandates this pattern for all tests.
+
+**Concurrent Test (100 Threads / 50 Seats)** — The specific integration test in `InventoryServiceTest` that spawns 100 threads, each attempting to reserve 1 seat from a 50-seat tier, using a `CountDownLatch` and `ExecutorService`. Exactly 50 must succeed and 50 must fail. This test MUST pass by Day 16 (Fix 16.1).
+
+**TDD — Test-Driven Development** — The practice of writing failing tests before writing implementation code. Used during Day 8 (`BookingStateMachineTest` is written first) and Day 9 (payment tests written before service implementation). The "Red-Green-Refactor" cycle is mentioned in the constitution template.
+
+---
+
+## 8. Concurrency and Distributed Systems Concepts
+
+**Distributed Lock** — A mutual exclusion mechanism implemented across multiple processes using Redis. `DistributedLockService.acquireLock(key, value, ttlSeconds)` uses `SET key value NX EX ttl` — `NX` means "only set if Not eXists." The lock is held for up to `LOCK_TTL_SECONDS = 300`. The lock key is user-scoped: `seat:lock:tier:{tierId}:user:{userId}`.
+
+**Lua Script (Atomic Redis Operation)** — See Breakdown 3, Section 4. In `InventoryService`, the Lua script is the implementation of the "check and decrement must be one atomic operation" requirement from Fix 5.1.
+
+**TOCTOU — Time of Check to Time of Use** — A race condition where the condition is checked at one point in time, but by the time the action is taken, the condition has changed. In this project: two users both check availability (see 1 seat), both pass the check, both proceed to decrement — oversell occurs. Fix 8.1 (double-check inside the lock) prevents this.
+
+**Optimistic Concurrency Control** — See Breakdown 2B (Optimistic Locking). The `@Version` mechanism is the JPA-layer complement to the Redis-layer distributed lock. Two independent safety layers.
+
+**`@Scheduled`** — The Spring annotation on `ReservationExpirationJob.expireStaleReservations()` that triggers the method every 30 seconds. `fixedDelay = BusinessConstants.EXPIRY_JOB_INTERVAL_MS` means the interval is measured from the END of the previous execution, preventing overlap if a run takes longer than expected.
+
+**Race Condition** — A bug where the program's behavior depends on the timing of concurrent operations. The two primary race conditions this project explicitly prevents: (1) inventory oversell (two users buying the last seat simultaneously), (2) duplicate Stripe webhook processing (two threads processing the same event ID simultaneously).
+
+**Thread Safety** — The property of code that behaves correctly when called from multiple threads simultaneously. The Lua script makes `reserveSeat()` thread-safe at the Redis layer. `@Transactional` + `@Version` makes `reserveTickets()` thread-safe at the DB layer. `@Scheduled` with a distributed lock makes `ReservationExpirationJob` multi-instance-safe.
+
+**`CountDownLatch`** — A Java concurrency utility used in the concurrent booking test. Initialized to 100 (the thread count). Each thread calls `latch.countDown()` when done. The main test thread calls `latch.await(10, TimeUnit.SECONDS)` — blocking until all 100 threads complete or 10 seconds elapse.
+
+**`AtomicInteger`** — A Java concurrency class providing thread-safe integer operations without `synchronized` blocks. Used in the concurrent booking test to count successes and failures across 100 threads without race conditions on the counter itself.
+
+**`ExecutorService`** — The Java thread pool abstraction. `Executors.newFixedThreadPool(100)` creates a pool of 100 threads reused across submitted tasks. Used in the concurrent booking test to simulate 100 simultaneous reservation attempts.
+
+**Exponential Backoff** — A retry delay strategy where each retry waits longer than the previous one (delay × multiplier). `@Backoff(delay = 100, multiplier = 2.0)` on `BookingService.reserveTickets()`: retry 1 waits 100ms, retry 2 waits 200ms, retry 3 waits 400ms. Reduces contention caused by synchronized retry storms.
+
+**`volatile` keyword** — A Java field modifier ensuring that all threads read the field's value directly from main memory (not a CPU cache copy). Used in `InventoryWarmupHealthIndicator.warmupComplete` — the field is written by the warm-up thread and read by the health-check thread; without `volatile`, the health-check thread might read a stale cached `false` value.
+
+**At-Least-Once Delivery** — A message delivery guarantee where the broker ensures each message is delivered at least once, but may deliver it more than once. RabbitMQ with manual ACK provides at-least-once delivery. This is why idempotency (Fix 9.2) is required — the same message may arrive twice.
+
+---
+
+## 9. Spring-Specific Concepts and Annotations
+
+**`@RequiredArgsConstructor`** — The Lombok annotation used on every `@Service`, `@Component`, and `@RestController`. Generates a constructor with one parameter per `private final` field, enabling Spring's constructor injection without writing the constructor manually.
+
+**`@Transactional`** — The Spring annotation that wraps a method in a database transaction. Applied at class level with `readOnly = true` as the default; write methods override with plain `@Transactional`. The transaction commits when the annotated method returns normally and rolls back when it throws an unchecked exception.
+
+**`@Transactional(readOnly = true)`** — The variant that signals read-only intent. Tells Hibernate to skip dirty checking; tells Spring to potentially route to a read replica; makes the method's intent explicit to code reviewers. Class-level default on all six service classes.
+
+**`@PostConstruct`** — The annotation on `InventoryService.warmUpInventoryCache()`. The annotated method is called by Spring once after the bean is fully constructed and all dependencies are injected, but before the application starts accepting traffic. Used to load all tier availability counts from PostgreSQL into Redis.
+
+**`@EnableStateMachineFactory`** — The Spring State Machine annotation in `BookingStateMachineConfig`. MUST be used instead of `@EnableStateMachine` — the factory creates a new, isolated state machine instance per `stateMachineFactory.getStateMachine(bookingId)` call, preventing state sharing between concurrent booking requests.
+
+**`@EnableRetry`** — Applied to a `@Configuration` class (or `TicketingApplication.java`). Activates Spring Retry's AOP proxy, enabling `@Retryable` and `@Recover` annotations on service methods.
+
+**`@Retryable`** — Applied to `BookingService.reserveTickets()`. Intercepts `ObjectOptimisticLockingFailureException` and automatically re-invokes the method up to `maxAttempts = 3` times.
+
+**`@EnableMethodSecurity`** — Applied to `SecurityConfig`. Enables Spring Security's AOP for `@PreAuthorize`, `@PostAuthorize`, and `@Secured` annotations on controller and service methods.
+
+**`@Where`** — A Hibernate-specific annotation placed on the `Booking` entity: `@Where(clause = "deleted_at IS NULL")`. Appends this SQL condition to every query that loads `Booking` entities — soft-deleted bookings are invisible to normal JPA queries without any additional filtering in the repository.
+
+**`@Enumerated(EnumType.STRING)`** — The JPA annotation on `User.role`. Tells Hibernate to store the enum value as its name string (e.g., `"ORGANIZER"`) rather than its ordinal number (e.g., `1`). Combined with `@Column(columnDefinition = "user_role")` to map to the PostgreSQL ENUM type.
+
+**`@Version`** — The JPA annotation on `Booking.version`. Hibernate manages this field automatically — reads it on load, includes `WHERE version = {read_value}` on UPDATE, increments it on successful update. No application code touches this field.
+
+**`@EntityGraph`** — The JPA annotation or `EntityGraph` name on a repository method that specifies which associations to eagerly JOIN FETCH in a single query. Used on `EventRepository` to prevent the N+1 problem when loading events with their categories and venues.
+
+**`@Cacheable`** — Applied to `EventService.getEventById(Long id)`. On first call, executes the DB query and caches the result in Redis under key `events::1`. On subsequent calls with the same ID, returns the cached value without hitting the DB.
+
+**`@CacheEvict`** — Applied to `EventService.updateEvent()` and `deleteEvent()`. Removes the specific event's cached entry from Redis to prevent stale data from being served after a write.
+
+**`OncePerRequestFilter`** — The Spring base class for `CorrelationIdFilter` and `JwtFilter`. Guarantees `doFilterInternal()` is called exactly once per request, even if the filter chain is re-entered (e.g., for error dispatching).
+
+**`@ControllerAdvice`** — The Spring annotation on a global exception handler class. Intercepts exceptions thrown by any controller method and maps them to structured `ApiResponse<Void>` error JSON bodies with appropriate HTTP status codes.
+
+**`@ConfigurationProperties`** — Used to bind `application.yml` configuration blocks to strongly-typed Java classes (e.g., `StripeProperties` binding `stripe.secret-key` and `stripe.webhook-secret`). Type-safe — a missing required property causes startup failure.
+
+**`@SpringBootApplication`** — The main application class annotation combining `@Configuration`, `@EnableAutoConfiguration`, and `@ComponentScan`. `TicketingApplication.java` is the single entry point that bootstraps the entire Spring context.
+
+---
+
+## 10. Design Patterns and Architectural Concepts
+
+*These are defined in full in Breakdown 1. Brief project-specific references here.*
+
+**Modular Monolith** — The architecture style: one deployable JAR, 7 independently-laid-out domain packages (`com.ticketing.event`, `com.ticketing.booking`, etc.), shared infrastructure in `com.ticketing.common`. Each domain can be extracted to a microservice without restructuring.
+
+**Layered Architecture** — Within each domain: Controller (HTTP) → Service (business logic) → Repository (data access). No cross-layer calls skipping a layer (e.g., no controller touching a repository directly).
+
+**Event-Driven Architecture** — State machine actions publish RabbitMQ domain events (`BookingConfirmedEvent`, `RefundDeniedEvent`). Listeners (`NotificationListener`, `QRCodeGenerationListener`) react to these events without the publisher knowing the subscriber exists.
+
+**Domain-Driven Design (Lite)** — The 7 domains (event, booking, payment, inventory, notification, pricing, user) represent bounded contexts. `Booking` is an aggregate root owning `Ticket` and `Payment`. `BookingState` and `BookingEvent` are value objects.
+
+**Anti-Corruption Layer** — `PaymentService` wraps the Stripe SDK, translating Stripe's `checkout.Session` into domain-native `CheckoutSessionResponse`. The rest of the system never depends on Stripe types.
+
+**Hexagonal Architecture (Not used)** — See Breakdown 1C. The project uses a simpler layered approach.
+
+---
+
+## 11. API and Integration Concepts
+
+**REST — Representational State Transfer** — The API style used for all backend endpoints. Resources are nouns (`/api/events`, `/api/bookings`), verbs are HTTP methods (`GET`, `POST`, `PUT`, `DELETE`), state is in responses not the server session.
+
+**`ApiResponse<T>`** — The standard response wrapper DTO for all API endpoints. Wraps the payload `T` in a consistent envelope: `{ "success": true, "data": {...}, "message": "...", "timestamp": "..." }`. Error responses set `success: false` and populate `message`.
+
+**Stripe Checkout Session** — The Stripe-hosted payment page. `PaymentService.createCheckoutSession()` creates it with line items from the booking's tickets, a 30-minute expiry, and `metadata: {bookingId, userId}`. Returns a URL the frontend redirects the user to.
+
+**Stripe Webhook** — An HTTP POST callback Stripe sends to `/api/webhooks/stripe` when a payment event occurs (`checkout.session.completed`, `checkout.session.expired`). The endpoint verifies the signature and delegates to `PaymentService`. This is the ONLY mechanism for confirming payment — the redirect URL alone is not trusted.
+
+**`X-Correlation-ID` Header** — A UUID generated per HTTP request by `CorrelationIdFilter`. Included in the response header and in all RabbitMQ message headers. Allows tracing a single user action (e.g., booking reservation) across all log lines, service calls, and queue messages.
+
+**HTTP Idempotency** — The property of HTTP methods where calling them multiple times produces the same result. `GET` and `DELETE` are naturally idempotent. The Stripe webhook `POST` is made idempotent through the `ProcessedStripeEvent` table (Fix 9.2).
+
+**OpenAPI / Swagger (implicit)** — Not explicitly configured in this project but `springdoc-openapi` is commonly added to Spring Boot 3.x projects to auto-generate API documentation from controller annotations. Relevant for frontend integration and third-party developer experience.
+
+**Actuator Endpoints** — RESTful HTTP endpoints exposed by Spring Actuator for operational purposes: `/actuator/health` (overall health), `/actuator/health/readiness` (pre-traffic readiness check by Railway), `/actuator/metrics` (JVM, HikariCP, cache stats), `/actuator/info`.
+
+---
+
+## 12. Performance and Observability Concepts
+
+**Structured Logging** — Log output formatted as key-value pairs or JSON, enabling log aggregation tools (e.g., Datadog, ELK Stack) to parse and query logs. Achieved in this project through SLF4J parameterized logging (`logger.info("Booking {} reserved", bookingId)`) combined with MDC context (`correlationId`).
+
+**N+1 Query Problem** — The database performance antipattern where a query for N records triggers N additional queries to load associated records. For example, loading 20 events and then issuing 20 separate queries for each event's venue. Prevented in this project via `@EntityGraph` and `@BatchSize` (Day 6 fixes).
+
+**HikariCP Pool Exhaustion** — The failure mode where all database connections in the pool are in use and new requests queue, causing `connection-timeout` exceptions after 30 seconds. Prevented by tuning `maximum-pool-size` to match PostgreSQL's `max_connections` minus connections used by other tools.
+
+**k6 Virtual Users (VUs)** — The load testing concept of simulated concurrent users. `k6` runs a JavaScript scenario defining the booking flow, with N virtual users executing it simultaneously. Results include throughput (requests/sec), error rate, and latency percentiles (p50, p95, p99).
+
+**p95 Latency** — The latency value below which 95% of requests complete. If p95 = 800ms for `POST /api/bookings/reserve`, 95% of reservation attempts complete within 800ms; 5% take longer. The project targets p95 < 200ms for read endpoints and < 1000ms for booking operations under load.
+
+**JaCoCo Coverage Report** — The HTML and XML output from JaCoCo measuring line coverage (% of code lines executed by tests), branch coverage (% of if/else branches taken), and method coverage. Target: 80%+ line coverage on service classes.
+
+**`EXPLAIN ANALYZE`** — See Breakdown 2C. The PostgreSQL query analysis command used during Day 6 performance work to identify missing indexes and slow query plans.
+
+**Cache Hit Rate** — The percentage of `@Cacheable` calls that return from Redis rather than hitting PostgreSQL. Monitored via Spring Actuator's `cache.gets` metric with `result=hit` vs `result=miss`. A high hit rate on `EventService.getEventById()` means the event listing page rarely touches the DB.
+
+**Dead Letter Queue Monitoring** — The practice of alerting when messages accumulate in DLQs (`booking.confirmation.dlq`, `ticket.generation.dlq`). DLQ messages indicate a failed processing loop. Monitored via RabbitMQ management UI or custom Actuator health check.
+
+**Correlation ID Tracing** — The practice of attaching a unique ID to every request and propagating it through all log lines, downstream service calls, and message queue headers, enabling a complete trace of any request's journey through the system. Implemented by `CorrelationIdFilter` and the RabbitMQ message header propagation in Fix CC-1.
+
+---
+
+## 13. Business Domain Concepts (Ticketing-Specific)
+
+**Ticket Tier** — A pricing category within an event (e.g., "General Admission $49", "VIP $149", "Early Bird $29"). One event has one or more `TicketTier` rows. Each tier has its own `available_count` tracked in both PostgreSQL and Redis.
+
+**Reservation Window** — The 5-minute time limit (`RESERVATION_TTL_SECONDS = 300`) during which a user holds selected seats (state: `RESERVED`) before completing checkout. If the window expires before payment, `ReservationExpirationJob` fires `TIMER_EXPIRED` and releases the seats back to inventory.
+
+**Oversell** — The critical business failure of selling more tickets than are available. Prevented by the two-layer guard: Redis Lua floor guard in `InventoryService.reserveSeat()` and TOCTOU double-check inside the distributed lock in `BookingService.reserveTickets()`.
+
+**Early Bird Pricing** — A discount applied when a purchase is made more than `EARLY_BIRD_DAYS_THRESHOLD = 30` days before the event. `EarlyBirdPricingStrategy.apply()` reduces the base tier price by `EARLY_BIRD_DISCOUNT = 50%`.
+
+**Group Discount** — A price reduction applied when a booking includes at least `GROUP_DISCOUNT_MIN_QUANTITY = 5` tickets. `GroupPricingStrategy.apply()` reduces price by `GROUP_DISCOUNT_RATE = 10%`.
+
+**Dynamic Pricing (Demand Surge)** — A price increase triggered when an event's sold percentage exceeds `DYNAMIC_PRICING_THRESHOLD = 80%`. `DynamicPricingStrategy.apply()` increases the price by `DYNAMIC_PRICING_SURGE = 25%`. Calculated from `(total - available) / total`.
+
+**Refund Policy Tiers** — The business rules governing refund eligibility: ≥ 7 days before event (`FULL_REFUND_DAYS_THRESHOLD`) → full refund; 3–6 days (`PARTIAL_REFUND_DAYS_THRESHOLD`) → 50% refund; < 3 days → refund denied. Enforced in `RefundService` and surfaced in the `REFUND_DENIED` state with `refundDenialReason` field (Fix 12.1).
+
+**Booking State** — The lifecycle stage of a booking: `RESERVED` (seats held, payment not started) → `PAYMENT_PENDING` (checkout session created) → `CONFIRMED` (payment received via webhook) → `ATTENDED` (check-in completed by organizer). Terminal states: `EXPIRED`, `PAYMENT_FAILED`, `REFUND_APPROVED`, `REFUND_DENIED`, `CANCELLED`.
+
+**QR Code** — A 2D barcode generated per ticket after booking is `CONFIRMED`. Contains encoded ticket ID and booking ID for scanner verification at event entrance. Generated asynchronously by `QRCodeGenerationListener` consuming from `ticket.generation.queue` (Fix 10.2).
+
+**Check-In** — The process of an organizer scanning a ticket's QR code to mark a booking as `ATTENDED`. Restricted to users with the `ORGANIZER` role (`@PreAuthorize`) who own the event (`CheckInGuard` at state machine layer). Fires the `CHECK_IN` event on the booking state machine.
+
+**Waitlist** — A feature where users can register interest in a sold-out event. Controlled by `events.waitlist_enabled BOOLEAN` (added in `V8__add_event_features.sql`). When a reservation expires and seats are released, the waitlist is offered the seats in order.
+
+**Organizer** — A user with `role = ORGANIZER` who creates and manages events. Authorization is enforced at two layers: `@PreAuthorize("hasRole('ORGANIZER')")` at the controller HTTP layer; service-layer ownership check (`event.getOrganizerId().equals(currentUserId)`) to prevent one organizer from modifying another organizer's event.
+
+**Soft Delete** — The practice of marking a booking as deleted via `deleted_at TIMESTAMPTZ` instead of physically removing it, preserving payment history, audit trail, and seat release records. Covered in full in Breakdown 2A (Schema Concept #8).
+
+**Event Status** — The lifecycle state of an event itself (distinct from booking state): `DRAFT` (created, not visible) → `PUBLISHED` (visible, no sales yet) → `SALES_OPEN` → `SALES_CLOSED` → `COMPLETED` → `ARCHIVED`. Booking reservations are only possible in `SALES_OPEN` state.
+
+**Inventory Warm-Up** — The `@PostConstruct` process where `InventoryService` reads all `ticket_tiers.available_count` values from PostgreSQL and populates corresponding Redis keys (`inventory:tier:{id}:available`) before the application accepts traffic. Guarded by `InventoryWarmupHealthIndicator`.
+
+**Stripe Idempotency Key** — A unique key sent with Stripe API requests to ensure that a network retry of a create-checkout-session call does not create two sessions. The `booking.id` is used as the Stripe idempotency key for checkout session creation.
+
+**PaymentService (Anti-Corruption Layer)** — See Breakdown 1B (Facade Pattern). The single class that translates between Stripe's SDK model and the domain model. No other class in the system imports `com.stripe.*` directly.
+
+**ProcessedStripeEvent** — The entity/table that records each processed Stripe webhook event ID. Existence of a row = the webhook was already processed. A `UNIQUE` constraint enforces idempotency at the database level. See Breakdown 2A (Unique Constraints) and Breakdown 2B (Idempotency).

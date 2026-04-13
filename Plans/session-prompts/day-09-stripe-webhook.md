@@ -3,6 +3,45 @@
 
 ---
 
+## YOUR FIRST MESSAGE TO COPILOT
+> After pasting `intsructions.txt` content, send this as your next message:
+
+```
+We are on Day 9 — Stripe Checkout + Webhook.
+Feature: stripe-webhook
+
+Active fixes today:
+- Fix 9.1 — CRITICAL: StripeWebhookController NOT @Transactional (return 200 AFTER commit)
+- Fix 9.2 — CRITICAL: Catch DataIntegrityViolationException for true webhook idempotency
+- Cross-cutting: Fix CC-1, Fix CC-2
+
+Pre-conditions confirmed:
+- Day 8 complete: BookingStateMachine tests 5/5 passing ✅
+- reserveTickets() with TOCTOU double-check implemented ✅
+- Stripe account + CLI installed ✅
+
+TDD MANDATORY — Tests FIRST (Red phase):
+Write PaymentServiceTest, StripeWebhookControllerTest, and WebhookServiceTest BEFORE any implementation:
+  createCheckoutSession_forValidBooking_inReservedState_shouldReturnStripeUrl()
+  createCheckoutSession_whenBookingNotInReservedState_shouldThrowConflictException()
+  createCheckoutSession_whenBookingNotOwnedByUser_shouldThrowForbiddenException()
+  handleWebhook_withInvalidSignature_shouldReturn400()
+  handleWebhook_withValidSignature_shouldReturn200()
+  processEvent_paymentSuccess_shouldTransitionBookingToConfirmed()
+  processEvent_duplicateEvent_shouldThrowDataIntegrityViolation_andSilentlyIgnore()
+
+Run ./mvnw test -Dtest=PaymentServiceTest,WebhookServiceTest — ALL must FAIL before coding.
+
+Non-negotiable rules:
+- Mock all Stripe SDK calls in tests (never call real Stripe API in unit tests).
+- StripeWebhookController must be normal @RestController, delegating to a @Transactional service.
+- DataIntegrityViolationException is the idempotency guard (requires unique constraint in DB schema).
+
+Start with: Write PaymentServiceTest with all 3 test method signatures. Confirm they fail.
+```
+
+---
+
 ## Context Briefing
 
 **What we're building today:**
@@ -36,12 +75,30 @@ If the webhook returns 200 BEFORE the DB transaction commits and then the app cr
 
 ## Tasks (In Order)
 
-### Morning (1.5 hrs) — Stripe Research
+### Morning (1.5 hrs) — Stripe Research + Write Tests First (Red — TDD)
 - Read Stripe Checkout Java quickstart
 - Read webhooks guide (signature verification section)
 - Read test card numbers reference
 - Verify Stripe account: `sk_test_*` and `pk_test_*` keys in `application-local.yml`
 - Run: `stripe listen --forward-to localhost:8080/api/webhooks/stripe` — copy webhook secret
+
+**After research, write ALL tests first before any implementation (TDD — Red phase):**
+```java
+// PaymentServiceTest.java — all Stripe SDK calls mocked with Mockito
+createCheckoutSession_forValidBooking_inReservedState_shouldReturnStripeUrl()
+createCheckoutSession_whenBookingNotInReservedState_shouldThrowConflictException()
+createCheckoutSession_whenBookingNotOwnedByUser_shouldThrowForbiddenException()
+
+// StripeWebhookControllerTest.java — @WebMvcTest
+handleWebhook_withInvalidSignature_shouldReturn400()
+handleWebhook_withValidSignature_shouldReturn200()
+
+// WebhookServiceTest.java — unit test the service layer
+processEvent_paymentSuccess_shouldTransitionBookingToConfirmed()
+processEvent_duplicateEvent_shouldThrowDataIntegrityViolation_andSilentlyIgnore()
+```
+Run `./mvnw test -Dtest=PaymentServiceTest,WebhookServiceTest` — confirm ALL tests FAIL.
+Do NOT write any production code until all tests are red.
 
 ### Afternoon (4.5 hrs) — Stripe Integration
 
@@ -124,14 +181,15 @@ stripe listen --forward-to localhost:8080/api/webhooks/stripe
 # Copy the webhook signing secret printed to console → set as STRIPE_WEBHOOK_SECRET
 ```
 
-### Evening (1 hr) — PaymentService Tests
-```java
-createCheckoutSession_forValidBooking_shouldReturnStripeUrl()
-handleWebhook_withInvalidSignature_shouldReturn400()
-handlePaymentSuccess_shouldTransitionBookingToConfirmed()
-// Mock all Stripe SDK calls with Mockito — NEVER call real Stripe in unit tests
-```
-Git commit: `feat: implement stripe checkout and webhook handling`
+### Evening (1 hr) — Green Phase Verification + Git
+- Run `./mvnw test -Dtest=PaymentServiceTest,WebhookServiceTest` — ALL 7 tests must be GREEN
+- Run `./mvnw test` — entire test suite must pass
+- Manual smoke test with Stripe CLI:
+  ```bash
+  stripe trigger checkout.session.completed  # fires test event
+  # Verify: booking status → CONFIRMED in DB
+  ```
+- Git commit: `feat: implement stripe checkout and webhook handling`
 
 ---
 

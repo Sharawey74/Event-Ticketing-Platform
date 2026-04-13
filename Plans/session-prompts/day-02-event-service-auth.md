@@ -3,6 +3,47 @@
 
 ---
 
+## YOUR FIRST MESSAGE TO COPILOT
+> After pasting `intsructions.txt` content, send this as your next message:
+
+```
+We are on Day 2 — Event Domain + Auth (JWT).
+Feature: event-service-auth
+
+Active fixes today:
+- Fix 2.1 — IMPORTANT: @Transactional(readOnly=true) at CLASS level on every service
+- Fix 2.2 — IMPORTANT: @RequiredArgsConstructor everywhere — zero @Autowired
+- Fix CC-1 — GOOD: X-Correlation-ID on all log statements
+- Fix CC-2 — IMPORTANT: BusinessConstants for all values
+
+Pre-conditions confirmed:
+- Day 1 complete: ./mvnw compile passes ✅
+- All 9 Flyway migrations run on startup ✅
+- All entities use Instant (zero LocalDateTime) ✅
+- BusinessConstants.java exists ✅
+- Docker Desktop is running ✅
+
+TDD MANDATORY:
+Write ALL EventService test methods BEFORE writing EventService:
+  createEvent_withValidData_shouldReturnEvent()
+  createEvent_withPastDate_shouldThrowValidationException()
+  getEvent_withNonExistentId_shouldThrowNotFoundException()
+  updateEvent_asNonOrganizer_shouldThrowForbiddenException()
+  updateEvent_whenPublished_shouldChangeState()
+Run ./mvnw test -Dtest=EventServiceTest — confirm ALL FAIL before coding.
+
+Non-negotiable rules:
+- @Transactional(readOnly=true) at class level, @Transactional on write methods only
+- @RequiredArgsConstructor + private final (zero @Autowired)
+- Instant everywhere (zero LocalDateTime)
+- DTOs only in API responses (never expose JPA entities)
+
+Start with: write the EventServiceTest class with all 5 test method signatures.
+Confirm they all fail before writing EventService.
+```
+
+---
+
 ## Context Briefing
 
 **What we're building today:**

@@ -1,0 +1,541 @@
+# Full System Workflow — Complete Relationship & Communication Map
+## Event Ticketing Platform — Phase 1A
+
+---
+
+## LAYER MAP OVERVIEW
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  EXTERNAL CLIENTS                                                    │
+│   Next.js 14 (Browser)          Stripe (Webhook Caller)             │
+│   k6 (Load Test Agent)          Stripe CLI (Local Dev Forwarder)    │
+└─────────────────────────────────┬────────────────────────────────────┘
+                                  │ HTTPS
+┌─────────────────────────────────▼────────────────────────────────────┐
+│  SECURITY LAYER  (Every request passes through this)                │
+│   JwtFilter (OncePerRequestFilter)                                  │
+│   CorrelationIdFilter (OncePerRequestFilter, Order=1)               │
+│   Spring Security Filter Chain (SecurityConfig)                     │
+│   @PreAuthorize on controller methods                               │
+└─────────────────────────────────┬────────────────────────────────────┘
+                                  │
+┌─────────────────────────────────▼────────────────────────────────────┐
+│  HTTP LAYER — Controllers (com.ticketing.{domain}.controller)        │
+│   EventController          UserController                            │
+│   BookingController        StripeWebhookController                  │
+│   PaymentController        @ControllerAdvice (GlobalExceptionHandler)│
+└──────────┬──────────────────────┬────────────────────────────────────┘
+           │                      │
+           │ Service calls        │ @Transactional service call
+           │ (no @Transactional   │ (PaymentService.handleStripeWebhook)
+           │  on webhook ctrl)    │
+┌──────────▼──────────────────────▼────────────────────────────────────┐
+│  SERVICE LAYER — Business Logic (com.ticketing.{domain}.service)     │
+│   EventService              @Transactional(readOnly = true) default  │
+│   BookingService            write methods override @Transactional    │
+│   PaymentService            @Retryable on reserveTickets()           │
+│   InventoryService          @PostConstruct warm-up                  │
+│   PricingEngineService      Strategy chain per booking               │
+│   UserService               BCrypt password handling                 │
+│   RefundService             3-tier refund policy                     │
+│   WaitlistService                                                    │
+│   BookingStateMachineService  factory.getStateMachine(bookingId)     │
+│   DistributedLockService    Lua acquire + Lua release                │
+└──────────┬──────────────────────┬──────────────────────┬─────────────┘
+           │                      │                      │
+    DB calls               Redis calls           RabbitMQ publishes
+           │                      │                      │
+┌──────────▼──────────┐  ┌────────▼────────┐   ┌────────▼────────────┐
+│  DATA LAYER         │  │  REDIS 7        │   │  RABBITMQ 3.12      │
+│  JPA Repositories   │  │  Inventory      │   │  booking.exchange   │
+│  Hibernate ORM      │  │  counters       │   │  notification.exch  │
+│  HikariCP pool      │  │  Distributed    │   │  Queues + DLQs      │
+│  TIMESTAMPTZ        │  │  lock tokens    │   │  Dead Letter Queues │
+│  ENUM types         │  │  Event cache    │   └────────┬────────────┘
+│  @Version optim.lk  │  │  Lua scripts    │            │
+│  soft delete        │  │  @Cacheable     │   ┌────────▼────────────┐
+│  partial indexes    │  └─────────────────┘   │  ASYNC LISTENERS   │
+│  Flyway migrations  │                        │  NotificationLstnr  │
+└──────────┬──────────┘                        │  QRCodeGenLstnr     │
+           │                                   │  WaitlistLstnr      │
+┌──────────▼──────────┐                        └────────┬────────────┘
+│  POSTGRESQL 15      │                                 │
+│  9 tables           │◄────────────────────────────────┘
+│  V1–V9 Flyway       │  (listeners may write back to DB)
+│  ACID guarantees    │
+│  Source of truth    │
+└─────────────────────┘
+```
+
+---
+
+## FLOW 1 — User Registration & Login
+
+```
+Browser                Spring Boot               PostgreSQL
+  │                         │                        │
+  ├─POST /api/auth/register─►│                        │
+  │                         ├─validate DTO (@Valid)   │
+  │                         ├─BCrypt.encode(password) │
+  │                         ├─userRepo.save(user)────►│
+  │                         │                        ├─INSERT users
+  │                         │                        │  role=USER (ENUM)
+  │◄─201 {userId, email}────┤◄───────────────────────┤
+  │                         │                        │
+  ├─POST /api/auth/login────►│                        │
+  │  {email, password}      ├─userRepo.findByEmail()─►│
+  │                         │◄────────────User entity─┤
+  │                         ├─BCrypt.matches(raw,hash)│
+  │                         ├─JwtService.generateToken│
+  │◄─200 {jwt, expiresIn}───┤                        │
+```
+
+**Cross-cutting:** `CorrelationIdFilter` adds `X-Correlation-ID` to MDC before any of these steps. Every log line from `UserService` includes the correlation ID automatically.
+
+---
+
+## FLOW 2 — Event Browsing (Read Path with Cache)
+
+```
+Browser          JwtFilter       EventController    EventService      Redis     PostgreSQL
+  │                  │                │                  │               │           │
+  ├─GET /api/events──►│               │                  │               │           │
+  │  JWT optional    ├─(skip if pub)  │                  │               │           │
+  │                  ├──────────────►│                  │               │           │
+  │                  │              ├─eventSvc.getEvents()               │           │
+  │                  │              │                  ├─@Cacheable hit?─►│          │
+  │                  │              │                  │               ├─HIT: return│
+  │                  │              │                           MISS:  │           │
+  │                  │              │                  ├──────────────────────────►│
+  │                  │              │                  │  @EntityGraph JOIN FETCH   │
+  │                  │              │                  │  (event + category + venue)│
+  │                  │              │                  │◄──────Page<Event>──────────┤
+  │                  │              │                  ├─map to EventResponse DTOs  │
+  │                  │              │                  ├─store in Redis cache        │
+  │◄─200 Page<Event>─┤──────────────┤◄─────────────────┤               │           │
+```
+
+**Optimization path:** Second browser request within 10 minutes hits Redis, never touches PostgreSQL. `@Transactional(readOnly = true)` skips Hibernate dirty checking. Composite index `idx_events_status_date` used for filtered queries.
+
+---
+
+## FLOW 3 — Ticket Reservation (The Core Critical Path)
+
+```
+Browser      JwtFilter   BookingController   BookingService   DistributedLockService   InventoryService   Redis    PostgreSQL
+  │             │              │                   │                    │                     │              │          │
+  ├─POST /api/bookings/reserve─►│                  │                    │                     │              │          │
+  │  {tierId, qty}  JWT:userId  ├─reserveTickets()─►│                   │                     │              │          │
+  │             │              │                   │                    │                     │              │          │
+  │             │              │         Step 1: validate event (status=SALES_OPEN) ──────────────────────────────────►│
+  │             │              │                   │◄────────────────────────────────────────────────────────────────────┤
+  │             │              │                   │                    │                     │              │          │
+  │             │              │         Step 2: FAST-FAIL check (before lock)               │              │          │
+  │             │              │                   ├─getAvailableCount(tierId)───────────────►│──GET key────►│          │
+  │             │              │                   │◄─────────────────────────────────────────┤◄─return N────┤          │
+  │             │              │                   │ if N < qty: throw InsufficientInventory  │              │          │
+  │             │              │                   │                    │                     │              │          │
+  │             │              │         Step 3: ACQUIRE DISTRIBUTED LOCK (user-scoped)       │              │          │
+  │             │              │                   ├─acquireLock("seat:lock:tier:X:user:Y")──►│              │          │
+  │             │              │                   │                   ├─Lua: SET NX EX 300───────────────►│          │
+  │             │              │                   │◄──────────────────┤◄──────────────────────────────────┤          │
+  │             │              │                   │  if not acquired: retry/fail              │              │          │
+  │             │              │                   │                    │                     │              │          │
+  │             │   ┌──────────────── INSIDE LOCK BODY ──────────────────────────────────────────────────────────────┐│
+  │             │   │           │         Step 4: TOCTOU GUARD (double-check inside lock)    │              │          ││
+  │             │   │           │                   ├─getAvailableCount(tierId)───────────────►│──GET key────►│         ││
+  │             │   │           │                   │◄──────────────────────────────────────────┤◄─return M────┤         ││
+  │             │   │           │                   │  if M < qty: throw (race was real)       │              │          ││
+  │             │   │           │                   │                    │                     │              │          ││
+  │             │   │           │         Step 5: LUA FLOOR GUARD (atomic decrement)          │              │          ││
+  │             │   │           │                   ├─reserveSeat(tierId, qty)────────────────►│              │          ││
+  │             │   │           │                   │                             ├─Lua script─►│──DECRBY──────►│         ││
+  │             │   │           │                   │◄──────────────────────────────────────────┤◄─new count───┤         ││
+  │             │   │           │                   │  if result<0: throw (floor guard fired)  │              │          ││
+  │             │   │           │                   │                    │                     │              │          ││
+  │             │   │           │         Step 6-10: Create Booking, Tickets, set expires_at  │              │          ││
+  │             │   │           │                   ├──────────────────────────────────────────────────────────────────►││
+  │             │   │           │                   │  INSERT bookings (state=RESERVED, version=0, expires_at=now+300s)││
+  │             │   │           │                   │  INSERT tickets (one per qty)            │              │          ││
+  │             │   │           │◄──────────────────────────────────────────────────────────────────────────────────────┤│
+  │             │   └──────────────── END LOCK BODY ───────────────────────────────────────────────────────────────────┘│
+  │             │              │                    │                   │                     │              │          │
+  │             │              │         FINALLY: RELEASE LOCK          │                     │              │          │
+  │             │              │                   ├─releaseLock(key, value)─────────────────►│              │          │
+  │             │              │                   │                   ├─Lua: if GET==value then DEL──────────►│         │
+  │             │              │                   │◄──────────────────┤◄────────────────────────────────────┤          │
+  │◄─201 BookingResponse───────┤◄──────────────────┤                   │                     │              │          │
+```
+
+**@Retryable wraps the entire flow:** If `ObjectOptimisticLockingFailureException` is thrown from the INSERT, Spring Retry replays the entire method (steps 1–10) up to 3 times.
+
+---
+
+## FLOW 4 — Checkout & Stripe Payment
+
+```
+Browser     BookingController  PaymentService       Stripe API    State Machine    RabbitMQ    PostgreSQL
+  │              │                  │                    │              │              │            │
+  ├─POST /checkout─►│               │                    │              │              │            │
+  │  {bookingId}  ├─createCheckout()►│                   │              │              │            │
+  │              │                  ├─validate booking belongs to user               │            │
+  │              │                  ├─validate state = RESERVED         │              │            │
+  │              │                  ├─stateMachine.send(PROCEED_TO_CHECKOUT)         │            │
+  │              │                  │                    │         ├─state: PAYMENT_PENDING        │
+  │              │                  │                    │         ├─UPDATE bookings.state────────►│
+  │              │                  ├─Stripe.checkout.Session.create()               │            │
+  │              │                  │  (line items, 30min expiry, metadata)          │              │
+  │              │                  │──────────────────►│              │              │            │
+  │              │                  │◄───Session{url}───┤              │              │            │
+  │              │                  ├─save Payment entity (status=PENDING, stripe_session_id)────►│
+  │◄─200 {checkoutUrl}──────────────┤                   │              │              │            │
+  │                                 │                   │              │              │            │
+  BROWSER REDIRECTS TO STRIPE ─────────────────────────►│              │              │            │
+  USER PAYS ON STRIPE-HOSTED PAGE   │                   │              │              │            │
+  STRIPE SENDS WEBHOOK ─────────────────────────────────│──────────────────────────────────────────
+```
+
+---
+
+## FLOW 5 — Stripe Webhook Processing (Most Critical Flow)
+
+```
+Stripe         StripeWebhookController   PaymentService(@Transactional)   StateMachine   RabbitMQ   PostgreSQL
+  │                     │                         │                            │              │          │
+  ├─POST /webhooks/stripe►│                        │                            │              │          │
+  │  Stripe-Signature   ├─Webhook.constructEvent() │                            │              │          │
+  │                     │  sig verification         │                            │              │          │
+  │                     │  (400 if invalid)         │                            │              │          │
+  │                     ├─paymentSvc.handleWebhook()►│                          │              │          │
+  │                     │ (NOT @Transactional here) │                            │              │          │
+  │                     │                     ┌────▼──────── @Transactional ────────────────────────────┐│
+  │                     │                     │    │                            │              │         ││
+  │                     │                     │    ├─processedRepo.save(eventId)──────────────────────►││
+  │                     │                     │    │  (UNIQUE constraint guard)  │              │         ││
+  │                     │                     │    │  if DataIntegrityViolation: │              │         ││
+  │                     │                     │    │    log("duplicate") return  │              │         ││
+  │                     │                     │    │                            │              │         ││
+  │                     │                     │    ├─"checkout.session.completed"│              │         ││
+  │                     │                     │    ├─UPDATE Payment.status=PAID───────────────────────►││
+  │                     │                     │    ├─stateMachine.send(PAYMENT_SUCCESS)        │         ││
+  │                     │                     │    │                       ├─state→CONFIRMED   │         ││
+  │                     │                     │    │                       ├─ConfirmBookingAction         ││
+  │                     │                     │    │                       │    ├─rabbitTemplate.send(BookingConfirmedEvent)
+  │                     │                     │    │                       │    │              ├─────────►││
+  │                     │                     │    │                       ├─GenerateQRCodeAction         ││
+  │                     │                     │    │                       │    ├─rabbitTemplate.send(GenerateQRCodesCommand)
+  │                     │                     │    │                       │    │              ├─────────►││
+  │                     │                     │    ├─UPDATE bookings.state=CONFIRMED──────────────────►││
+  │                     │                     └────▼──────── TRANSACTION COMMITS ────────────────────────┘│
+  │                     │                                                                      │          │
+  │◄─200 OK (AFTER commit, not before)──────────────────────────────────────────────────────────         │
+```
+
+**If PaymentService throws:** Controller catches, returns 500. Stripe retries. Transaction was rolled back — no partial state. The `ProcessedStripeEvent` row was NOT committed, so the retry will be processed normally.
+
+---
+
+## FLOW 6 — Async Notification & QR Generation
+
+```
+RabbitMQ               NotificationListener              QRCodeGenerationListener        PostgreSQL
+booking.exchange       (booking.confirmation.queue)      (ticket.generation.queue)
+  │                           │                                   │                          │
+  ├─BookingConfirmedEvent─────►│                                  │                          │
+  │  headers: X-Corr-ID       ├─MDC.put(correlationId)            │                          │
+  │                           ├─fetch user email                  │                          │
+  │                           ├─send confirmation email (SMTP)    │                          │
+  │                           ├─ACK (message removed from queue)  │                          │
+  │                           │                                   │                          │
+  ├─GenerateQRCodesCommand─────────────────────────────────────►│                          │
+  │                           │                                   ├─fetch all tickets for bookingId────►│
+  │                           │                                   │◄──────────────────────────────────────┤
+  │                           │                                   ├─for each ticket:                    │
+  │                           │                                   │   ZXing.encode(ticketId)            │
+  │                           │                                   │   base64 QR image                  │
+  │                           │                                   ├─UPDATE tickets SET qr_code=...──────►│
+  │                           │                                   ├─ACK                                 │
+  │                           │                                   │                                   │
+  │  if QRCode generation FAILS:                                                                      │
+  ├──────────────────────────────────── NACK ──────────────────────                                  │
+  │  after N retries: route to ticket.generation.dlq                                                 │
+```
+
+**Frontend polling:** The confirmation page calls `GET /api/bookings/{id}` via React Query every 2 seconds until `tickets[].qrCode` is populated, then shows QR images.
+
+---
+
+## FLOW 7 — Reservation Expiry (Background Job)
+
+```
+Scheduler Thread       ReservationExpirationJob    DistributedLockService    BookingRepository    StateMachine    InventoryService    PostgreSQL    Redis
+  │                           │                          │                        │                    │                │               │             │
+  ├─every 30s (@Scheduled)───►│                          │                        │                    │                │               │             │
+  │                           ├─acquireLock(             │                        │                    │                │               │             │
+  │                           │   "scheduler:rsv-expiry",│                        │                    │                │               │             │
+  │                           │   uuid, 25s)─────────────►│                       │                    │                │               │             │
+  │                           │                          ├─Lua SET NX EX 25────────────────────────────────────────────────────────────────────────►│
+  │                           │◄─────────────────────────┤  if already locked: return "skip"           │                │               │             │
+  │                           │                          │                        │                    │                │               │             │
+  │                     if acquired:                     │                        │                    │                │               │             │
+  │                           ├─findByStateAndExpiresAtBefore(RESERVED, now())────►│                  │                │               │             │
+  │                           │                          │                        ├─SELECT with partial idx────────────────────────────►│             │
+  │                           │◄─────────────────────────────────────────────────┤◄─List<Booking>──────────────────────────────────────┤             │
+  │                           │                          │                        │                    │                │               │             │
+  │                           │ for each expired booking:│                        │                    │                │               │             │
+  │                           ├──stateMachine.send(bookingId, TIMER_EXPIRED)──────────────────────────►│               │               │             │
+  │                           │                          │                        │               ├─state→EXPIRED       │               │             │
+  │                           │                          │                        │               ├─ReleaseSeatsAction  │               │             │
+  │                           │                          │                        │               │    ├─inventorySvc.releaseSeat(tierId, qty)        │
+  │                           │                          │                        │               │    │                ├─INCRBY────────────────────►│
+  │                           │                          │                        │               │    ├─UPDATE bookings.state=EXPIRED────────────────►│
+  │                           │                          │                        │                    │                │               │             │
+  │                           ├─releaseLock(key, uuid)───►│                       │                    │                │               │             │
+  │                           │                          ├─Lua if GET==uuid then DEL──────────────────────────────────────────────────────────────►│
+```
+
+**Multi-instance safety:** Two Railway replicas both wake up at the 30-second tick. Both try to acquire `scheduler:reservation-expiry`. Only one gets the `NX` (not-exists) lock. The other sees `SET NX` fail and logs "skipped."
+
+---
+
+## FLOW 8 — Event Cancellation (Organizer-Triggered)
+
+```
+OrganizerBrowser    EventController    EventService    BookingRepository    StateMachine    RabbitMQ    Stripe    PostgreSQL
+  │                      │                 │                  │                 │              │           │           │
+  ├─DELETE /api/events/99─►│               │                  │                 │              │           │           │
+  │  JWT: organizer      ├─@PreAuthorize(ORGANIZER)           │                 │              │           │           │
+  │                      ├─eventSvc.cancelEvent(99)──────────►│                 │              │           │           │
+  │                      │                 ├─findNonTerminalBookings(eventId=99)►│             │           │           │
+  │                      │                 │◄─────────────────┤◄─List<Booking>──┤             │           │           │
+  │                      │                 │                  │                 │              │           │           │
+  │                      │                 │ for each booking:│                 │              │           │           │
+  │                      │                 ├─stateMachine.send(EVENT_CANCELLED)──────────────►│           │           │
+  │                      │                 │                  │            ├─if CONFIRMED:    │           │           │
+  │                      │                 │                  │            │  CancelBookingAction          │           │
+  │                      │                 │                  │            │     ├─stripe.refund(paymentIntentId)──────►│
+  │                      │                 │                  │            │     ├─publish(EventCancelledNotif)──────►│           │
+  │                      │                 │                  │            ├─if RESERVED:     │           │           │
+  │                      │                 │                  │            │  ReleaseSeatsAction           │           │
+  │                      │                 │                  │            ├─if PAYMENT_PENDING:           │           │
+  │                      │                 │                  │            │  CancelPaymentSessionAction   │           │
+  │                      │                 │                  │            │     ├─stripe.expire(sessionId)──────────►│
+  │                      │                 ├─event.setStatus(ARCHIVED)──────────────────────────────────────────────►│
+  │◄─200 OK──────────────┤◄────────────────┤                  │                 │              │           │           │
+```
+
+---
+
+## FLOW 9 — Check-In (Dual-Guard Authorization)
+
+```
+OrganizerDevice     BookingController      Spring Security       CheckInGuard        StateMachine       PostgreSQL
+  │                       │                     │                    │                   │                  │
+  ├─POST /bookings/5/check-in─►│                │                    │                   │                  │
+  │  JWT: organizerId     │                     │                    │                   │                  │
+  │                       ├─@PreAuthorize("hasRole('ORGANIZER')")─►│                   │                  │
+  │                       │  (Layer 1: HTTP role guard)  ├─verify   │                   │                  │
+  │                       │◄─────────────────────────────┤          │                   │                  │
+  │                       │                     │                    │                   │                  │
+  │                       ├─stateMachineService.send(5, CHECK_IN)───────────────────────►│                 │
+  │                       │                     │                    │             ├─evaluate CheckInGuard  │
+  │                       │                     │                    │◄────────────┤                        │
+  │                       │                     │              ├─bookingRepo.findById(5)──────────────────►│
+  │                       │                     │              │◄──────────────────────────────────────────┤
+  │                       │                     │              ├─booking.event.organizerId == currentUserId │
+  │                       │                     │              │  (Layer 2: event ownership guard)         │
+  │                       │                     │              ├─return true/false ──────────────────────►│
+  │                       │                     │                    │             ├─if false: guard denied │
+  │                       │                     │                    │             │  send FORBIDDEN error  │
+  │                       │                     │                    │             ├─if true: state→ATTENDED│
+  │                       │                     │                    │             ├─UPDATE bookings.state──►│
+  │◄─200 / 403 ───────────┤                     │                    │                   │                  │
+```
+
+---
+
+## FLOW 10 — CI/CD & Deployment Pipeline
+
+```
+Developer Machine        GitHub                 GitHub Actions              Railway
+  │                         │                       │                          │
+  ├─git push origin staged──►│                       │                          │
+  │                         ├─trigger workflow .yml──►│                         │
+  │                         │                       ├─./mvnw verify             │
+  │                         │                       │  (compile + test + jacooc)│
+  │                         │                       ├─docker build              │
+  │                         │                       │  (multi-stage Dockerfile) │
+  │                         │                       ├─docker push registry──────►│
+  │                         │                       │                          ├─pull new image
+  │                         │                       │                          ├─start container
+  │                         │                       │                          ├─poll /health/readiness
+  │                         │                       │                          │  (InventoryWarmupHealthIndicator)
+  │                         │                       │                          ├─warm-up @PostConstruct
+  │                         │                       │                          │  (Redis inventory load)
+  │                         │                       │                          ├─readiness=UP
+  │                         │                       │                          ├─route traffic to new instance
+  │                         │                       │                          ├─drain old instance
+```
+
+---
+
+## CROSS-CUTTING CONCERNS — Applied to Every Flow
+
+```
+EVERY HTTP REQUEST:
+  │
+  ├─[1] CorrelationIdFilter (Order=1, before all else)
+  │      Extract X-Correlation-ID header (or generate UUID)
+  │      MDC.put("correlationId", id)
+  │      response.setHeader(X-Correlation-ID, id) ← echoed back to client
+  │
+  ├─[2] JwtFilter
+  │      Extract "Authorization: Bearer {token}"
+  │      JwtService.validateToken() → userId, role, expiry
+  │      SecurityContextHolder.setAuthentication(...)
+  │
+  ├─[3] SecurityConfig authorization rules
+  │      /api/auth/** → permitAll()
+  │      /api/webhooks/** → no JWT (Stripe signature = auth)
+  │      everything else → authenticated()
+  │
+  ├─[4] Controller method
+  │      @PreAuthorize("hasRole('ORGANIZER')") where applicable
+  │      @Valid on request body DTO → 400 if invalid
+  │
+  ├─[5] Service method (inside @Transactional boundary)
+  │      Business logic
+  │      DB reads/writes via HikariCP → PostgreSQL
+  │      Redis operations via RedisTemplate
+  │      RabbitMQ publishes via RabbitTemplate
+  │           └─ message.setHeader(X-Correlation-ID, MDC.get("correlationId"))
+  │
+  ├─[6] Response
+  │      API response wrapped in ApiResponse<T>
+  │      X-Correlation-ID header echoed
+  │
+  └─[7] CorrelationIdFilter finally block
+         MDC.remove("correlationId") ← ALWAYS cleaned up
+
+EVERY RABBITMQ CONSUMER:
+  ├─Extract X-Correlation-ID from message headers
+  ├─MDC.put("correlationId", id)
+  ├─process message
+  └─MDC.remove("correlationId") in finally block
+```
+
+---
+
+## COMPLETE TECHNOLOGY DEPENDENCY GRAPH
+
+```
+                    ┌─────────────────┐
+                    │   Next.js 14    │
+                    │  TypeScript     │
+                    │  Tailwind CSS   │
+                    │  Zustand        │
+                    │  React Query    │
+                    │  Axios          │
+                    └────────┬────────┘
+                             │ REST/JSON
+                    ┌────────▼────────┐
+              ┌─────┤  Spring Boot    ├──────────────────────────┐
+              │     │  Spring MVC     │                          │
+              │     │  Spring Security│                          │
+              │     │  Spring Data JPA│                          │
+              │     │  Spring AMQP    │                          │
+              │     │  Spring Cache   │                          │
+              │     │  Spring Retry   │                          │
+              │     │  Spring SM 3.2  │                          │
+              │     │  Spring Actuator│                          │
+              │     │  Lombok / jjwt  │                          │
+              │     │  Stripe SDK     │                          │
+              │     │  ZXing / QRGen  │                          │
+              │     │  Flyway         │                          │
+              │     └────────┬────────┘                          │
+              │              │                                   │
+     ┌────────▼──────┐ ┌─────▼──────┐ ┌───────────┐   ┌────────▼────┐
+     │  PostgreSQL   │ │  Redis 7   │ │ RabbitMQ  │   │ Stripe API  │
+     │  15           │ │            │ │  3.12     │   │ (external)  │
+     │  9 tables     │ │  Inventory │ │  Exchanges│   │  Webhooks   │
+     │  Flyway hist  │ │  Locks     │ │  Queues   │   │  Checkout   │
+     │  ACID         │ │  Cache     │ │  DLQs     │   │  Refunds    │
+     │  ENUM types   │ │  Lua       │ │  AMQP     │   └─────────────┘
+     │  TIMESTAMPTZ  │ └────────────┘ └───────────┘
+     └───────────────┘
+
+              ┌──────────────────────────────────────────┐
+              │            INFRASTRUCTURE                 │
+              │  Docker (local dev containers)            │
+              │  Docker Compose (service orchestration)  │
+              │  Multi-Stage Dockerfile (prod image)     │
+              │  Railway (cloud PaaS deployment)         │
+              │  GitHub Actions (CI/CD pipeline)         │
+              │  GitHub Copilot + SpecKit (dev workflow) │
+              └──────────────────────────────────────────┘
+
+              ┌──────────────────────────────────────────┐
+              │              TESTING                      │
+              │  JUnit 5 (test framework)                 │
+              │  Mockito (unit test mocking)              │
+              │  Testcontainers (real infra in tests)    │
+              │  @SpringBootTest (integration tests)     │
+              │  @WebMvcTest / @DataJpaTest (slices)     │
+              │  JaCoCo (coverage reporting)             │
+              │  k6 (load & performance testing)         │
+              └──────────────────────────────────────────┘
+```
+
+---
+
+## STATE MACHINE — Complete State Transition Map
+
+```
+                    ┌─────────────┐
+                    │  AVAILABLE  │ ← tier has seats
+                    └──────┬──────┘
+                           │ ADD_TO_CART
+                           │ guard: SeatsAvailableGuard
+                           │ action: StartReservationTimerAction
+                    ┌──────▼──────┐
+                    │  RESERVED   │ ← 5-min window
+                    └──────┬──────┘
+           ┌───────── ─────┤
+           │               │ PROCEED_TO_CHECKOUT
+           │ TIMER_EXPIRED │
+           │ action:       │
+           │ ReleaseSeats  ▼
+           │        ┌─────────────────┐
+           │        │ PAYMENT_PENDING │ ← Stripe session created
+           │        └──────┬──────────┘
+           ▼               │ PAYMENT_SUCCESS          │ PAYMENT_FAILURE
+    ┌──────────┐           │ action: ConfirmBooking   │ action: ReleaseSeats
+    │ EXPIRED  │           │ action: GenerateQRCode   ▼
+    └──────────┘    ┌──────▼──────┐           ┌──────────────┐
+                    │  CONFIRMED  │           │ PAYMENT_FAILED│
+                    └──────┬──────┘           └──────────────┘
+                           │
+           ┌───────────────┼────────────────┐
+           │ REQUEST_REFUND│ CHECK_IN        │ EVENT_CANCELLED
+           │               │ guard:CheckIn   │ action: CancelBooking
+           ▼               │ guard          │ action: StripeFullRefund
+    ┌──────────────┐       ▼                ▼
+    │REFUND_REQUEST│  ┌──────────┐    ┌───────────┐
+    └──────┬───────┘  │ ATTENDED │    │ CANCELLED │
+           │          └──────────┘    └───────────┘
+    ┌──────┴──────┐
+    │             │ DENY_REFUND
+    │ APPROVE_    │ action: NotifyRefundDenied
+    │ REFUND      ▼
+    │      ┌──────────────┐
+    │      │ REFUND_DENIED│  ← stores refundDenialReason
+    ▼      └──────────────┘
+┌──────────────┐
+│REFUND_APPROVED│  ← Stripe refund issued
+└──────────────┘
+```
+
+**Terminal states** (no outgoing transitions): `ATTENDED`, `EXPIRED`, `PAYMENT_FAILED`, `REFUND_APPROVED`, `REFUND_DENIED`, `CANCELLED`
+
+**EVENT_CANCELLED** can reach `CANCELLED` from `CONFIRMED`, `RESERVED`, and `PAYMENT_PENDING` — three source states, one target.

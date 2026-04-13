@@ -3,6 +3,45 @@
 
 ---
 
+## YOUR FIRST MESSAGE TO COPILOT
+> After pasting `intsructions.txt` content, send this as your next message:
+
+```
+We are on Day 5 — Inventory Service (Redis + Lua) + RabbitMQ Config.
+Feature: inventory-redis
+
+Active fixes today:
+- Fix 5.1 — CRITICAL: reserveSeat() MUST use Lua floor guard script, never plain DECR
+- Fix 5.2 — IMPORTANT: InventoryWarmupHealthIndicator blocks /actuator/health until cache warm
+
+Pre-conditions confirmed:
+- Day 4 complete: Next.js home page rendering real event data ✅
+- All backend services from Week 1 working ✅
+- Docker Desktop is RUNNING ✅ (required for Testcontainers)
+
+TDD MANDATORY — Start with tests FIRST (Red phase):
+Write InventoryServiceTest with real Redis via Testcontainers BEFORE any service code:
+  @Container GenericContainer redis = new GenericContainer<>("redis:7").withExposedPorts(6379)
+  reserveSeat_whenSufficientInventory_shouldDecrementCount()
+  reserveSeat_whenInsufficientInventory_shouldReturnFalse()
+  releaseSeat_shouldIncrementCount()
+  concurrentReservations_100threads_50seats_exactlyFiftySucceed()  ← THE critical gate test
+
+Run ./mvnw test -Dtest=InventoryServiceTest — ALL 4 must FAIL before coding.
+Do NOT write InventoryService until all 4 tests are red.
+
+Non-negotiable rules:
+- Lua atomic check+decrement (never plain DECR or two-step SETNX+EXPIRE)
+- BusinessConstants.RESERVATION_TTL_SECONDS (never raw 300)
+- @RequiredArgsConstructor + private final
+- Testcontainers image: redis:7 (matches docker-compose version)
+
+Start with: write the full InventoryServiceTest class (all 4 methods, bodies failing).
+State all test signatures before writing any InventoryService code.
+```
+
+---
+
 ## Context Briefing
 
 **What we're building today:**
@@ -41,7 +80,27 @@ The Lua floor guard (Fix 5.1) is the most subtle bug in the entire plan. Without
 
 ### Afternoon (3.5 hrs) — InventoryService + Redis
 
-#### InventoryService (Fix 5.1 — CRITICAL)
+#### STEP 1 — Write InventoryService Tests FIRST (Red — TDD)
+Before writing any service code, write all 4 tests. They will all fail (red) since
+the service doesn't exist yet. Use @Testcontainers with a real Redis container:
+```java
+@Testcontainers
+class InventoryServiceTest {
+    @Container
+    static GenericContainer<?> redis = new GenericContainer<>("redis:7").withExposedPorts(6379);
+
+    reserveSeat_whenSufficientInventory_shouldDecrementCount()
+    reserveSeat_whenInsufficientInventory_shouldReturnFalse()   // expects false — not -1
+    releaseSeat_shouldIncrementCount()
+    concurrentReservations_100threads_50seats_exactlyFiftySucceed()
+    //   ^^ This is THE critical test. 100 threads. 50 seats. Count successes.
+    //      assertThat(successCount.get()).isEqualTo(50)  -- never 51, never 49.
+}
+```
+Run: `./mvnw test -pl . -Dtest=InventoryServiceTest` — confirm all 4 FAIL before coding.
+
+#### STEP 2 — Implement InventoryService (Green — TDD, Fix 5.1 CRITICAL)
+Now write the service to make the tests pass:
 ```java
 // reserveSeat(Long tierId, Long userId, int quantity)
 // MUST use this Lua script — plain DECR is NOT acceptable:
@@ -58,28 +117,22 @@ String luaScript = """
 // releaseSeat(Long tierId, int quantity) — INCRBY (atomic increment)
 // commitReservation — no-op (DB is source of truth)
 ```
+Run tests again — all 4 must now pass (green). The concurrency test is the gate.
+Do NOT move forward until `concurrentReservations_100threads_50seats_exactlyFiftySucceed()` passes.
 
-#### Redis Startup Warm-up (Fix 5.2)
+#### STEP 3 — Redis Startup Warm-up (Fix 5.2)
 - On `@PostConstruct`, load all tier availability from DB into Redis
 - Create `InventoryWarmupHealthIndicator implements HealthIndicator` — returns `DOWN` until warm-up completes
 
-#### CacheService for Events
+#### STEP 4 — CacheService for Events
 - `@Cacheable` on `getEventById` — key: `event:{id}`, TTL: 10 min
 - `@CacheEvict` on `updateEvent` and `deleteEvent`
 - `@CacheEvict(allEntries = true)` on `publishEvent`
 
-#### RedisConfig
+#### STEP 5 — RedisConfig
 - `RedisTemplate<String, Object>` with Jackson serialization
 - `RedisCacheManager` with 10-min default TTL
 - Cache name constants: `EVENT_CACHE`, `EVENT_LIST_CACHE`, `TIER_AVAILABILITY_CACHE`
-
-#### InventoryService Tests (Testcontainers — real Redis)
-```java
-reserveSeat_whenSufficientInventory_shouldDecrementCount()
-reserveSeat_whenInsufficientInventory_shouldReturnFalse()
-releaseSeat_shouldIncrementCount()
-concurrentReservations_shouldNotOversell()  // 10 threads, 5 available — exactly 5 succeed
-```
 
 ### Evening (1 hr) — RabbitMQ Infrastructure Config
 ```java

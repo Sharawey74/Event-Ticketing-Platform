@@ -3,6 +3,35 @@
 
 ---
 
+## YOUR FIRST MESSAGE TO COPILOT
+> After pasting `intsructions.txt` content, send this as your next message:
+
+```
+We are on Day 7 — Week 1 Cleanup + Docker Compose Polish.
+Feature: week1-cleanup
+
+Active fixes today:
+- Fix 7.1 — IMPORTANT: @Version on Booking and TicketTier for optimistic locking
+- Fix CC-1 — GOOD: X-Correlation-ID on all log statements
+- Fix CC-2 — IMPORTANT: BusinessConstants for all values
+
+Pre-conditions confirmed:
+- Day 6 complete: N+1 issues resolved and integration tests passing ✅
+- Docker Desktop is RUNNING ✅
+
+This is a Cleanup Session (No Java TDD required for new services).
+Instead, confirm that running ./mvnw test passes the ENTIRE test suite with all fixes applied.
+
+Non-negotiable rules:
+- Validate postgres:17, redis:7, and rabbitmq:4-management are used in docker-compose.yml
+- Validate @Version is correctly applied to Booking and TicketTier entities
+- Zero @Autowired or LocalDateTime across the entire Week 1 codebase.
+
+Start with: Apply Fix 7.1 to Booking and TicketTier entities, then review docker-compose.yml to ensure PostgreSQL 17, Redis 7, and RabbitMQ 4.2.5 are declared correctly.
+```
+
+---
+
 ## Context Briefing
 
 **What we're building today:**

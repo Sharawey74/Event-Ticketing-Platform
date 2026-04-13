@@ -1,0 +1,730 @@
+# Concepts Clarification — Event Ticketing Platform
+
+---
+
+## QUESTION 1 — API Types: What Are They, Why REST, How They Work
+
+---
+
+### What Is an API?
+
+An API (Application Programming Interface) is simply **a contract between two programs** on how they talk to each other.  
+Your frontend (Next.js) needs to get event data from your backend (Spring Boot). The API is how they do that — it defines: "send a GET request to `/api/events`, and I'll send you back a JSON list of events."
+
+---
+
+### The 3 Main API Types
+
+| Type | Full Name | How it works | Best For |
+|------|-----------|-------------|---------|
+| **REST** | Representational State Transfer | You send HTTP verbs (GET, POST, PUT, DELETE) to URLs. Each URL = one resource. | CRUD apps, public APIs, mobile apps |
+| **GraphQL** | Graph Query Language | Client sends a "what I need" query in one request. Server returns exactly that shape. | Complex frontends needing custom data shapes |
+| **WebSocket** | — | Persistent two-way connection. Server can push data without client asking. | Live chat, live scores, real-time notifications |
+
+---
+
+### Why REST Was the Right Choice for Your Project
+
+Your project chose **REST** — here's why it's specifically correct for you:
+
+**1. Your data is structured around resources**
+Every endpoint maps cleanly to a thing:
+- `/api/events` → events
+- `/api/bookings` → bookings
+- `/api/payments` → payments
+
+REST was literally designed for this. One URL = one resource. This matches your domain perfectly.
+
+**2. Spring Boot makes REST trivial**
+`@RestController`, `@GetMapping`, `@PostMapping` — these are first-class Spring Boot annotations. You get REST out of the box.
+
+**3. Stripe's webhook IS REST**
+Stripe sends a `POST` to your `/api/webhooks/stripe`. This is REST. Your API style must match what Stripe sends.
+
+**4. Next.js consumes REST naturally**
+Your frontend uses React Query + Axios. Both are built for REST. You'd need extra libraries and complexity for GraphQL.
+
+**5. You don't need real-time (mostly)**
+WebSocket is for things like live auction bidding. Your use case: user searches events, books a ticket, pays. This is request-response — REST.
+
+> **The exception:** Later if you add "live seat availability updates" on the booking UI, you'd add a WebSocket layer on top of REST — not replace REST.
+
+---
+
+### How REST Works in Your Project (End-to-End)
+
+```
+USER BROWSER
+  │  clicks "Book Now"
+  ▼
+NEXT.JS (Vercel)
+  │  Axios sends: POST https://api.ticketing.com/api/bookings
+  │  Headers: Authorization: Bearer {JWT token}
+  │  Body: { tierId: 5, quantity: 2 }
+  ▼
+SPRING BOOT (Railway)
+  │  JwtFilter validates the JWT → extracts userId
+  │  @PostMapping("/api/bookings") → BookingController.reserveTickets()
+  │  BookingService:
+  │    └─ Acquire Redis lock (tier:5:user:99)
+  │    └─ Re-check availability INSIDE lock (TOCTOU fix)
+  │    └─ Lua script decrements Redis count
+  │    └─ Creates Booking entity (state=RESERVED)
+  │    └─ Sets expires_at = now + 5 minutes
+  │  Returns: HTTP 201 { bookingId: 123, expiresAt: "...", status: "RESERVED" }
+  ▼
+NEXT.JS
+  displays: "Booking reserved! Complete payment in 4:59"
+```
+
+---
+
+### Your API Structure (All Domains)
+
+```
+POST   /api/auth/register          → create user account
+POST   /api/auth/login             → get JWT token
+
+GET    /api/events                 → paginated event list
+POST   /api/events                 → create event (ORGANIZER only)
+GET    /api/events/{id}            → single event with venue + tiers
+PUT    /api/events/{id}            → update event
+POST   /api/events/{id}/publish    → change status to PUBLISHED
+
+POST   /api/bookings               → reserve seats → returns booking
+GET    /api/bookings/{id}          → booking details + QR code
+POST   /api/bookings/{id}/checkout → create Stripe session → returns URL
+POST   /api/bookings/{id}/check-in → mark attended (ORGANIZER only)
+
+POST   /api/webhooks/stripe        → Stripe calls this after payment
+
+GET    /api/search/events?q=&city= → filtered event search
+```
+
+---
+
+## QUESTION 2 — Hosting: Railway + Vercel + Where Does the Database Go?
+
+---
+
+### The Big Picture (3 Separate Deployments)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         INTERNET                                 │
+└──────────┬─────────────────────────────────────────────────────┘
+           │
+    ┌──────▼──────┐          ┌──────────────┐      ┌────────────┐
+    │   VERCEL    │  ──────► │   RAILWAY    │ ───► │  DATABASE  │
+    │  (Frontend) │  HTTP    │  (Backend)   │      │  (Railway  │
+    │  Next.js 14 │  REST    │  Spring Boot │      │  Postgres) │
+    │  Port: 443  │          │  Port: 8080  │      │  Port:5432 │
+    └─────────────┘          └──────────────┘      └────────────┘
+           ▲                        │
+           │              ┌─────────┴──────────┐
+    User's Browser        │  Railway Services  │
+                          ├───────────────────┤
+                          │ Redis (Railway)    │
+                          │ RabbitMQ (Railway) │
+                          └───────────────────┘
+```
+
+---
+
+### Part A — Backend on Railway
+
+**What Railway hosts for you:**
+- Spring Boot JAR (your main app)
+- PostgreSQL database
+- Redis instance
+- RabbitMQ instance
+
+**How Railway works:**
+1. Railway detects your project has a `Dockerfile` or `pom.xml`
+2. It builds your Spring Boot app automatically on every push to `main`
+3. It gives you a public URL like `https://ticketing-platform.up.railway.app`
+4. Environment variables (DB URL, Stripe keys, JWT secret) are set in Railway's dashboard — NEVER hardcoded
+
+**Railway's database hosting is the answer to your database question:**
+
+> **Your database is hosted ON RAILWAY, alongside your backend.**
+
+Railway gives you a managed PostgreSQL service. You get:
+- Connection string: `postgresql://user:pass@host:5432/ticketing_db`
+- This string goes into your Railway environment variables as `DATABASE_URL`
+- Your Spring Boot `application.yml` reads it: `url: ${DATABASE_URL}`
+
+**Why on Railway (not separate)?**
+- Same internal network = fast queries (no internet round-trip)
+- No extra service to manage
+- Railway handles backups automatically
+- Flyway migrations run on startup against Railway's Postgres
+
+---
+
+### Part B — Frontend on Vercel
+
+**What Vercel hosts:**
+- Your Next.js 14 app (the React frontend)
+- Static files (HTML, CSS, JS bundles)
+- Server-side rendering (Next.js API routes if you use any)
+
+**How Vercel works:**
+1. Connect your GitHub repo to Vercel
+2. Every push to `main` → Vercel auto-builds and deploys
+3. Every pull request → Vercel creates a preview URL automatically
+4. Set environment variable: `NEXT_PUBLIC_API_URL=https://ticketing-platform.up.railway.app`
+5. Your Axios calls use that URL to reach Railway
+
+**Vercel gives you a domain like:** `https://ticketing-platform.vercel.app`
+
+---
+
+### Part C — How They Talk to Each Other
+
+```
+Step 1:  User visits https://ticketing-platform.vercel.app
+Step 2:  Next.js renders the home page (events from API)
+Step 3:  Axios sends: GET https://ticketing-platform.up.railway.app/api/events
+Step 4:  Spring Boot queries PostgreSQL (on Railway's internal network)
+Step 5:  Returns JSON → Next.js renders event cards
+Step 6:  User clicks "Book" → POST /api/bookings (with JWT)
+Step 7:  Spring Boot checks Redis (on Railway) for inventory
+Step 8:  Returns booking → Next.js shows checkout button
+Step 9:  User clicks "Pay" → Spring Boot creates Stripe session
+Step 10: User redirected to Stripe → pays
+Step 11: Stripe sends POST to Railway webhook URL
+Step 12: Spring Boot processes → publishes to RabbitMQ (on Railway)
+Step 13: NotificationListener sends email
+Step 14: Next.js polls GET /api/bookings/{id} → shows QR code
+```
+
+---
+
+### CORS Configuration (Critical for Separated Hosting)
+
+Because Vercel and Railway are on **different domains**, the browser will block requests unless your Spring Boot backend explicitly allows it:
+
+```java
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/api/**")
+            .allowedOrigins(
+                "https://ticketing-platform.vercel.app",  // production
+                "http://localhost:3000"                    // local dev
+            )
+            .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+            .allowCredentials(true);
+    }
+}
+```
+
+---
+
+### Summary Table
+
+| What | Where | Why |
+|------|-------|-----|
+| Spring Boot backend | Railway | Java-friendly, includes services |
+| PostgreSQL database | Railway (managed) | Same network as backend, auto-backups |
+| Redis | Railway (managed) | Same network, fast inventory checks |
+| RabbitMQ | Railway (managed) | Same network, message queuing |
+| Next.js frontend | Vercel | Best Next.js platform, free hobby tier |
+| Stripe | Stripe.com | External payment processor |
+
+---
+
+## QUESTION 3 — GitHub Actions & CI/CD Pipelines (Start to End)
+
+---
+
+### What Is CI/CD?
+
+**CI (Continuous Integration):** Every time you push code, run tests automatically to catch breaks immediately.
+
+**CD (Continuous Deployment):** Every time tests pass on `main`, automatically deploy the new version.
+
+**Without CI/CD:** You manually run tests, forget, push broken code, manually deploy, realize production is broken.
+
+**With CI/CD:** Code is tested and deployed automatically. You can't accidentally skip tests.
+
+---
+
+### How GitHub Actions Works (The Mechanics)
+
+GitHub Actions looks for files in `.github/workflows/`. Each file is a **pipeline** — a sequence of steps that run on GitHub's servers when triggered.
+
+---
+
+### Your Backend Pipeline (Spring Boot → Railway)
+
+**Every time you push to `main` or make a Pull Request, this runs:**
+
+```
+TRIGGER: git push origin main
+         │
+         ▼
+GITHUB ACTIONS STARTS (GitHub's cloud server)
+         │
+         ├── Step 1: CHECKOUT CODE
+         │     git clone your repo onto the GitHub server
+         │
+         ├── Step 2: SET UP JAVA 21
+         │     Install Java 21 on the server
+         │
+         ├── Step 3: CACHE MAVEN DEPENDENCIES
+         │     Download pom.xml dependencies (cached for speed)
+         │
+         ├── Step 4: BUILD + TEST
+         │     ./mvnw clean test
+         │     → Starts Testcontainers (real PostgreSQL + Redis in Docker)
+         │     → Runs all your unit tests (EventServiceTest, BookingServiceTest...)
+         │     → Runs integration tests
+         │     → concurrentBookings_100threads_50tickets test MUST pass
+         │     If ANY test fails → PIPELINE STOPS. Railway does NOT deploy.
+         │
+         ├── Step 5: BUILD JAR
+         │     ./mvnw package -DskipTests
+         │     → Creates target/ticketing-platform.jar
+         │
+         └── Step 6: DEPLOY TO RAILWAY (only if all tests passed)
+               Railway CLI or webhook detects the push
+               Railway pulls your repo, builds Docker image, deploys
+               Your new version goes live
+```
+
+---
+
+### Your Frontend Pipeline (Next.js → Vercel)
+
+Vercel handles this automatically — you don't even need a GitHub Actions file for it:
+
+```
+TRIGGER: git push origin main
+         │
+         ▼
+VERCEL DETECTS THE PUSH (via GitHub webhook)
+         │
+         ├── Step 1: CHECKOUT CODE
+         │
+         ├── Step 2: npm install
+         │
+         ├── Step 3: npm run build
+         │     → Compiles Next.js
+         │     → If build errors → deployment STOPS
+         │
+         └── Step 4: DEPLOY
+               New version goes live at ticketing-platform.vercel.app
+               Previous version kept as rollback
+```
+
+---
+
+### Your Actual CI/CD Files (to create on Day 18)
+
+**`.github/workflows/backend-ci.yml`**
+
+```yaml
+name: Backend CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Cache Maven packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+
+      - name: Run all tests
+        run: ./mvnw clean test
+        # Testcontainers spin up real DB + Redis here
+
+      - name: Build JAR
+        run: ./mvnw package -DskipTests
+        if: github.ref == 'refs/heads/main'
+
+      - name: Deploy to Railway
+        if: github.ref == 'refs/heads/main' && success()
+        run: |
+          curl -X POST ${{ secrets.RAILWAY_DEPLOY_WEBHOOK }}
+```
+
+**What the secrets are (set in GitHub repo Settings → Secrets):**
+- `RAILWAY_DEPLOY_WEBHOOK` → Railway gives you a webhook URL to trigger deploy
+- `STRIPE_SECRET_KEY` → Used in tests
+- `JWT_SECRET` → Used in integration tests
+
+---
+
+### The Full Flow Every Day
+
+```
+You write code → git add . → git commit → git push
+                                              │
+                              GitHub receives push
+                                              │
+                    ┌─────────────────────────┤
+                    │                         │
+              Backend pipeline           Vercel auto-detects
+              starts on GitHub           and builds frontend
+                    │
+            Tests run (5-10 min)
+                    │
+              ┌─────┴─────┐
+              │           │
+           PASS         FAIL
+              │           │
+         Deploy to    GitHub sends
+         Railway      you an email:
+              │       "Pipeline failed:
+         New version  EventServiceTest
+         goes live    line 42 failed"
+```
+
+---
+
+## QUESTION 4 — TDD: When to Write Tests, Where to Save Them
+
+---
+
+### What TDD Is (Simplified)
+
+**TDD = Test-Driven Development**
+You write the test BEFORE writing the actual code.
+
+```
+RED   → Write a test for code that doesn't exist yet → it FAILS (red)
+GREEN → Write the minimum code to make that test pass → it PASSES (green)
+REFACTOR → Clean up the code while keeping tests green
+```
+
+**Why this works:** You can't skip testing because the tests come first. Your code exists to make tests pass.
+
+---
+
+### When to Write Tests in Your Project
+
+| Phase | When | What To Write |
+|-------|------|---------------|
+| **Before service implementation** | SAME session, BEFORE coding | Unit tests for that service's methods |
+| **Before integration work** | After entity + repo done | Integration tests with real DB |
+| **After a bug fix** | IMMEDIATELY after fixing | A test that proves the bug is gone |
+| **After each 🔴 CRITICAL fix** | Same task | A test that proves the fix works |
+
+**Specific to your plan:**
+- **Day 2:** Write `EventServiceTest` BEFORE writing `EventService` (Red → Green TDD stated in session prompt)
+- **Day 5:** Write `InventoryServiceTest` with concurrency test BEFORE implementing `reserveSeat()`
+- **Day 8:** Write `BookingStateMachineTest` (5 tests) BEFORE wiring up the state machine
+- **Day 16:** The dedicated testing day — push coverage to 80%+
+
+---
+
+### Where Tests Are Saved
+
+Your Spring Boot project follows Maven's standard layout:
+
+```
+src/
+├── main/
+│   └── java/com/ticketing/       ← Your actual production code
+│       ├── event/
+│       │   ├── EventController.java
+│       │   ├── EventService.java     ← Real implementation
+│       │   └── EventRepository.java
+│       └── booking/
+│           └── BookingService.java
+│
+└── test/
+    └── java/com/ticketing/       ← ALL your test files live here
+        ├── event/
+        │   ├── EventServiceTest.java           ← Unit tests (Mockito)
+        │   ├── EventControllerTest.java        ← @WebMvcTest
+        │   └── EventIntegrationTest.java       ← @SpringBootTest + Testcontainers
+        ├── inventory/
+        │   └── InventoryServiceTest.java       ← Lua script concurrency test
+        ├── booking/
+        │   ├── BookingServiceTest.java         ← Unit + TOCTOU test
+        │   └── BookingStateMachineTest.java    ← State machine transitions
+        └── payment/
+            └── PaymentServiceTest.java         ← Mocked Stripe SDK
+```
+
+**Mirror the main package structure exactly.** If code is in `com.ticketing.event.service`, the test is in `com.ticketing.event.EventServiceTest`.
+
+---
+
+### The 3 Types of Tests You'll Write
+
+**1. Unit Tests → `EventServiceTest.java`**
+- Test ONE class in isolation
+- All dependencies are MOCKED (fake)
+- Fast (no database, no network)
+- Tool: JUnit 5 + Mockito
+
+```java
+@ExtendWith(MockitoExtension.class)
+class EventServiceTest {
+
+    @Mock
+    private EventRepository eventRepository;    // fake — no real DB
+
+    @InjectMocks
+    private EventService eventService;
+
+    @Test
+    @DisplayName("createEvent_withValidData_shouldReturnEvent")
+    void createEvent_withValidData_shouldReturnEvent() {
+        // ARRANGE — set up what the fake returns
+        when(eventRepository.save(any())).thenReturn(mockEvent());
+
+        // ACT — call the real method
+        EventResponse result = eventService.createEvent(validRequest(), 1L);
+
+        // ASSERT — verify what came back
+        assertThat(result.getTitle()).isEqualTo("Rock Concert");
+        verify(eventRepository, times(1)).save(any());
+    }
+}
+```
+
+---
+
+**2. Integration Tests → `EventIntegrationTest.java`**
+- Tests the whole stack (controller → service → real DB)
+- Uses Testcontainers (spins up real PostgreSQL in Docker during test)
+- Slower but catches real bugs
+- Tool: @SpringBootTest + @Testcontainers
+
+```java
+@SpringBootTest
+@Testcontainers
+class EventIntegrationTest {
+
+    @Container
+    static PostgreSQLContainer<?> postgres =
+        new PostgreSQLContainer<>("postgres:15");
+
+    @Container
+    static GenericContainer<?> redis =
+        new GenericContainer<>("redis:7").withExposedPorts(6379);
+
+    @Autowired
+    private EventService eventService;
+
+    @Test
+    void createEvent_persistsToDatabase_andCanBeRetrieved() {
+        // This uses a REAL database, not a mock
+        EventResponse created = eventService.createEvent(validRequest(), 1L);
+        EventResponse retrieved = eventService.getEventById(created.getId());
+
+        assertThat(retrieved.getTitle()).isEqualTo("Rock Concert");
+    }
+}
+```
+
+---
+
+**3. Concurrency Tests → `InventoryServiceTest.java`**
+- The hardest and most important test in the project
+- 100 threads, 50 seats → exactly 50 must succeed
+- Only passes if your Lua script floor guard works correctly
+
+```java
+@Test
+@DisplayName("100 concurrent reservations on 50 seats → exactly 50 succeed")
+void concurrentReservations_shouldNotOversell() throws InterruptedException {
+    inventoryService.setAvailableCount(tierId, 50);
+
+    ExecutorService pool = Executors.newFixedThreadPool(100);
+    AtomicInteger successes = new AtomicInteger(0);
+    CountDownLatch latch = new CountDownLatch(100);
+
+    for (int i = 0; i < 100; i++) {
+        pool.submit(() -> {
+            try {
+                if (inventoryService.reserveSeat(tierId, 1))
+                    successes.incrementAndGet();
+            } finally {
+                latch.countDown();
+            }
+        });
+    }
+
+    latch.await(10, TimeUnit.SECONDS);
+    assertThat(successes.get()).isEqualTo(50);   // EXACTLY 50, never 51
+}
+```
+
+---
+
+### Test Naming Convention (Your Project)
+
+```
+methodName_when_condition_should_expectedBehavior
+
+Examples:
+  createEvent_withValidData_shouldReturnEvent()
+  createEvent_withPastDate_shouldThrowValidationException()
+  reserveSeat_whenCountIsZero_shouldReturnFalse()
+  handleWebhook_withInvalidSignature_shouldReturn400()
+  bookingStateMachine_fromReservedToExpired_shouldReleaseSeats()
+```
+
+---
+
+## QUESTION 5 — AI Agent First Prompt: Skeleton-First or Incremental Modules?
+
+---
+
+### The Answer: Incremental Modules (NOT Skeleton-First)
+
+**Skeleton-first** means: generate ALL files with empty/stub bodies on Day 1, then fill them in later.
+
+**Incremental modules** means: build one complete module at a time — fully tested and working — before moving to the next.
+
+**Your project uses incremental modules. Here's why:**
+
+---
+
+### Why NOT Skeleton-First
+
+If you generate skeletons of all 50+ files on Day 1:
+- Day 1: `BookingService.java` is a stub with empty methods
+- Day 8: Now you fill in `BookingService` — but `EventService` changed since Day 1
+- Result: **The skeleton is now wrong.** You end up rewriting instead of filling in.
+
+Also:
+- `speckit.implement` reads `tasks.md` and generates ONE task at a time
+- It marks `[x]` on completion and moves to the next
+- A skeleton approach would confuse the agent about what's done vs. stubbed
+
+---
+
+### How Your Incremental Approach Works
+
+```
+Day 1:  [Package structure] → Empty placeholder classes ONLY (no logic)
+        [9 Flyway migrations] → COMPLETE SQL files
+        [BusinessConstants.java] → COMPLETE
+        [CorrelationIdFilter.java] → COMPLETE
+        [JPA Entities] → COMPLETE (User, Event, Booking, etc.)
+        → ./mvnw compile passes → DONE
+
+Day 2:  [EventRepository] → COMPLETE with 3 queries
+        [EventService] → COMPLETE with tests passing FIRST
+        [EventController] → COMPLETE with @PreAuthorize
+        [GlobalExceptionHandler] → COMPLETE
+        → ./mvnw test passes 7/7 → DONE
+
+Day 5:  [InventoryService] → COMPLETE with Lua script
+        [InventoryServiceTest] → COMPLETE including concurrency test
+        [RabbitMQConfig] → COMPLETE declaration
+        → concurrentReservations test passes → DONE
+
+Day 8:  [BookingStateMachineConfig] → COMPLETE
+        [BookingService.reserveTickets()] → COMPLETE with TOCTOU fix
+        [All guards and actions] → COMPLETE
+        → 5/5 state machine tests pass → DONE
+```
+
+Each day delivers **working, tested code** — not stubs.
+
+---
+
+### The First Prompt You Send to the AI Agent (Template)
+
+This is what you send at the start of EACH day's `speckit.implement` session:
+
+```
+[PASTE the full content of intsructions.txt here as your FIRST message]
+
+We are working on Day 8 — Booking State Machine.
+Feature: booking-state-machine
+
+Context:
+- Days 1–7 are complete. ./mvnw test is all green.
+- constitution.md has been generated.
+
+Today's goal:
+Implement the BookingStateMachine and BookingService.reserveTickets() exactly as
+described in .specify/features/booking-state-machine/tasks.md.
+
+Apply all fixes from Phase1A_Adjustments_and_Fixes.md before generating any code:
+- Fix 8.1 (TOCTOU double-check inside lock) — CRITICAL, apply immediately
+- Fix 8.2 (CheckInGuard two-layer protection) — apply to CHECK_IN transition
+- Fix 8.3 (ExpiryJob distributed lock) — apply to ReservationExpirationJob
+- Fix 11.1 (CANCELLED state) — add CANCELLED + EVENT_CANCELLED now
+
+Rules (non-negotiable):
+- @EnableStateMachineFactory — NEVER @EnableStateMachine
+- Constructor injection via @RequiredArgsConstructor
+- All timestamps: Instant (UTC)
+- BookingState enum values from enums only — no raw strings
+- BusinessConstants.RESERVATION_TTL_SECONDS (not magic number 300)
+
+Start with: Write BookingStateMachineTest (5 tests, all failing) FIRST.
+Then implement BookingStateMachineConfig to make them pass.
+Then implement BookingService.reserveTickets() with Fix 8.1 applied.
+
+Confirm: which task in tasks.md are you starting with?
+```
+
+---
+
+### The Pattern For Every Day
+
+```
+Session Start:
+  1. PASTE intsructions.txt content
+  2. State: "Day N — [theme], Feature: [feature-name]"
+  3. List today's fixes from the overlay
+  4. State the non-negotiable rules
+  5. Say: "Start with tests FIRST before implementation"
+  6. Ask Copilot to confirm which task it's starting with
+
+During Session:
+  - After each task: run ./mvnw compile → must pass
+  - After each 🔴 CRITICAL fix: verify it's in the code before continuing
+  - Say: "Mark task T0XX as [x] in tasks.md"
+
+Session End:
+  - Ask for the SESSION HANDOFF summary (exact format from intsructions.txt)
+  - Save it to Docs/AI_Sessions/day-{N}-handoff.md
+  - git commit with conventional commit message
+```
+
+---
+
+### Quick Summary Table
+
+| Question | Answer |
+|----------|--------|
+| API type used | REST — matches your domain (resources), Stripe, Spring Boot, and Next.js |
+| Database hosting | Railway (managed PostgreSQL, same network as backend) |
+| Backend hosting | Railway (Spring Boot JAR) |
+| Frontend hosting | Vercel (Next.js, auto-deploys from GitHub) |
+| CI/CD flow | Push → GitHub Actions runs tests → if pass, Railway/Vercel deploys |
+| When to write tests | BEFORE implementation (TDD: Red → Green → Refactor) |
+| Where to save tests | `src/test/java/com/ticketing/{domain}/` mirroring main package |
+| AI first prompt approach | Incremental modules (complete + tested per day) NOT skeletons |
+| AI first message structure | Paste intsructions.txt → state day + fixes → say "write tests first" |

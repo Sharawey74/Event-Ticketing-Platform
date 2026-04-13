@@ -3,6 +3,51 @@
 
 ---
 
+## YOUR FIRST MESSAGE TO COPILOT
+> After pasting `intsructions.txt` content, send this as your next message:
+
+```
+We are on Day 1 — Project Initialization.
+Feature: project-scaffold
+
+Active fixes today:
+- Fix 1.1 — CRITICAL: ALL Instant not LocalDateTime; TIMESTAMPTZ in SQL
+- Fix 1.2 — IMPORTANT: user_role as PostgreSQL ENUM, not VARCHAR
+- Fix 1.3 — GOOD: deleted_at TIMESTAMPTZ on bookings table
+- Fix CC-2 — IMPORTANT: BusinessConstants.java created on Day 1
+- Fix CC-1 — GOOD: CorrelationIdFilter with MDC propagation
+
+Pre-conditions: This is Day 1 — starting from scratch.
+Docker Desktop is running. ./mvnw is available.
+
+Day 1 has no service logic, so no TDD loop today.
+Instead: confirm ./mvnw compile passes after each step before moving forward.
+
+Non-negotiable rules:
+- All entities use Instant (zero LocalDateTime)
+- All TIMESTAMPTZ in Flyway SQL (zero TIMESTAMP WITHOUT TIME ZONE)
+- user_role is CREATE TYPE ... AS ENUM
+- BusinessConstants.java created before any service code
+- Zero @Autowired anywhere
+
+Start with Step 1 (Spring Boot project generation). Confirm the full
+pom.xml before writing any Java files.
+```
+
+---
+
+## PRE-SESSION CHECKLIST (Do before opening VS Code)
+```
+[ ] Native Windows PostgreSQL and RabbitMQ services are DISABLED (Check services.msc)
+[ ] WSL Redis is STOPPED (sudo service redis-server stop)
+[ ] Docker Desktop is OPEN and RUNNING (check system tray icon is green)
+    Without this: ./mvnw test will fail with pipe error
+[ ] Verify in PowerShell: java -version → must show 21.x
+[ ] Read this full prompt before starting
+```
+
+---
+
 ## Context Briefing
 
 **What we're building today:**
@@ -46,11 +91,11 @@ Cross-reference `Plans/Phase1A_Adjustments_and_Fixes.md` for full details:
 
 #### Step 1 — Spring Boot Project
 - Generate at `start.spring.io`: Web, Data JPA, Security, AMQP, Data Redis, Flyway, PostgreSQL, Lombok, Validation, Actuator, Testcontainers (test scope)
-- Add to `pom.xml` manually: `stripe-java:23.3.0`, `spring-statemachine-core:3.2.0`, `jjwt:0.11.5`, `qrgen:2.6.0`
+- Add to `pom.xml` manually: `stripe-java:23.3.0`, `spring-statemachine-core:3.2.0`, `jjwt:0.11.5` (api/impl/jackson), `spring-retry`, `spring-boot-starter-cache`, `com.google.zxing:core:3.5.2`, `com.google.zxing:javase:3.5.2`
 - Project settings: `name=ticketing-platform`, `group=com.ticketing`, **Java 21**
 
-#### Step 2 — Package Structure
-Create full package structure (empty placeholder classes with `@Service`, `@Repository`, `@RestController`):
+#### Step 2 — Package Structure Definition
+Acknowledge the target package structure (do NOT create empty stub classes like `@Service` or `@RestController`, this violates our incremental rule. Packages will be created as needed when entities and configs are added today):
 ```
 com.ticketing.event.controller
 com.ticketing.event.service
@@ -113,8 +158,60 @@ Write all entities: `User`, `Event`, `Category`, `Venue`, `TicketTier`, `Booking
 
 #### Step 6 — Docker Compose
 ```yaml
-# docker-compose.yml — PostgreSQL 15, Redis 7, RabbitMQ 3.12 + management plugin
-# Also: application.yml reads from env vars; application-local.yml has hardcoded debug values
+# docker-compose.yml — Fully Dockerized infrastructure
+services:
+  postgres:
+    image: postgres:17              
+    environment:
+      POSTGRES_DB: ticketing_db
+      POSTGRES_USER: ticketing
+      POSTGRES_PASSWORD: ticketing
+    ports:
+      - "5432:5432"                # Standard port
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7                  
+    ports:
+      - "6379:6379"                # Standard port
+    command: redis-server --save 20 1 --loglevel warning
+
+  rabbitmq:
+    image: rabbitmq:4-management    
+    ports:
+      - "5672:5672"                # Standard port
+      - "15672:15672"              # management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: ticketing
+      RABBITMQ_DEFAULT_PASS: ticketing
+
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "1025:1025"               # SMTP
+      - "8025:8025"               # Web UI
+
+volumes:
+  pgdata:
+```
+
+**application-local.yml** (used when running natively via `./mvnw spring-boot:run`):
+```yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ticketing_db
+    username: ticketing
+    password: ticketing
+  data:
+    redis:
+      host: localhost
+      port: 6379   
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: ticketing
+    password: ticketing
 ```
 
 #### Step 7 — CorrelationIdFilter (Fix CC-1)
