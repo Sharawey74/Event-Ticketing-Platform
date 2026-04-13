@@ -31,7 +31,17 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- [ ] Domain architecture gate: design uses required package boundaries and keeps controllers thin.
+- [ ] Concurrency safety gate: lock strategy, optimistic locking, and TOCTOU re-check are defined for
+  inventory-critical paths.
+- [ ] Data integrity gate: Instant and TIMESTAMPTZ usage, enum safety, soft delete strategy, and
+  idempotency constraints are specified.
+- [ ] Payment and async gate: webhook commit semantics and async QR/message processing are explicit.
+- [ ] Test discipline gate: red-green-refactor plan includes unit, integration, and concurrency tests.
+- [ ] Observability and security gate: correlation ID propagation, DTO boundaries, and authorization
+  controls are documented.
+
+If any gate is not satisfied, the plan MUST document a remediation path before implementation starts.
 
 ## Project Structure
 
@@ -99,6 +109,6 @@ directories captured above]
 > **Fill ONLY if Constitution Check has violations that must be justified**
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
+| --------- | ---------- | ----------------------------------- |
 | [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
 | [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |

@@ -95,6 +95,19 @@
 - **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
 - **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
 
+### Constitution Alignment Requirements *(mandatory)*
+
+- **CA-001**: The design MUST preserve domain package boundaries and keep controller logic minimal.
+- **CA-002**: Inventory-affecting workflows MUST define lock acquisition, in-lock availability
+  re-check, and optimistic locking behavior.
+- **CA-003**: Time-sensitive fields MUST use UTC-safe modeling and persistence conventions.
+- **CA-004**: API boundaries MUST use DTO contracts and include authorization requirements for
+  sensitive operations.
+- **CA-005**: The feature MUST define observability requirements, including correlation ID handling
+  across HTTP and asynchronous message flows when applicable.
+- **CA-006**: The feature MUST include a test strategy covering unit, integration, and concurrency
+  behavior where race conditions are possible.
+
 ### Key Entities *(include if feature involves data)*
 
 - **[Entity 1]**: [What it represents, key attributes without implementation]
