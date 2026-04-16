@@ -24,9 +24,28 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          time_zone: UTC
+
+  mail:
+    host: localhost
+    port: 1025
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
 
 logging:
   level:
     com.ticketing: DEBUG
     org.springframework.security: INFO
     org.flywaydb: INFO
+
+jwt:
+  secret: ${JWT_SECRET:ZmFrZS1qc3ctc2VjcmV0LWtleS1mb3ItbG9jYWwtZGV2LTAwMDAwMDAwMDA=}
+  expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+
+frontend:
+  url: ${FRONTEND_URL:https://ticketing-platform.vercel.app}

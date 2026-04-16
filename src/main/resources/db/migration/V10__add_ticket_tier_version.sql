@@ -1,0 +1,1 @@
+ALTER TABLE ticket_tiers ADD COLUMN version BIGINT NOT NULL DEFAULT 0;
