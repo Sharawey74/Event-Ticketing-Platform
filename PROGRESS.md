@@ -9,8 +9,8 @@
 
 | Day | Theme | Status | Tests | Notes |
 |-----|-------|--------|-------|-------|
-| 0 | Pre-flight Setup | ⬜ Not Started | — | Run constitution, verify scripts |
-| 1 | Project Init + Entities + Migrations | ⬜ Not Started | — | |
+| 0 | Pre-flight Setup | ✅ Complete | — | Run constitution, verify scripts |
+| 1 | Project Init + Entities + Migrations | ✅ Complete | Passing | |
 | 2 | Event Domain + Auth (JWT) | ⬜ Not Started | — | |
 | 3 | Venue + Category + Search | ⬜ Not Started | — | |
 | 4 | Next.js Frontend + Home Page | ⬜ Not Started | — | |
@@ -38,9 +38,9 @@
 
 | Fix ID | Severity | Day | Applied | Notes |
 |--------|----------|-----|---------|-------|
-| Fix 1.1 | CRITICAL | 1 | ⬜ | Instant vs LocalDateTime on all entities |
-| Fix 1.2 | IMPORTANT | 1 | ⬜ | ENUM type for user_role in SQL |
-| Fix 1.3 | GOOD | 1 | ⬜ | BusinessConstants class created ("deleted_at TIMESTAMPTZ on bookings table (soft delete)")|
+| Fix 1.1 | CRITICAL | 1 | ✅ | Instant vs LocalDateTime on all entities |
+| Fix 1.2 | IMPORTANT | 1 | ✅ | ENUM type for user_role in SQL |
+| Fix 1.3 | GOOD | 1 | ✅ | deleted_at TIMESTAMPTZ on bookings table |
 | Fix 2.1 | IMPORTANT | 2 | ⬜ | @Transactional(readOnly=true) class-level |
 | Fix 2.2 | IMPORTANT | 2 | ⬜ | @RequiredArgsConstructor everywhere |
 | Fix 5.1 | CRITICAL | 5 | ⬜ | Lua floor guard in InventoryService |
@@ -58,9 +58,9 @@
 | Fix 11.2 | IMPORTANT | 11 | ⬜ | RELEASE event / AVAILABLE state clarified |
 | Fix 12.1 | GOOD | 12 | ⬜ | Refund days calculated with ChronoUnit |
 | Fix 16.1 | CRITICAL | 16 | ⬜ | 80% test coverage gate before deploy |
-| Fix CC-1 | GOOD | All | ⬜ | X-Correlation-ID in all log statements |
-| Fix CC-2 | IMPORTANT | All | ⬜ | No magic numbers — BusinessConstants only |
-| Fix PW3-1 | CRITICAL | 1/2 | ⬜ | Stripe account + CLI installed |
+| Fix CC-1 | GOOD | All | ✅ | X-Correlation-ID in all log statements |
+| Fix CC-2 | IMPORTANT | All | ✅ | No magic numbers — BusinessConstants only |
+| Fix PW3-1 | CRITICAL | 1/2 | ✅ | Stripe account + CLI installed |
 
 ---
 
@@ -68,11 +68,11 @@
 
 | Metric | Current | Target |
 |--------|---------|--------|
-| `./mvnw test` passing | — | 100% |
-| Test coverage | — | 80%+ |
-| Active @Autowired usages | — | 0 |
-| Active LocalDateTime usages | — | 0 |
-| Magic numbers in code | — | 0 |
+| `./mvnw test` passing | 100% | 100% |
+| Test coverage | N/A | 80%+ |
+| Active @Autowired usages | 0 | 0 |
+| Active LocalDateTime usages | 0 | 0 |
+| Magic numbers in code | 0 | 0 |
 
 ---
 
