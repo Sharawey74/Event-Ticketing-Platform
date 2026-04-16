@@ -11,7 +11,7 @@
 |-----|-------|--------|-------|-------|
 | 0 | Pre-flight Setup | ✅ Complete | — | Run constitution, verify scripts |
 | 1 | Project Init + Entities + Migrations | ✅ Complete | Passing | |
-| 2 | Event Domain + Auth (JWT) | ⬜ Not Started | — | |
+| 2 | Event Domain + Auth (JWT) | 🔄 In Progress | EventServiceTest 7/7 + AuthServiceTest 4/4 + AuthControllerTest 2/2 ✅ | Event/Auth services and auth endpoints validated with focused tests |
 | 3 | Venue + Category + Search | ⬜ Not Started | — | |
 | 4 | Next.js Frontend + Home Page | ⬜ Not Started | — | |
 | 5 | Inventory (Redis + Lua) + RabbitMQ Config | ⬜ Not Started | — | |
@@ -41,8 +41,8 @@
 | Fix 1.1 | CRITICAL | 1 | ✅ | Instant vs LocalDateTime on all entities |
 | Fix 1.2 | IMPORTANT | 1 | ✅ | ENUM type for user_role in SQL |
 | Fix 1.3 | GOOD | 1 | ✅ | deleted_at TIMESTAMPTZ on bookings table |
-| Fix 2.1 | IMPORTANT | 2 | ⬜ | @Transactional(readOnly=true) class-level |
-| Fix 2.2 | IMPORTANT | 2 | ⬜ | @RequiredArgsConstructor everywhere |
+| Fix 2.1 | IMPORTANT | 2 | ✅ | Applied on EventService, AuthService, UserDetailsServiceImpl |
+| Fix 2.2 | IMPORTANT | 2 | ✅ | Applied in all new services/controllers/security classes |
 | Fix 5.1 | CRITICAL | 5 | ⬜ | Lua floor guard in InventoryService |
 | Fix 5.2 | IMPORTANT | 5 | ⬜ | InventoryWarmupHealthIndicator |
 | Fix 7.1 | IMPORTANT | 7 | ⬜ | @Version on Booking and TicketTier |
@@ -68,7 +68,7 @@
 
 | Metric | Current | Target |
 |--------|---------|--------|
-| `./mvnw test` passing | 100% | 100% |
+| `./mvnw test` passing | EventServiceTest 7/7 + AuthServiceTest 4/4 + AuthControllerTest 2/2 | 100% |
 | Test coverage | N/A | 80%+ |
 | Active @Autowired usages | 0 | 0 |
 | Active LocalDateTime usages | 0 | 0 |
