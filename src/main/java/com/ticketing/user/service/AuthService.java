@@ -50,7 +50,13 @@ public class AuthService {
             .role(role)
             .build();
 
-        User saved = userRepository.save(user);
+        User saved;
+        try {
+            saved = userRepository.save(user);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            throw new ValidationException("Email is already registered");
+        }
+        
         UserDetails userDetails = userDetailsService.loadUserByUsername(saved.getEmail());
         String token = jwtService.generateToken(userDetails);
 
