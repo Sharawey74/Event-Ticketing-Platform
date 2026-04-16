@@ -55,6 +55,10 @@ public class TicketTier {
     @Column(name = "available_count", nullable = false)
     private Integer availableCount;
 
+    @Version
+    @Column(nullable = false)
+    private Long version = 0L;
+
     @Column(name = "max_per_booking", nullable = false)
     private Integer maxPerBooking;
 
