@@ -19,13 +19,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ticketing.common.dto.ApiResponse;
+import com.ticketing.common.dto.PageResponse;
 import com.ticketing.event.dto.CreateEventRequest;
 import com.ticketing.event.dto.EventFilterRequest;
 import com.ticketing.event.dto.EventResponse;
 import com.ticketing.event.dto.UpdateEventRequest;
 import com.ticketing.event.model.EventStatus;
 import com.ticketing.event.service.EventService;
-import com.ticketing.user.service.AuthService;
+import com.ticketing.user.service.CustomUserDetails;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +40,6 @@ public class EventController {
     private static final Logger logger = LoggerFactory.getLogger(EventController.class);
 
     private final EventService eventService;
-    private final AuthService authService;
 
     @PostMapping
     @PreAuthorize("hasRole('ORGANIZER')")
@@ -47,7 +47,8 @@ public class EventController {
         @Valid @RequestBody CreateEventRequest request,
         Authentication authentication) {
 
-        Long organizerId = authService.getUserIdByEmail(authentication.getName());
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        Long organizerId = userDetails.getId();
         EventResponse response = eventService.createEvent(request, organizerId);
         logger.info("Create event endpoint finished for organizer {}", organizerId);
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -61,7 +62,7 @@ public class EventController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<EventResponse>>> getEvents(
+    public ResponseEntity<ApiResponse<PageResponse<EventResponse>>> getEvents(
         @RequestParam(required = false) EventStatus status,
         @RequestParam(required = false) Long categoryId,
         @RequestParam(required = false) String city,
@@ -73,7 +74,8 @@ public class EventController {
             .city(city)
             .build();
 
-        Page<EventResponse> response = eventService.getEvents(filter, pageable);
+        Page<EventResponse> page = eventService.getEvents(filter, pageable);
+        PageResponse<EventResponse> response = PageResponse.of(page);
         logger.info("Get events endpoint finished with status {} category {} city {}", status, categoryId, city);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -85,7 +87,8 @@ public class EventController {
         @Valid @RequestBody UpdateEventRequest request,
         Authentication authentication) {
 
-        Long organizerId = authService.getUserIdByEmail(authentication.getName());
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        Long organizerId = userDetails.getId();
         EventResponse response = eventService.updateEvent(id, request, organizerId);
         logger.info("Update event endpoint finished for event {}", id);
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -94,7 +97,8 @@ public class EventController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ORGANIZER')")
     public ResponseEntity<ApiResponse<Void>> deleteEvent(@PathVariable Long id, Authentication authentication) {
-        Long organizerId = authService.getUserIdByEmail(authentication.getName());
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        Long organizerId = userDetails.getId();
         eventService.deleteEvent(id, organizerId);
         logger.info("Delete event endpoint finished for event {}", id);
         return ResponseEntity.ok(ApiResponse.success(null));
@@ -103,7 +107,8 @@ public class EventController {
     @PostMapping("/{id}/publish")
     @PreAuthorize("hasRole('ORGANIZER')")
     public ResponseEntity<ApiResponse<EventResponse>> publishEvent(@PathVariable Long id, Authentication authentication) {
-        Long organizerId = authService.getUserIdByEmail(authentication.getName());
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        Long organizerId = userDetails.getId();
         EventResponse response = eventService.publishEvent(id, organizerId);
         logger.info("Publish event endpoint finished for event {}", id);
         return ResponseEntity.ok(ApiResponse.success(response));

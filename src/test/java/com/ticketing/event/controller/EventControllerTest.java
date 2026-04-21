@@ -14,12 +14,15 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import com.ticketing.user.service.CustomUserDetails;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
@@ -48,19 +51,17 @@ class EventControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
+    @MockitoBean
     private EventService eventService;
 
-    @MockBean
-    private AuthService authService;
+    @MockitoBean
+    private com.ticketing.common.security.JwtService jwtService;
 
-    @MockBean
-    private JwtService jwtService;
+    @MockitoBean
+    private org.springframework.security.core.userdetails.UserDetailsService userDetailsService;
 
-    @MockBean
-    private UserDetailsService userDetailsService;
-
-    private static final TestingAuthenticationToken AUTH_TOKEN = new TestingAuthenticationToken("org@example.com", null, "ROLE_ORGANIZER");
+    private static final CustomUserDetails USER_DETAILS = new CustomUserDetails(7L, "org@example.com", "password", List.of(new SimpleGrantedAuthority("ROLE_ORGANIZER")));
+    private static final TestingAuthenticationToken AUTH_TOKEN = new TestingAuthenticationToken(USER_DETAILS, null, "ROLE_ORGANIZER");
 
     @Test
     @DisplayName("POST /api/events should create event and return success")
@@ -80,7 +81,6 @@ class EventControllerTest {
             .status(EventStatus.DRAFT)
             .build();
 
-        when(authService.getUserIdByEmail("org@example.com")).thenReturn(7L);
         when(eventService.createEvent(any(CreateEventRequest.class), eq(7L))).thenReturn(response);
 
         mockMvc.perform(post("/api/events")
@@ -141,7 +141,6 @@ class EventControllerTest {
             .title("Updated Tech Conference")
             .build();
 
-        when(authService.getUserIdByEmail("org@example.com")).thenReturn(7L);
         when(eventService.updateEvent(eq(1L), any(UpdateEventRequest.class), eq(7L))).thenReturn(response);
 
         mockMvc.perform(put("/api/events/1")
@@ -156,7 +155,6 @@ class EventControllerTest {
     @Test
     @DisplayName("DELETE /api/events/{id} should return success")
     void deleteEvent_shouldReturnSuccess() throws Exception {
-        when(authService.getUserIdByEmail("org@example.com")).thenReturn(7L);
 
         mockMvc.perform(delete("/api/events/1")
                 .principal(AUTH_TOKEN))
@@ -173,7 +171,6 @@ class EventControllerTest {
             .status(EventStatus.PUBLISHED)
             .build();
 
-        when(authService.getUserIdByEmail("org@example.com")).thenReturn(7L);
         when(eventService.publishEvent(1L, 7L)).thenReturn(response);
 
         mockMvc.perform(post("/api/events/1/publish")

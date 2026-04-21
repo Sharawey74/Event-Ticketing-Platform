@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.web.servlet.MockMvc;
@@ -34,13 +34,13 @@ class AuthControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
+    @MockitoBean
     private AuthService authService;
 
-    @MockBean
+    @MockitoBean
     private JwtService jwtService;
 
-    @MockBean
+    @MockitoBean
     private UserDetailsService userDetailsService;
 
     @Test
@@ -94,5 +94,22 @@ class AuthControllerTest {
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.token").value("jwt-login-token"))
             .andExpect(jsonPath("$.data.userId").value(21));
+    }
+    @Test
+    @DisplayName("POST /api/auth/login with bad credentials should return 401")
+    void login_withBadCredentials_shouldReturn401() throws Exception {
+        LoginRequest request = new LoginRequest();
+        request.setEmail("user@example.com");
+        request.setPassword("WrongPassword");
+
+        when(authService.login(any(LoginRequest.class)))
+            .thenThrow(new org.springframework.security.authentication.BadCredentialsException("Bad credentials"));
+
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.message").value("Authentication failed: Bad credentials"));
     }
 }

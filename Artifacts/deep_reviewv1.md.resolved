@@ -1,0 +1,330 @@
+# Deep Review — Event-Ticketing-Platform
+> Reviewed: April 7, 2026 | Scope: Full project planning layer (no source code exists yet)
+
+---
+
+## 1. Overall Assessment
+
+This is an exceptionally well-prepared planning layer for a production-grade Java/Spring Boot system. The level of pre-implementation design — covering concurrency safety, state machine correctness, payment idempotency, and distributed systems hygiene — is rare for a solo engineering project. The dual-document overlay pattern (original plan + `Phase1A_Adjustments_and_Fixes.md`) is particularly mature.
+
+**Verdict:** The plan is execution-ready. The gaps identified below are real but none are blockers for Day 1. They range from a critical omission in the constitution, to minor inconsistencies between documents.
+
+---
+
+## 2. Project Structure Review
+
+```
+Event-Ticketing-Platform/
+├── .github/          ✅ Well-formed — agents, instructions, copilot-instructions.md
+├── .specify/         ⚠️  constitution.md is a blank TEMPLATE — not filled in yet
+├── Artifacts/        ✅ Contains 4 .resolved analysis files from prior sessions
+├── Docs/AI_Sessions/ ✅ Correct location for handoff files — currently empty (no sessions run yet)
+├── Plans/            ✅ Complete and well-organized
+│   ├── README.md
+│   ├── Phase1A_Adjustments_and_Fixes.md
+│   ├── intsructions.txt       ⚠️  Typo in filename: "intsructions" → "instructions"
+│   ├── session-prompts/       ✅ All 10 days written
+│   ├── skills/                ✅ 6 skill files + README
+│   └── Text/                  ✅ All 5 plan sections present
+├── END_TO_END_WORKFLOW.md     ✅ Single source of truth — excellent
+└── intsructions.txt           ⚠️  Same typo, root-level duplicate of Plans/intsructions.txt
+```
+
+### Structural Issues
+
+| # | Issue | Severity |
+|---|-------|----------|
+| S-1 | `END_TO_END_WORKFLOW.md` is listed in the file tree as living inside `Plans/` but physically lives at the **root**. The workflow's own project structure diagram (line 312) shows it at `Plans/END_TO_END_WORKFLOW.md`. This is a discrepancy. | 🟡 |
+| S-2 | `intsructions.txt` is duplicated at two locations: root AND `Plans/`. The root copy and the `Plans/` copy appear to be identical. One should be removed or one should be canonical. | 🟡 |
+| S-3 | `Plans/intsructions.txt` filename has a persistent **typo** ("intsructions"). Every document references this filename. Fixing the typo would require updating all references. Leave it or fix uniformly — do not fix partially. | 🟢 |
+| S-4 | `Plans/PDF/` directory exists but was not checked — PDF files presumably exist there as source originals. No issue, just confirm they're the originals for the Text files. | 🟢 |
+| S-5 | No `src/`, `frontend/`, `pom.xml`, `docker-compose.yml`, or `PROGRESS.md` exist yet. This is **expected** — Day 1 hasn't run. But pre-create `PROGRESS.md` as an empty table now so the handoff protocol has somewhere to write. | 🟢 |
+
+---
+
+## 3. `.specify/memory/constitution.md` — CRITICAL GAP
+
+**This is the single most important gap in the entire project.**
+
+The `constitution.md` file exists but contains only the **blank SpecKit template** — `[PRINCIPLE_1_NAME]`, `[SECTION_2_NAME]`, etc. It has never been filled in by `speckit.constitution`.
+
+### Impact
+The `END_TO_END_WORKFLOW.md` Phase 0 step says to run `speckit.constitution` **before Day 1**. `speckit.implement` reads `constitution.md` + `copilot-instructions.md` to make architecture decisions. If it reads only the blank template, every implementation session starts without project memory — no package names, no Java 21, no Instant/TIMESTAMPTZ rules, no Lua guard requirement.
+
+### What to Do
+Run Phase 0 immediately before any implementation work:
+```
+@speckit.constitution
+Attach: Plans/intsructions.txt
+Attach: Plans/Phase1A_Adjustments_and_Fixes.md
+Type: "Generate the project constitution from these documents"
+```
+The `copilot-instructions.md` is comprehensive and would serve as an excellent source for the constitution content.
+
+> [!CAUTION]
+> Do NOT proceed to Day 1 implementation without running `speckit.constitution` first. The blank template will produce incorrect or generic code from `speckit.implement`.
+
+---
+
+## 4. `END_TO_END_WORKFLOW.md` — Deep Review
+
+**Rating: 9/10 — Exceptional document with two small gaps.**
+
+### Strengths
+- The Q&A format (Q1/Q2) at the top is the right UX choice — it anticipates exactly the questions a developer would have before opening their first session
+- The agent chain decision table (Use / Skip) is highly practical
+- The anti-patterns table (line 194–204) is gold — it pre-empts every Copilot mistake before it happens
+- Attachment rules (max 3 files, priority order) show real operational discipline
+- Severity enforcement table (CRITICAL/IMPORTANT/GOOD PRACTICE) is clear and non-ambiguous
+- Session handoff format is precise and reproducible
+
+### Gap 1 — `features/` Directory Not Pre-Created
+The workflow says to run `create-new-feature.ps1` before `speckit.plan`. But the `.specify/scripts/powershell/` directory is listed in the structure yet needs to be verified as containing the script. If the script doesn't exist yet, Day 1 will stall immediately.
+
+**Verify:** Does `.specify/scripts/powershell/create-new-feature.ps1` exist?
+
+### Gap 2 — No Rollback Protocol
+The workflow documents forward-progress steps, but there's no guidance for when `speckit.implement` generates incorrect code that breaks compile. For example:
+- What do you do when `./mvnw compile` fails after an implement step?
+- Do you revert, fix inline, or ask Copilot to regenerate?
+
+**Recommendation:** Add a short "Breakglass Protocol" section:
+```
+If ./mvnw compile fails after speckit.implement:
+1. Do NOT move to the next task
+2. Show the error to Copilot in the same chat window: "Fix this compile error"
+3. Only mark the task [x] after compile passes
+4. If after 2 self-correction attempts it still fails → git stash, return to task start
+```
+
+### Gap 3 — No Test-Run Step in the Sessions for Days 1–4
+The workflow's Phase 4 says "Run: `./mvnw compile` (must pass before moving to next task)" but doesn't require `./mvnw test` until the checklist phase. Days 1–4 build foundational entities and migrations — any broken Flyway script or wrong entity mapping here poisons all future days. Recommend adding `./mvnw test -Dtest=*MigrationTest` after each Flyway batch.
+
+### Minor — `PROGRESS.md` Not in the Root Yet
+The Session Close (Step 6.3) references `PROGRESS.md` in the project root. This file doesn't exist. Pre-create it with the empty table header before Day 1.
+
+---
+
+## 5. `Phase1A_Adjustments_and_Fixes.md` — Deep Review
+
+**Rating: 10/10 — Best-in-class engineering overlay document.**
+
+### Strengths
+- Every fix has: Severity, Original Plan Location, Why (the root cause), and Exact Fix (copy-paste ready code)
+- Day-by-day scoping makes it trivially easy to apply the right fix at the right time
+- The CROSS-CUTTING section (CC-1, CC-2) correctly identifies fixes that can't be day-scoped
+- The Final Checklist at the end (Day 21) is a production-gate checklist, not a vanity list
+- The concurrent test (Fix 16.1) is exactly right — 100 threads, 50 seats, assert exactly 50 succeed
+
+### Potential Issues
+
+| Fix | Observation |
+|-----|-------------|
+| **Fix 8.4** (`@Retryable`) | The fix correctly requires `spring-retry` in `pom.xml`. But `@EnableRetry` must be placed on a `@Configuration` class, not on `TicketingApplication.java` directly (though `@SpringBootApplication` technically qualifies). Add this note to avoid confusion. |
+| **Fix 11.2** (`RELEASE` event) | The recommended decision is to remove `RELEASE` entirely but the "if intentional" path keeps it as an admin API. This ambiguity will cause Copilot to pick one of the two options non-deterministically. **Decide now**: keep or remove. Remove is the cleaner choice. |
+| **Fix 12.1** SQL location | The fix says add to `V8__add_event_features.sql` OR create `V10__add_refund_denial.sql`. Flyway requires sequential versioning. If Day 1 already writes V1–V9, a `V10` is fine. But if you add to V8 after V8 has already been applied, Flyway will throw `FlywayValidateException`. Clarify: use a new sequential migration. |
+| **Fix PW3-1** | The "CRITICAL" tag on this is appropriate. The Stripe + Railway account setup warning is well-placed. One addition: the Stripe webhook secret printed by `stripe listen` is **ephemeral** — it changes every time you re-start the CLI. Document that it must be re-set in `application-local.yml` every dev session. |
+| **Fix 5.2** health indicator YAML | The YAML path `management.health.readinessstate.enabled: true` is correct for Spring Boot 2.3+. However the Actuator endpoint that Railway checks is `/actuator/health/readiness`. Confirm Railway's health check path is configured to `/actuator/health/readiness` not `/actuator/health` — otherwise the warmup indicator has no effect. |
+
+### Missing Fix — Day 2 Auth Layer
+The overlay has Day 2 fixes (2.1, 2.2) covering `@Transactional(readOnly = true)` and constructor injection. But there is **no fix** for the JWT implementation itself:
+- JWT expiry should use `Instant` (not `Date`) — aligned with Fix 1.1 but not mentioned in the Day 2 section
+- `JwtFilter` should extract user ID from claims and store in `SecurityContextHolder` with a custom `AuthenticatedUser` principal, not raw `UsernamePasswordAuthenticationToken`
+- The `@PreAuthorize("hasRole('ORGANIZER')")` checks on Day 8 require `ROLE_ORGANIZER` to be in the authority list — this depends on how authorities are mapped at token decode time
+
+**Recommendation:** Add a Fix 2.3 for JWT authority mapping to prevent a Day 8 surprise when `@PreAuthorize` doesn't work.
+
+---
+
+## 6. Session Prompts — Deep Review
+
+**All 10 session prompts reviewed structurally. Rating: 9/10.**
+
+### Format Consistency ✅
+Every prompt has the same structure:
+- Context Briefing (why this day matters)
+- Active Plan Reference (which files to attach)
+- Fixes to Apply Today (table with Fix ID + Severity + Action)
+- Tasks In Order (morning/afternoon/evening breakdown)
+- Expected Deliverable / Success Criteria (checkboxes)
+- Skills to Attach
+- (Major days) Critical Reminders ⚠️
+
+### Highlights by Day
+
+| Day | Standout Feature | Risk |
+|-----|-----------------|------|
+| **Day 1** | Includes inline `BusinessConstants.java` code — AI doesn't need to guess the values | 9 migrations is aggressive for a first day. 2 hours of "Designing Data-Intensive Applications reading" during an 8-hour implementation day risks schedule pressure |
+| **Day 5** | Correctly includes the Lua script inline — no ambiguity on what "atomic" means | The concurrent test (10 threads, 5 available) is simpler than Fix 16.1's test (100 threads, 50 available). Ensure Day 5's simpler test doesn't create false confidence |
+| **Day 8** | Best prompt in the set. Fix 11.1 is correctly pulled forward from Day 11 to Day 8. The 10-step `reserveTickets()` outline is clear | `BookingState.AVAILABLE` is listed as a state in the enum on line 47 but Fix 11.2 recommends removing it. This should be resolved before Day 8 runs |
+| **Day 9** | The webhook architecture diagram (inline code) is clear and correct | `StripeConfig` uses `@PostConstruct` to set `Stripe.apiKey` globally — this is correct but note that the Stripe SDK global is not thread-safe if `Stripe.apiKey` is ever mutated after startup. Safe as written, just document the assumption |
+
+### Cross-Prompt Issue — Day Count vs. Session Count
+The workflow says Days 1–21 (21 days, 105–122 hours) but only 10 session prompts exist for days 1–10. Days 11–21 have no session prompts.
+
+> [!IMPORTANT]
+> Days 11–21 have no session prompt files. This is a planning gap. Sessions for Days 11+ will need to be run without pre-written prompts, making them more vulnerable to context loss and deviation from the plan.
+
+**Recommendation:** Create session prompts for Days 11–21. At minimum create stubs with the fix table for each day.
+
+---
+
+## 7. `.github/` Configuration — Deep Review
+
+### `copilot-instructions.md` — Rating: 10/10
+This is one of the most comprehensive Copilot instruction files I've seen. It covers:
+- All architecture decisions with "why" rationale
+- Full package naming convention (exact, no deviations)
+- Every `BusinessConstants` value pre-defined in a table
+- Critical components flagged (`DistributedLockService`, `BookingStateMachineConfig`, `InventoryService`, `StripeWebhookController`)
+- Logging standards (SLF4J only, parameterized)
+- Testing standards (naming convention, Testcontainers, 100-thread concurrency test required)
+
+**One issue:** The instructions reference `private static final Logger logger = LoggerFactory.getLogger(MyClass.class)` but the project uses Lombok `@Slf4j` annotation which is simpler and less error-prone. The skill file and instructions should agree on which style to use.
+
+### `instructions/` — 9 Files Present ✅
+All expected instruction files exist:
+- `springboot.instructions.md` — Spring Boot practices
+- `security-and-owasp.instructions.md` — OWASP
+- `spec-driven-workflow-v1.instructions.md` — SpecKit workflow
+- `object-calisthenics.instructions.md` — Code quality rules
+- `oop-design-patterns.instructions.md` — Design patterns
+- `self-explanatory-code-commenting.instructions.md` — Commenting standards
+- `update-docs-on-code-change.instructions.md` — Doc freshness
+- `performance-optimization.instructions.md` — Perf patterns
+- `nextjs.instructions.md` — Frontend
+
+**Note:** The `spec-driven-workflow-v1.instructions.md` file at 12KB is the most important of these for session workflow. Verify its `applyTo` glob covers `*.md` files so it auto-injects during plan and tasks phases.
+
+### `agents/` — 9 SpecKit Agents Present ✅
+All 9 agents present: `analyze`, `plan`, `tasks`, `implement`, `checklist`, `clarify`, `constitution`, `specify`, `taskstoissues`. 
+
+The `speckit.taskstoissues` agent (1KB — very small) may be undersized for what it needs to do. Confirm it can push tasks to GitHub Issues if needed for tracking.
+
+---
+
+## 8. Skills Review
+
+| Skill | Size | Assessment |
+|-------|------|-----------|
+| `java-springboot.SKILL.md` | 4.1KB | Generic best practices. Good as a base. But it recommends organizing by **feature/domain** package structure, which conflicts with the project's decided layer-within-domain structure (`com.ticketing.event.controller`, `.service`, `.repository`). Minor conflict worth noting. |
+| `java-junit.SKILL.md` | 3.0KB | Standard JUnit 5 + Mockito patterns. Adequate. |
+| `postgresql-optimization.SKILL.md` | 11.4KB | Large and detailed — likely covers the N+1 fix patterns needed on Day 6. |
+| `sql-optimization.SKILL.md` | 9.3KB | Good for Flyway migration days (1, 5, 6). |
+| `multi-stage-dockerfile.SKILL.md` | 2.3KB | Adequate for Day 7's Docker work. |
+| `conventional-commit.SKILL.md` | 2.6KB | Clean. The commit examples in `END_TO_END_WORKFLOW.md` follow conventional commit format correctly. |
+
+---
+
+## 9. `intsructions.txt` (System Prompt) — Deep Review
+
+**Rating: 9.5/10 — Near-perfect system prompt.**
+
+### Strengths
+- The dual-document workflow is clearly defined: original plan first, overlay second
+- The severity enforcement rules are unambiguous
+- The "WHAT NOT TO DO" section preemptively eliminates the most common AI failure modes ("should I apply the fix?" → just apply it)
+- Package naming convention included verbatim — AI can't get it wrong
+- Asks for handoff summary in exact format — reproducible, parseable
+
+### Issues
+
+| # | Issue |
+|---|-------|
+| I-1 | Line 96: "Start each session by asking me: 'Which day or section are we working on today?'" — This is correct for a fresh session, but session prompts already provide this context inline. On Day 8, pasting the session prompt after this instruction means the AI asks the question AND has the answer simultaneously. Minor friction but could confuse the flow. Consider: "If the day is not stated in my first message, ask: Which day are we working on?" |
+| I-2 | No mention of the SpecKit agents in the system prompt. The prompt is written as if Copilot is in free-chat mode. In practice, the user switches between `@speckit.plan`, `@speckit.tasks`, `@speckit.implement` etc. This prompt would be read by whichever agent is active. Verify that each SpecKit agent's own `.agent.md` also reads `copilot-instructions.md` — if agents don't reference it, the master config is only active for free-chat mode. |
+| I-3 | The final checklist tracking instruction (Point 5) says "At the end of each week (Day 7, Day 14, Day 21), run through the checklist." But Day 14's session prompt doesn't exist (Days 11–21 missing). This weekly checkpoint will be missed unless a Day 14 prompt is created. |
+
+---
+
+## 10. Concurrency & Correctness Analysis
+
+The fixes collectively address an impressive range of distributed systems correctness problems. Here's an independent validation:
+
+| Scenario | Protection Mechanism | Status |
+|----------|---------------------|--------|
+| Two users race on last seat | Redis Lua floor guard (Fix 5.1) + TOCTOU double-check inside lock (Fix 8.1) | ✅ Correct — two layers |
+| Same user double-clicks Reserve | User-scoped lock key `tier:{tierId}:user:{userId}` | ✅ Correct |
+| Stripe delivers same webhook twice simultaneously | DB UNIQUE constraint + `DataIntegrityViolationException` catch (Fix 9.2) | ✅ Correct — only DB constraint survives race |
+| App crashes after 200 sent but before DB commit | Impossible — 200 only sent after service method returns (Fix 9.1) | ✅ Correct |
+| Multi-instance scheduler runs expiry job twice | Distributed lock on `scheduler:reservation-expiry` (Fix 8.3) | ✅ Correct |
+| Redis cache cold on startup | `InventoryWarmupHealthIndicator` blocks readiness (Fix 5.2) | ✅ Correct — but Railway health check path must be `/actuator/health/readiness` |
+| Optimistic lock collision under load | `@Retryable` with 3 attempts + exponential backoff (Fix 8.4) | ✅ Correct |
+| Refund denied with no user notification | `NotifyRefundDeniedAction` + `RefundDeniedEvent` to RabbitMQ (Fix 10.1) | ✅ Correct |
+| 50 QR codes blocking webhook thread | Async `ticket.generation.queue` (Fix 10.2) | ✅ Correct |
+| Organizer marks their own ticket attended | `CheckInGuard` at state machine layer (Fix 8.2) | ✅ Correct |
+| Multi-replica distributed pricing/expiry | No fix exists yet for `PricingEngineService` if it has time-sensitive calculations | ⚠️ Unaddressed |
+
+**One unaddressed scenario:** If dynamic pricing is calculated on all instances simultaneously, there's no distributed coordination for the `80% threshold triggers 25% surge` logic. This may cause inconsistent pricing for ~1 second during surge onset. Acceptable for Phase 1A but worth noting for Phase 1B.
+
+---
+
+## 11. What Is Missing / Should Be Created
+
+### Before Day 1 (Blockers)
+1. **Fill `constitution.md`** — Run `speckit.constitution` — this is the only true blocker
+2. **Create `PROGRESS.md`** at project root (empty table template)
+3. **Verify `.specify/scripts/powershell/create-new-feature.ps1` exists** — Day 1 Step 1.1 depends on it
+
+### Before Day 11 (Non-Blockers, But Important)
+4. **Session prompts for Days 11–21** — Currently missing. Create at minimum stub files
+5. **Decide on `BookingState.AVAILABLE`** — Remove it or keep it? Resolve the Fix 11.2 ambiguity definitively
+6. **Decide on `RELEASE` event** — Keep as admin-only or remove entirely?
+
+### Ongoing
+7. **Add Fix 2.3** — JWT authority mapping for `@PreAuthorize` to work correctly on Day 8
+8. **Clarify Fix 12.1 migration version** — Use `V10__add_refund_denial.sql`, not modify V8
+
+---
+
+## 12. Document Consistency Matrix
+
+| Claim | In END_TO_END_WORKFLOW | In Phase1A_Fixes | In copilot-instructions | In intsructions.txt | In session prompts |
+|-------|----------------------|-----------------|------------------------|--------------------|--------------------|
+| `RESERVATION_TTL_SECONDS = 300` | ✅ | ✅ | ✅ | ✅ | ✅ (Day 8) |
+| `@RequiredArgsConstructor` only | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `Instant` never `LocalDateTime` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `@EnableStateMachineFactory` | ✅ | — | ✅ | — | ✅ (Day 8) |
+| `TIMESTAMPTZ` in Flyway | — | ✅ | ✅ | — | ✅ (Day 1) |
+| `X-Correlation-ID` via MDC | ✅ | ✅ | ✅ | — | ✅ (Day 1) |
+| Base package `com.ticketing` | ✅ | — | ✅ | ✅ | — |
+| `constitution.md` must be run first | ✅ | — | — | — | — |
+
+**All major architectural decisions are consistent across all documents.** The only intentional omissions are in `intsructions.txt` (no mention of SpecKit agents — expected, it's a system prompt) and `Phase1A_Fixes` (no package naming — those are structural rules, not fixes).
+
+---
+
+## 13. Priority Action List
+
+### 🔴 Do Before Any Code
+1. Run `@speckit.constitution` to fill `constitution.md` — **today**
+2. Verify `.specify/scripts/powershell/create-new-feature.ps1` exists and is executable
+3. Create `PROGRESS.md` at root
+
+### 🟡 Do Before Day 8
+4. Add **Fix 2.3** — JWT authority mapping note to the overlay
+5. Decide and document: **keep or remove `BookingState.AVAILABLE`** 
+6. Decide and document: **keep or remove `BookingEvent.RELEASE`**
+7. Clarify Fix 12.1: use `V10__add_refund_denial.sql` not V8
+
+### 🟢 Do Anytime Before Day 11
+8. Create session prompt stubs for Days 11–21
+9. Resolve `intsructions.txt` duplication (root vs Plans/)
+10. Add Railway health check path clarification to Fix 5.2
+
+---
+
+## 14. Final Verdict
+
+| Dimension | Score | Notes |
+|-----------|-------|-------|
+| Technical Correctness | 9.5/10 | The concurrency fixes are textbook-correct. One unaddressed pricing race. |
+| Documentation Quality | 9/10 | Exceptional overlay format. Missing Days 11–21 session prompts. |
+| Workflow Readiness | 8.5/10 | Blank constitution is the only real blocker. |
+| Internal Consistency | 9.5/10 | All docs agree on every architectural decision. |
+| Production Readiness of Plan | 9/10 | The gap analysis (Stripe account timing warning, Railway cold-start, etc.) shows real ops thinking. |
+
+**This project is ready to begin implementation the moment `speckit.constitution` is run.**
+
+---
+*Deep review by Antigravity | April 7, 2026*

@@ -1,0 +1,47 @@
+PHASE 4 — Day 3 Completeness Audit
+Deliverables Checklist
+Deliverable	Status	Evidence
+VenueService (3 tests, TDD)	✅	VenueServiceTest — 7/7 passing
+CategoryService (3 tests, TDD)	✅	CategoryServiceTest — 7/7 passing
+EventSearchService	✅	EventSearchServiceTest — 2/2 passing
+TicketTierService.getAvailableCount()	✅	TicketTierServiceTest — 3/3 passing
+VenueController + CategoryController	✅	Both live, @PreAuthorize("hasRole('ADMIN')") on write ops
+EventSearchController	✅	GET /api/search/events with @Size(max=100) on params
+V8 migration (waitlist_enabled, dynamic_pricing_enabled)	✅	File present in db/migration
+V9 migration (5 categories, 3 venues seed)	✅	File present in db/migration
+./mvnw test all green	✅	56/56 passing (2 Docker errors pre-existing, excluded)
+Overlay Fix Audit
+Fix ID	Status	Evidence
+Fix CC-1 (X-Correlation-ID)	⚠️ NO — DEFERRED	New service classes (VenueService, CategoryService, EventSearchService) use plain logger.info() without MDC correlation ID. This was marked ✅ in PROGRESS.md but not applied to Day 3 classes. Not a blocker for Day 3 close — deferred to Day 7 cleanup.
+Fix CC-2 (BusinessConstants, no magic numbers)	✅ YES	Zero magic numbers in any Day 3 file. All constants centralised in BusinessConstants.java.
+Fix 2.1 (@Transactional readOnly)	✅ YES	All three services: @Transactional(readOnly = true) at class level, @Transactional on write methods.
+Fix 2.2 (@RequiredArgsConstructor, no @Autowired)	✅ YES	Zero @Autowired in event package. All injection via private final + @RequiredArgsConstructor.
+PHASE 5 — SESSION HANDOFF
+--- SESSION HANDOFF ---
+Day 3 status      : Complete ✅
+Damage repaired   :
+  - VenueControllerTest.java — rewritten correctly with TestSecurityConfig
+  - CategoryControllerTest.java — rewritten correctly with TestSecurityConfig
+  - EventSearchControllerTest.java — rewritten correctly with TestSecurityConfig
+  - All three previously had addFilters=false (HARD STOP condition) — now removed
+Files created     :
+  - src/test/java/com/ticketing/common/config/TestSecurityConfig.java
+Files modified    :
+  - PROGRESS.md (Day 3 marked complete)
+  - src/test/java/.../VenueControllerTest.java (final, correct version)
+  - src/test/java/.../CategoryControllerTest.java (final, correct version)
+  - src/test/java/.../EventSearchControllerTest.java (final, correct version)
+Files verified (correct, no changes needed):
+  - VenueController.java — hasRole('ADMIN') on POST/PUT/DELETE ✅
+  - CategoryController.java — hasRole('ADMIN') on POST/PUT/DELETE ✅
+  - EventSearchController.java — @Validated + @Size(max=100) ✅
+  - GlobalExceptionHandler.java — ConstraintViolationException → 400 ✅
+  - All Flyway migrations V1–V10 — INTACT, never edited ✅
+  - BusinessConstants.java — INTACT ✅
+Fixes applied     : Fix CC-2 ✅, Fix 2.1 ✅, Fix 2.2 ✅
+Fixes pending     : Fix CC-1 (X-Correlation-ID MDC on new services) — DEFERRED Day 7
+Tests status      : ./mvnw test — 56 passed, 0 failed, 0 skipped
+                    (2 Docker/Testcontainers errors pre-existing — no Docker Desktop)
+Day 2 regression  : NONE
+Next session start: Day 4 — Next.js Frontend Setup + Home Page
+  First task: npx create-next-app@latest frontend/ --typescript --tailwind --eslint --app --src-dir

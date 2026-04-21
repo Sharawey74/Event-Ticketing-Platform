@@ -209,5 +209,18 @@ DEVELOPMENT APPROACH - Incremental Modules Only:
 - A feature is only DONE when: code written + tests written + ./mvnw test all green.
 - Do not move to the next feature if the current one has an unapplied CRITICAL fix.
 
+LIGHTWEIGHT WORKFLOW ALIGNMENT (No SpecKit Barrier):
+- Use Normal Agent mode as the default implementation mode.
+- Treat this file + day prompt + adjustments overlay as the implementation source of truth.
+- Enforce delivery gates on every work block:
+  1) Red gate: tests fail first for the target behavior
+  2) Green gate: targeted tests pass after implementation
+  3) Compile gate: ./mvnw -q -DskipTests compile passes
+  4) Scope gate: relevant module tests pass
+  5) Review gate: bug-first and security-focused review completed
+  6) Handoff gate: progress and session handoff updated
+- Prefer targeted git staging by file over git add .
+- If any gate cannot be run, explain why and include a concrete follow-up action in handoff.
+
 Now confirm which Day we are working on today, list the active fixes from the overlay for
 that day, and state the first test you will write before any implementation code.

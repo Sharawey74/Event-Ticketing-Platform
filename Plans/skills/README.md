@@ -18,6 +18,9 @@ or use `#file:` references. Unlike instructions (which are auto-injected), skill
 | `sql-optimization.SKILL.md` | Days 1, 5, 6 (Flyway migrations) | Query tuning, index design, pagination, batch operations |
 | `multi-stage-dockerfile.SKILL.md` | Day 3, Day 7 (Docker Compose polish) | Multi-stage Dockerfiles, layer caching, security practices |
 | `conventional-commit.SKILL.md` | Every commit | Conventional commit messages, scope, breaking changes |
+| `implementation-gate-review.SKILL.md` | End of each feature block | Verifies Red/Green/Compile/Scope gates before commit |
+| `code-review-gates.SKILL.md` | Pre-merge code review | Bug-first review with severity ordering and test gap checks |
+| `security-review-gates.SKILL.md` | Auth/payment/webhook changes | Focused security gates for authz, token, webhook, secrets |
 
 ## Attachment Rules
 
