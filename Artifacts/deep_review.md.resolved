@@ -1,330 +1,445 @@
-# Deep Review — Event-Ticketing-Platform
-> Reviewed: April 7, 2026 | Scope: Full project planning layer (no source code exists yet)
+# Event-Ticketing-Platform — Deep Review
+**Reviewed:** 2026-04-16 | **Reviewer:** Antigravity  
+**Project Phase:** Day 1 Complete, Day 2 Not Started  
+**Scope:** Full project — all source files, migrations, config, tooling, plans, session prompts
 
 ---
 
-## 1. Overall Assessment
+## Executive Summary
 
-This is an exceptionally well-prepared planning layer for a production-grade Java/Spring Boot system. The level of pre-implementation design — covering concurrency safety, state machine correctness, payment idempotency, and distributed systems hygiene — is rare for a solo engineering project. The dual-document overlay pattern (original plan + `Phase1A_Adjustments_and_Fixes.md`) is particularly mature.
+Day 1 is correctly marked complete. The scaffold is solid: all 9 Flyway migrations are present, all JPA entities use `Instant`, the PostgreSQL ENUM is in place, soft-delete is on bookings, and both `BusinessConstants` and `CorrelationIdFilter` are wired. The constitution is filled and ratified — that is a strong foundation.
 
-**Verdict:** The plan is execution-ready. The gaps identified below are real but none are blockers for Day 1. They range from a critical omission in the constitution, to minor inconsistencies between documents.
-
----
-
-## 2. Project Structure Review
-
-```
-Event-Ticketing-Platform/
-├── .github/          ✅ Well-formed — agents, instructions, copilot-instructions.md
-├── .specify/         ⚠️  constitution.md is a blank TEMPLATE — not filled in yet
-├── Artifacts/        ✅ Contains 4 .resolved analysis files from prior sessions
-├── Docs/AI_Sessions/ ✅ Correct location for handoff files — currently empty (no sessions run yet)
-├── Plans/            ✅ Complete and well-organized
-│   ├── README.md
-│   ├── Phase1A_Adjustments_and_Fixes.md
-│   ├── intsructions.txt       ⚠️  Typo in filename: "intsructions" → "instructions"
-│   ├── session-prompts/       ✅ All 10 days written
-│   ├── skills/                ✅ 6 skill files + README
-│   └── Text/                  ✅ All 5 plan sections present
-├── END_TO_END_WORKFLOW.md     ✅ Single source of truth — excellent
-└── intsructions.txt           ⚠️  Same typo, root-level duplicate of Plans/intsructions.txt
-```
-
-### Structural Issues
-
-| # | Issue | Severity |
-|---|-------|----------|
-| S-1 | `END_TO_END_WORKFLOW.md` is listed in the file tree as living inside `Plans/` but physically lives at the **root**. The workflow's own project structure diagram (line 312) shows it at `Plans/END_TO_END_WORKFLOW.md`. This is a discrepancy. | 🟡 |
-| S-2 | `intsructions.txt` is duplicated at two locations: root AND `Plans/`. The root copy and the `Plans/` copy appear to be identical. One should be removed or one should be canonical. | 🟡 |
-| S-3 | `Plans/intsructions.txt` filename has a persistent **typo** ("intsructions"). Every document references this filename. Fixing the typo would require updating all references. Leave it or fix uniformly — do not fix partially. | 🟢 |
-| S-4 | `Plans/PDF/` directory exists but was not checked — PDF files presumably exist there as source originals. No issue, just confirm they're the originals for the Text files. | 🟢 |
-| S-5 | No `src/`, `frontend/`, `pom.xml`, `docker-compose.yml`, or `PROGRESS.md` exist yet. This is **expected** — Day 1 hasn't run. But pre-create `PROGRESS.md` as an empty table now so the handoff protocol has somewhere to write. | 🟢 |
+However, there are **5 hard bugs** that will cause compilation failures or silent correctness violations starting from Day 2 if not addressed, plus **7 important structural risks** that will compound across coming days. These are catalogued below in priority order.
 
 ---
 
-## 3. `.specify/memory/constitution.md` — CRITICAL GAP
+## Part 1 — What Is Confirmed CORRECT ✅
 
-**This is the single most important gap in the entire project.**
+| Item | Evidence |
+|------|----------|
+| All entity timestamps use `Instant` (Fix 1.1 ✅) | `Event`, `Booking`, `TicketTier`, `Ticket`, `User`, `Venue`, `Category`, `Payment`, `Refund` — all verified |
+| All Flyway columns use `TIMESTAMPTZ` (Fix 1.1 ✅) | V1–V9 all confirmed |
+| `user_role` PostgreSQL ENUM (Fix 1.2 ✅) | `CREATE TYPE user_role AS ENUM` in V1 |
+| `@Enumerated(EnumType.STRING) @Column(columnDefinition = "user_role")` on `User.role` (Fix 1.2 ✅) | Verified in `User.java` |
+| Soft delete `deleted_at TIMESTAMPTZ` on bookings (Fix 1.3 ✅) | V5 migration + `Booking.java` + `@Where(clause = "deleted_at IS NULL")` |
+| `@Version Long version` on `Booking` | Verified |
+| `BusinessConstants.java` exists and complete (Fix CC-2 ✅) | All 12 constants present in `com.ticketing.common.util` |
+| `CorrelationIdFilter` created and registered (Fix CC-1 ✅) | `OncePerRequestFilter` + `MDC` + `WebConfig` bean registration verified |
+| `processed_stripe_events` table with UNIQUE constraint on `stripe_event_id` (Fix 9.2 pre-work ✅) | V6 migration confirmed |
+| Partial-index on `bookings(expires_at) WHERE state = 'RESERVED'` | V7 confirmed — this is excellent |
+| All 9 Flyway migrations present | V1–V9 verified |
+| `docker-compose.yml` correct | postgres:17, redis:7, rabbitmq:4-management, mailhog all present |
+| `application.yaml` sets `spring.profiles.active: local` | Verified — profile activation is correct |
+| `application-local.yml` complete | DB, Redis, RabbitMQ, Flyway, JPA all configured |
+| `EventStatus` enum correct | DRAFT, PUBLISHED, SALES_OPEN, SALES_CLOSED, COMPLETED, ARCHIVED |
+| `BookingState` enum complete | 11 states including REFUND_REQUESTED, REFUND_APPROVED, REFUND_DENIED |
+| Payment + Refund entities exist | `Payment.java`, `Refund.java`, `PaymentStatus`, `RefundStatus` all present |
+| `BookingState.AVAILABLE` included | Exists — though see Issue 7 below |
+| Constitution fully ratified | Version 1.0.0, ratified 2026-04-04, last amended 2026-04-13 |
+| All 10 session prompts (Days 1–10) complete and TDD-ordered | Verified — Day 5 and Day 9 were explicitly patched for correct Red-first ordering |
+| `complete_workflow_reference.md` is comprehensive and actionable | Parts 1–10 verified |
+| All 9 SpecKit agents present | analyze, checklist, clarify, constitution, implement, plan, specify, tasks, taskstoissues |
+| All 9 instruction files present | springboot, security-owasp, performance, oop-patterns, object-calisthenics, self-explanatory, spec-driven-workflow-v1, nextjs, update-docs-on-code-change |
 
-The `constitution.md` file exists but contains only the **blank SpecKit template** — `[PRINCIPLE_1_NAME]`, `[SECTION_2_NAME]`, etc. It has never been filled in by `speckit.constitution`.
+---
 
-### Impact
-The `END_TO_END_WORKFLOW.md` Phase 0 step says to run `speckit.constitution` **before Day 1**. `speckit.implement` reads `constitution.md` + `copilot-instructions.md` to make architecture decisions. If it reads only the blank template, every implementation session starts without project memory — no package names, no Java 21, no Instant/TIMESTAMPTZ rules, no Lua guard requirement.
+## Part 2 — CRITICAL BUGS 🔴 (Fix Before Day 2)
 
-### What to Do
-Run Phase 0 immediately before any implementation work:
+### Bug 1 — Spring Boot Version `3.5.13` Does Not Exist
+**File:** `pom.xml`, line 8  
+**Problem:**  
+```xml
+<version>3.5.13</version>
 ```
-@speckit.constitution
-Attach: Plans/intsructions.txt
-Attach: Plans/Phase1A_Adjustments_and_Fixes.md
-Type: "Generate the project constitution from these documents"
+Spring Boot `3.5.13` does not exist. As of April 2026, the latest stable releases are in the `3.2.x` / `3.3.x` / `3.4.x` lines. This version string will cause Maven to fail on first `./mvnw` run with a "Could not resolve artifact" error.
+
+**Fix:**
+```xml
+<version>3.4.4</version>  <!-- or latest 3.4.x / 3.3.x stable -->
 ```
-The `copilot-instructions.md` is comprehensive and would serve as an excellent source for the constitution content.
+Verify with: https://spring.io/projects/spring-boot#learn  
+Or run: `./mvnw versions:display-dependency-updates`
 
 > [!CAUTION]
-> Do NOT proceed to Day 1 implementation without running `speckit.constitution` first. The blank template will produce incorrect or generic code from `speckit.implement`.
+> This is a build-breaking issue. `./mvnw test` will never pass until this is corrected. Verify what version was actually used during Day 1 by checking what compiled successfully, then lock it exactly.
 
 ---
 
-## 4. `END_TO_END_WORKFLOW.md` — Deep Review
-
-**Rating: 9/10 — Exceptional document with two small gaps.**
-
-### Strengths
-- The Q&A format (Q1/Q2) at the top is the right UX choice — it anticipates exactly the questions a developer would have before opening their first session
-- The agent chain decision table (Use / Skip) is highly practical
-- The anti-patterns table (line 194–204) is gold — it pre-empts every Copilot mistake before it happens
-- Attachment rules (max 3 files, priority order) show real operational discipline
-- Severity enforcement table (CRITICAL/IMPORTANT/GOOD PRACTICE) is clear and non-ambiguous
-- Session handoff format is precise and reproducible
-
-### Gap 1 — `features/` Directory Not Pre-Created
-The workflow says to run `create-new-feature.ps1` before `speckit.plan`. But the `.specify/scripts/powershell/` directory is listed in the structure yet needs to be verified as containing the script. If the script doesn't exist yet, Day 1 will stall immediately.
-
-**Verify:** Does `.specify/scripts/powershell/create-new-feature.ps1` exist?
-
-### Gap 2 — No Rollback Protocol
-The workflow documents forward-progress steps, but there's no guidance for when `speckit.implement` generates incorrect code that breaks compile. For example:
-- What do you do when `./mvnw compile` fails after an implement step?
-- Do you revert, fix inline, or ask Copilot to regenerate?
-
-**Recommendation:** Add a short "Breakglass Protocol" section:
+### Bug 2 — `@Where` Is Deprecated in Hibernate 6 (Spring Boot 3.x)
+**File:** `Booking.java`, line 8 and 40  
+**Problem:**
+```java
+import org.hibernate.annotations.Where;
+// ...
+@Where(clause = "deleted_at IS NULL")
 ```
-If ./mvnw compile fails after speckit.implement:
-1. Do NOT move to the next task
-2. Show the error to Copilot in the same chat window: "Fix this compile error"
-3. Only mark the task [x] after compile passes
-4. If after 2 self-correction attempts it still fails → git stash, return to task start
+`org.hibernate.annotations.Where` was deprecated in Hibernate 6.2 and removed in Hibernate 6.3+. Spring Boot 3.x ships with Hibernate 6.4+. This annotation will either produce a `ClassNotFoundException` at runtime or silently not apply the filter — both are critical failures.
+
+**Fix — replace with `@SQLRestriction`:**
+```java
+import org.hibernate.annotations.SQLRestriction;
+// ...
+@SQLRestriction("deleted_at IS NULL")
+public class Booking {
 ```
 
-### Gap 3 — No Test-Run Step in the Sessions for Days 1–4
-The workflow's Phase 4 says "Run: `./mvnw compile` (must pass before moving to next task)" but doesn't require `./mvnw test` until the checklist phase. Days 1–4 build foundational entities and migrations — any broken Flyway script or wrong entity mapping here poisons all future days. Recommend adding `./mvnw test -Dtest=*MigrationTest` after each Flyway batch.
+---
 
-### Minor — `PROGRESS.md` Not in the Root Yet
-The Session Close (Step 6.3) references `PROGRESS.md` in the project root. This file doesn't exist. Pre-create it with the empty table header before Day 1.
+### Bug 3 — Spring State Machine 3.2.0 Is Incompatible with Spring Boot 3.x
+**File:** `pom.xml`, line 72–75  
+**Problem:**
+```xml
+<artifactId>spring-statemachine-core</artifactId>
+<version>3.2.0</version>
+```
+Spring State Machine 3.2.0 was built against Spring Framework 5.x / Spring Boot 2.7. The project uses Spring Boot 3.x (Spring Framework 6.x). This will produce context initialization failures — most likely `NoSuchMethodError` on Spring Framework 6 APIs that SSM 3.2.0 doesn't know.
+
+**Fix:**
+```xml
+<version>4.0.0</version>  <!-- First SSM release supporting Spring Boot 3.x -->
+```
+Spring State Machine 4.0.0 introduced Spring Boot 3.x and Spring Framework 6.x support.
+
+> [!WARNING]  
+> The `BookingStateMachineConfig` (Day 8) is architecturally the most complex component. Without SSM 4.0.0, Day 8 cannot start. Validate this fix by running `./mvnw dependency:tree` to confirm no Spring 5.x transitive dependencies remain.
 
 ---
 
-## 5. `Phase1A_Adjustments_and_Fixes.md` — Deep Review
+### Bug 4 — `TicketTier` Missing `@Version` (Fix 7.1 Not Applied)
+**File:** `TicketTier.java`  
+**Problem:**
+The constitution (Principle II) states:  
+> "optimistic locking via @Version on Booking and TicketTier entities"
 
-**Rating: 10/10 — Best-in-class engineering overlay document.**
+`Booking.java` has `@Version Long version` ✅  
+`TicketTier.java` has **no `@Version` field** ❌  
 
-### Strengths
-- Every fix has: Severity, Original Plan Location, Why (the root cause), and Exact Fix (copy-paste ready code)
-- Day-by-day scoping makes it trivially easy to apply the right fix at the right time
-- The CROSS-CUTTING section (CC-1, CC-2) correctly identifies fixes that can't be day-scoped
-- The Final Checklist at the end (Day 21) is a production-gate checklist, not a vanity list
-- The concurrent test (Fix 16.1) is exactly right — 100 threads, 50 seats, assert exactly 50 succeed
+Without it, two concurrent requests that update the same tier's `available_count` can race, with both reads seeing the same pre-update value and both writes committing — a classic lost-update that causes oversell.
 
-### Potential Issues
+**Fix — add to `TicketTier.java`:**
+```java
+@Version
+@Column(nullable = false)
+private Long version;
+```
 
-| Fix | Observation |
-|-----|-------------|
-| **Fix 8.4** (`@Retryable`) | The fix correctly requires `spring-retry` in `pom.xml`. But `@EnableRetry` must be placed on a `@Configuration` class, not on `TicketingApplication.java` directly (though `@SpringBootApplication` technically qualifies). Add this note to avoid confusion. |
-| **Fix 11.2** (`RELEASE` event) | The recommended decision is to remove `RELEASE` entirely but the "if intentional" path keeps it as an admin API. This ambiguity will cause Copilot to pick one of the two options non-deterministically. **Decide now**: keep or remove. Remove is the cleaner choice. |
-| **Fix 12.1** SQL location | The fix says add to `V8__add_event_features.sql` OR create `V10__add_refund_denial.sql`. Flyway requires sequential versioning. If Day 1 already writes V1–V9, a `V10` is fine. But if you add to V8 after V8 has already been applied, Flyway will throw `FlywayValidateException`. Clarify: use a new sequential migration. |
-| **Fix PW3-1** | The "CRITICAL" tag on this is appropriate. The Stripe + Railway account setup warning is well-placed. One addition: the Stripe webhook secret printed by `stripe listen` is **ephemeral** — it changes every time you re-start the CLI. Document that it must be re-set in `application-local.yml` every dev session. |
-| **Fix 5.2** health indicator YAML | The YAML path `management.health.readinessstate.enabled: true` is correct for Spring Boot 2.3+. However the Actuator endpoint that Railway checks is `/actuator/health/readiness`. Confirm Railway's health check path is configured to `/actuator/health/readiness` not `/actuator/health` — otherwise the warmup indicator has no effect. |
-
-### Missing Fix — Day 2 Auth Layer
-The overlay has Day 2 fixes (2.1, 2.2) covering `@Transactional(readOnly = true)` and constructor injection. But there is **no fix** for the JWT implementation itself:
-- JWT expiry should use `Instant` (not `Date`) — aligned with Fix 1.1 but not mentioned in the Day 2 section
-- `JwtFilter` should extract user ID from claims and store in `SecurityContextHolder` with a custom `AuthenticatedUser` principal, not raw `UsernamePasswordAuthenticationToken`
-- The `@PreAuthorize("hasRole('ORGANIZER')")` checks on Day 8 require `ROLE_ORGANIZER` to be in the authority list — this depends on how authorities are mapped at token decode time
-
-**Recommendation:** Add a Fix 2.3 for JWT authority mapping to prevent a Day 8 surprise when `@PreAuthorize` doesn't work.
+**And add to V4 migration:**
+```sql
+version BIGINT NOT NULL DEFAULT 0,
+```
+Or create a new `V10__add_ticket_tier_version.sql`:
+```sql
+ALTER TABLE ticket_tiers ADD COLUMN version BIGINT NOT NULL DEFAULT 0;
+```
 
 ---
 
-## 6. Session Prompts — Deep Review
+### Bug 5 — `TestcontainersConfiguration` Uses `:latest` Instead of Pinned Versions
+**File:** `src/test/.../TestcontainersConfiguration.java`  
+**Problem:**
+```java
+new PostgreSQLContainer<>(DockerImageName.parse("postgres:latest"))
+new RabbitMQContainer(DockerImageName.parse("rabbitmq:latest"))
+new GenericContainer<>(DockerImageName.parse("redis:latest"))
+```
 
-**All 10 session prompts reviewed structurally. Rating: 9/10.**
+The constitution and `docker-compose.yml` mandate `postgres:17`, `redis:7`, `rabbitmq:4-management`. Using `:latest` in tests means:
+- Tests could run against a different major version than production
+- Redis 8 or PostgreSQL 18 changes could silently break the test suite
+- The Day 5 concurrency test (`concurrentReservations_100threads_50seats_exactlyFiftySucceed`) could behave differently across versions
 
-### Format Consistency ✅
-Every prompt has the same structure:
-- Context Briefing (why this day matters)
-- Active Plan Reference (which files to attach)
-- Fixes to Apply Today (table with Fix ID + Severity + Action)
-- Tasks In Order (morning/afternoon/evening breakdown)
-- Expected Deliverable / Success Criteria (checkboxes)
-- Skills to Attach
-- (Major days) Critical Reminders ⚠️
-
-### Highlights by Day
-
-| Day | Standout Feature | Risk |
-|-----|-----------------|------|
-| **Day 1** | Includes inline `BusinessConstants.java` code — AI doesn't need to guess the values | 9 migrations is aggressive for a first day. 2 hours of "Designing Data-Intensive Applications reading" during an 8-hour implementation day risks schedule pressure |
-| **Day 5** | Correctly includes the Lua script inline — no ambiguity on what "atomic" means | The concurrent test (10 threads, 5 available) is simpler than Fix 16.1's test (100 threads, 50 available). Ensure Day 5's simpler test doesn't create false confidence |
-| **Day 8** | Best prompt in the set. Fix 11.1 is correctly pulled forward from Day 11 to Day 8. The 10-step `reserveTickets()` outline is clear | `BookingState.AVAILABLE` is listed as a state in the enum on line 47 but Fix 11.2 recommends removing it. This should be resolved before Day 8 runs |
-| **Day 9** | The webhook architecture diagram (inline code) is clear and correct | `StripeConfig` uses `@PostConstruct` to set `Stripe.apiKey` globally — this is correct but note that the Stripe SDK global is not thread-safe if `Stripe.apiKey` is ever mutated after startup. Safe as written, just document the assumption |
-
-### Cross-Prompt Issue — Day Count vs. Session Count
-The workflow says Days 1–21 (21 days, 105–122 hours) but only 10 session prompts exist for days 1–10. Days 11–21 have no session prompts.
-
-> [!IMPORTANT]
-> Days 11–21 have no session prompt files. This is a planning gap. Sessions for Days 11+ will need to be run without pre-written prompts, making them more vulnerable to context loss and deviation from the plan.
-
-**Recommendation:** Create session prompts for Days 11–21. At minimum create stubs with the fix table for each day.
+**Fix:**
+```java
+new PostgreSQLContainer<>(DockerImageName.parse("postgres:17"))
+new RabbitMQContainer(DockerImageName.parse("rabbitmq:4-management"))
+new GenericContainer<>(DockerImageName.parse("redis:7")).withExposedPorts(6379)
+```
 
 ---
 
-## 7. `.github/` Configuration — Deep Review
+## Part 3 — IMPORTANT STRUCTURAL ISSUES 🟡
 
-### `copilot-instructions.md` — Rating: 10/10
-This is one of the most comprehensive Copilot instruction files I've seen. It covers:
-- All architecture decisions with "why" rationale
-- Full package naming convention (exact, no deviations)
-- Every `BusinessConstants` value pre-defined in a table
-- Critical components flagged (`DistributedLockService`, `BookingStateMachineConfig`, `InventoryService`, `StripeWebhookController`)
-- Logging standards (SLF4J only, parameterized)
-- Testing standards (naming convention, Testcontainers, 100-thread concurrency test required)
+### Issue 6 — Missing `spring-boot-starter-mail` Dependency
+**File:** `pom.xml`  
+Day 10 requires `JavaMailSender` for Mailhog-based email. There is no `spring-boot-starter-mail` in `pom.xml`. Day 10 will not compile.
 
-**One issue:** The instructions reference `private static final Logger logger = LoggerFactory.getLogger(MyClass.class)` but the project uses Lombok `@Slf4j` annotation which is simpler and less error-prone. The skill file and instructions should agree on which style to use.
-
-### `instructions/` — 9 Files Present ✅
-All expected instruction files exist:
-- `springboot.instructions.md` — Spring Boot practices
-- `security-and-owasp.instructions.md` — OWASP
-- `spec-driven-workflow-v1.instructions.md` — SpecKit workflow
-- `object-calisthenics.instructions.md` — Code quality rules
-- `oop-design-patterns.instructions.md` — Design patterns
-- `self-explanatory-code-commenting.instructions.md` — Commenting standards
-- `update-docs-on-code-change.instructions.md` — Doc freshness
-- `performance-optimization.instructions.md` — Perf patterns
-- `nextjs.instructions.md` — Frontend
-
-**Note:** The `spec-driven-workflow-v1.instructions.md` file at 12KB is the most important of these for session workflow. Verify its `applyTo` glob covers `*.md` files so it auto-injects during plan and tasks phases.
-
-### `agents/` — 9 SpecKit Agents Present ✅
-All 9 agents present: `analyze`, `plan`, `tasks`, `implement`, `checklist`, `clarify`, `constitution`, `specify`, `taskstoissues`. 
-
-The `speckit.taskstoissues` agent (1KB — very small) may be undersized for what it needs to do. Confirm it can push tasks to GitHub Issues if needed for tracking.
+**Fix — add to pom.xml:**
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-mail</artifactId>
+</dependency>
+```
+Add to `application-local.yml`:
+```yaml
+spring:
+  mail:
+    host: localhost
+    port: 1025
+    properties:
+      mail.smtp.auth: false
+      mail.smtp.starttls.enable: false
+```
 
 ---
 
-## 8. Skills Review
+### Issue 7 — `BookingState.AVAILABLE` Is Semantically Wrong
+**File:** `BookingState.java`  
+**Problem:**
+`AVAILABLE` is a booking state in the enum, but a booking by definition cannot be "available" — that is the state of a **ticket tier's inventory**, not a booking. Fix 11.2 from the overlay correctly identifies this. As written, the state machine will have a confusing `AVAILABLE → RESERVED` transition where `AVAILABLE` is a booking, not a seat.
 
-| Skill | Size | Assessment |
-|-------|------|-----------|
-| `java-springboot.SKILL.md` | 4.1KB | Generic best practices. Good as a base. But it recommends organizing by **feature/domain** package structure, which conflicts with the project's decided layer-within-domain structure (`com.ticketing.event.controller`, `.service`, `.repository`). Minor conflict worth noting. |
-| `java-junit.SKILL.md` | 3.0KB | Standard JUnit 5 + Mockito patterns. Adequate. |
-| `postgresql-optimization.SKILL.md` | 11.4KB | Large and detailed — likely covers the N+1 fix patterns needed on Day 6. |
-| `sql-optimization.SKILL.md` | 9.3KB | Good for Flyway migration days (1, 5, 6). |
-| `multi-stage-dockerfile.SKILL.md` | 2.3KB | Adequate for Day 7's Docker work. |
-| `conventional-commit.SKILL.md` | 2.6KB | Clean. The commit examples in `END_TO_END_WORKFLOW.md` follow conventional commit format correctly. |
-
----
-
-## 9. `intsructions.txt` (System Prompt) — Deep Review
-
-**Rating: 9.5/10 — Near-perfect system prompt.**
-
-### Strengths
-- The dual-document workflow is clearly defined: original plan first, overlay second
-- The severity enforcement rules are unambiguous
-- The "WHAT NOT TO DO" section preemptively eliminates the most common AI failure modes ("should I apply the fix?" → just apply it)
-- Package naming convention included verbatim — AI can't get it wrong
-- Asks for handoff summary in exact format — reproducible, parseable
-
-### Issues
-
-| # | Issue |
-|---|-------|
-| I-1 | Line 96: "Start each session by asking me: 'Which day or section are we working on today?'" — This is correct for a fresh session, but session prompts already provide this context inline. On Day 8, pasting the session prompt after this instruction means the AI asks the question AND has the answer simultaneously. Minor friction but could confuse the flow. Consider: "If the day is not stated in my first message, ask: Which day are we working on?" |
-| I-2 | No mention of the SpecKit agents in the system prompt. The prompt is written as if Copilot is in free-chat mode. In practice, the user switches between `@speckit.plan`, `@speckit.tasks`, `@speckit.implement` etc. This prompt would be read by whichever agent is active. Verify that each SpecKit agent's own `.agent.md` also reads `copilot-instructions.md` — if agents don't reference it, the master config is only active for free-chat mode. |
-| I-3 | The final checklist tracking instruction (Point 5) says "At the end of each week (Day 7, Day 14, Day 21), run through the checklist." But Day 14's session prompt doesn't exist (Days 11–21 missing). This weekly checkpoint will be missed unless a Day 14 prompt is created. |
+**Recommended fix (align with Fix 11.2):**
+- Remove `AVAILABLE` from `BookingState` 
+- Add `PENDING` as the initial booking state (before reservation is confirmed) OR start directly at `RESERVED`
+- Document what triggers the `RELEASE` → `AVAILABLE` path if it's kept (Fix 11.2 says to document it as an admin trigger)
 
 ---
 
-## 10. Concurrency & Correctness Analysis
-
-The fixes collectively address an impressive range of distributed systems correctness problems. Here's an independent validation:
-
-| Scenario | Protection Mechanism | Status |
-|----------|---------------------|--------|
-| Two users race on last seat | Redis Lua floor guard (Fix 5.1) + TOCTOU double-check inside lock (Fix 8.1) | ✅ Correct — two layers |
-| Same user double-clicks Reserve | User-scoped lock key `tier:{tierId}:user:{userId}` | ✅ Correct |
-| Stripe delivers same webhook twice simultaneously | DB UNIQUE constraint + `DataIntegrityViolationException` catch (Fix 9.2) | ✅ Correct — only DB constraint survives race |
-| App crashes after 200 sent but before DB commit | Impossible — 200 only sent after service method returns (Fix 9.1) | ✅ Correct |
-| Multi-instance scheduler runs expiry job twice | Distributed lock on `scheduler:reservation-expiry` (Fix 8.3) | ✅ Correct |
-| Redis cache cold on startup | `InventoryWarmupHealthIndicator` blocks readiness (Fix 5.2) | ✅ Correct — but Railway health check path must be `/actuator/health/readiness` |
-| Optimistic lock collision under load | `@Retryable` with 3 attempts + exponential backoff (Fix 8.4) | ✅ Correct |
-| Refund denied with no user notification | `NotifyRefundDeniedAction` + `RefundDeniedEvent` to RabbitMQ (Fix 10.1) | ✅ Correct |
-| 50 QR codes blocking webhook thread | Async `ticket.generation.queue` (Fix 10.2) | ✅ Correct |
-| Organizer marks their own ticket attended | `CheckInGuard` at state machine layer (Fix 8.2) | ✅ Correct |
-| Multi-replica distributed pricing/expiry | No fix exists yet for `PricingEngineService` if it has time-sensitive calculations | ⚠️ Unaddressed |
-
-**One unaddressed scenario:** If dynamic pricing is calculated on all instances simultaneously, there's no distributed coordination for the `80% threshold triggers 25% surge` logic. This may cause inconsistent pricing for ~1 second during surge onset. Acceptable for Phase 1A but worth noting for Phase 1B.
+### Issue 8 — `EventServiceTest` Has Only 3 Stubs, Day 2 Requires 5
+**File:** `src/test/.../EventServiceTest.java`  
+**Problem:**
+Day 1's session plan says: "Create `EventServiceTest` with 3 failing test stubs." ✅ Done.  
+But Day 2's session plan requires **5 tests**:
+```
+createEvent_withValidData_shouldReturnEvent()
+createEvent_withPastDate_shouldThrowValidationException()
+getEvent_withNonExistentId_shouldThrowNotFoundException()
+updateEvent_asNonOrganizer_shouldThrowForbiddenException()
+updateEvent_whenPublished_shouldChangeState()
+```
+Only 3 exist. Two are missing. Minor — this is caught at Day 2 start, but if you follow the "Red phase is non-negotiable" rule, these must exist and FAIL before writing `EventService`.
 
 ---
 
-## 11. What Is Missing / Should Be Created
+### Issue 9 — Missing `@EnableScheduling` for `ReservationExpirationJob` (Day 8)
+**File:** `TicketingPlatformApplication.java`  
+The `@Scheduled(fixedDelay = ...)` annotation (used on `ReservationExpirationJob`, Day 8) requires `@EnableScheduling` on the application class or any `@Configuration` class. Without it, `@Scheduled` methods are silently ignored — no expiry job fires, reservations never expire.
 
-### Before Day 1 (Blockers)
-1. **Fill `constitution.md`** — Run `speckit.constitution` — this is the only true blocker
-2. **Create `PROGRESS.md`** at project root (empty table template)
-3. **Verify `.specify/scripts/powershell/create-new-feature.ps1` exists** — Day 1 Step 1.1 depends on it
-
-### Before Day 11 (Non-Blockers, But Important)
-4. **Session prompts for Days 11–21** — Currently missing. Create at minimum stub files
-5. **Decide on `BookingState.AVAILABLE`** — Remove it or keep it? Resolve the Fix 11.2 ambiguity definitively
-6. **Decide on `RELEASE` event** — Keep as admin-only or remove entirely?
-
-### Ongoing
-7. **Add Fix 2.3** — JWT authority mapping for `@PreAuthorize` to work correctly on Day 8
-8. **Clarify Fix 12.1 migration version** — Use `V10__add_refund_denial.sql`, not modify V8
+**Fix:**
+```java
+@SpringBootApplication
+@EnableScheduling
+public class TicketingPlatformApplication {
+```
 
 ---
 
-## 12. Document Consistency Matrix
+### Issue 10 — Missing BusinessConstants Entry for Scheduler Lock TTL
+**File:** `BusinessConstants.java`  
+Fix 8.3 implements:
+```java
+distributedLockService.acquireLock(lockKey, lockValue, 25L); // hardcoded 25s
+```
+`25L` is a magic number with no corresponding constant. The constitution is explicit: "business rules MUST come from BusinessConstants instead of magic numbers."
 
-| Claim | In END_TO_END_WORKFLOW | In Phase1A_Fixes | In copilot-instructions | In intsructions.txt | In session prompts |
-|-------|----------------------|-----------------|------------------------|--------------------|--------------------|
-| `RESERVATION_TTL_SECONDS = 300` | ✅ | ✅ | ✅ | ✅ | ✅ (Day 8) |
-| `@RequiredArgsConstructor` only | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `Instant` never `LocalDateTime` | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `@EnableStateMachineFactory` | ✅ | — | ✅ | — | ✅ (Day 8) |
-| `TIMESTAMPTZ` in Flyway | — | ✅ | ✅ | — | ✅ (Day 1) |
-| `X-Correlation-ID` via MDC | ✅ | ✅ | ✅ | — | ✅ (Day 1) |
-| Base package `com.ticketing` | ✅ | — | ✅ | ✅ | — |
-| `constitution.md` must be run first | ✅ | — | — | — | — |
-
-**All major architectural decisions are consistent across all documents.** The only intentional omissions are in `intsructions.txt` (no mention of SpecKit agents — expected, it's a system prompt) and `Phase1A_Fixes` (no package naming — those are structural rules, not fixes).
-
----
-
-## 13. Priority Action List
-
-### 🔴 Do Before Any Code
-1. Run `@speckit.constitution` to fill `constitution.md` — **today**
-2. Verify `.specify/scripts/powershell/create-new-feature.ps1` exists and is executable
-3. Create `PROGRESS.md` at root
-
-### 🟡 Do Before Day 8
-4. Add **Fix 2.3** — JWT authority mapping note to the overlay
-5. Decide and document: **keep or remove `BookingState.AVAILABLE`** 
-6. Decide and document: **keep or remove `BookingEvent.RELEASE`**
-7. Clarify Fix 12.1: use `V10__add_refund_denial.sql` not V8
-
-### 🟢 Do Anytime Before Day 11
-8. Create session prompt stubs for Days 11–21
-9. Resolve `intsructions.txt` duplication (root vs Plans/)
-10. Add Railway health check path clarification to Fix 5.2
+**Fix — add to `BusinessConstants.java`:**
+```java
+/** Expiry job distributed lock TTL — must be < EXPIRY_JOB_INTERVAL_MS / 1000 */
+public static final long EXPIRY_LOCK_TTL_SECONDS = 25L;
+```
 
 ---
 
-## 14. Final Verdict
+### Issue 11 — Test Package Name Is Inconsistent with Base Package
+**File:** `src/test/java/com/ticketing/ticketing_platform/`  
+**Problem:**
+The test package is `com.ticketing.ticketing_platform` (with underscore) but the base package is `com.ticketing`. The constitution says base package is `com.ticketing`. Using `ticketing_platform` as a subpackage violates naming conventions and creates visual noise.
 
-| Dimension | Score | Notes |
-|-----------|-------|-------|
-| Technical Correctness | 9.5/10 | The concurrency fixes are textbook-correct. One unaddressed pricing race. |
-| Documentation Quality | 9/10 | Exceptional overlay format. Missing Days 11–21 session prompts. |
-| Workflow Readiness | 8.5/10 | Blank constitution is the only real blocker. |
-| Internal Consistency | 9.5/10 | All docs agree on every architectural decision. |
-| Production Readiness of Plan | 9/10 | The gap analysis (Stripe account timing warning, Railway cold-start, etc.) shows real ops thinking. |
+This was likely auto-generated by Spring Initializr. It's not a bug, but it causes:
+- `TicketingPlatformApplicationTests` is in a non-standard location relative to domain tests
+- Future integration tests would be split between `com.ticketing.event.*` and `com.ticketing.ticketing_platform.*`
 
-**This project is ready to begin implementation the moment `speckit.constitution` is run.**
+**Recommended fix:**
+Move `TicketingPlatformApplicationTests` and `TestcontainersConfiguration` to `com.ticketing` package.
 
 ---
-*Deep review by Antigravity | April 7, 2026*
+
+### Issue 12 — `docker-compose.yml` Has No Health Checks
+**File:** `docker-compose.yml`  
+The app starts and attempts Flyway migrations the moment the container port opens, but PostgreSQL may not be ready to accept connections yet. This causes intermittent startup failures locally and in CI.
+
+**Fix — add to the postgres service:**
+```yaml
+healthcheck:
+  test: ["CMD-SHELL", "pg_isready -U ticketing"]
+  interval: 5s
+  timeout: 5s
+  retries: 5
+```
+And for redis:
+```yaml
+healthcheck:
+  test: ["CMD", "redis-cli", "ping"]
+  interval: 5s
+```
+
+---
+
+## Part 4 — GOOD PRACTICE GAPS 🟢
+
+### Gap 1 — `hibernate.jdbc.time_zone: UTC` Not Set
+The Fix 1.1 overlay explicitly specifies:
+```yaml
+spring:
+  jpa:
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+```
+This is **not present** in `application-local.yml`. Without it, Hibernate may interpret `Instant` values through the JVM's default timezone when writing to JDBC, which defeats the purpose of using `Instant`.
+
+**Add to `application-local.yml`:**
+```yaml
+spring:
+  jpa:
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          time_zone: UTC    # ← ADD THIS
+```
+
+---
+
+### Gap 2 — `Plans/Phase1A_Adjustments_and_Fixes.md` Exists in Two Locations
+Both `Event-Ticketing-Platform/Phase1A_Adjustments_and_Fixes.md` (root, 38,850 bytes) and `Plans/Phase1A_Adjustments_and_Fixes.md` (Plans dir, 41,344 bytes) exist. The sizes differ — the Plans/ copy is larger. The workflow reference documents say to "attach `Phase1A_Adjustments_and_Fixes.md`" which is now ambiguous.
+
+**Risk:** Using the wrong (shorter) copy could miss overlay fixes.   
+**Fix:** Delete or clearly rename the root copy. Rename root one to `Phase1A_Adjustments_and_Fixes_OLD.md` or remove it. The Plans/ copy should be canonical (it's larger — likely the updated version).
+
+---
+
+### Gap 3 — `intsructions.txt` Typo in Filename
+The file is named `intsructions.txt` (transposed 'r' and 's'). Every session prompt says "paste `intsructions.txt`" and the workflow reference references it by that name too. Since it's consistently referenced by the wrong name, this is not a functional blocker — but it will confuse anyone new to the project.
+
+---
+
+### Gap 4 — `Ticket` Entity Has No Unique Constraint on QR Code
+**File:** `Ticket.java`  
+The `qr_code` column stores a Base64-encoded QR per ticket. There is no uniqueness constraint at either the DB or entity level. A bug in QR generation could silently produce duplicate codes across tickets, enabling ticket fraud. Adding `unique = true` to the column is a one-line fix.
+
+---
+
+### Gap 5 — `CorrelationIdFilter` Is in `common/filter` but Overlay Says `common/config`
+Minor inconsistency: the Fix CC-1 overlay says to create it in `common/config/` but it was placed in `common/filter/`. This is perfectly fine architecturally (filter belongs in filter) — but confirm the `applyTo` pattern in any relevant `instructions.md` still picks it up.
+
+---
+
+## Part 5 — Schema Cross-Checks
+
+| Migration | Java Entity | Status |
+|-----------|-------------|--------|
+| V1 users | `User` | ✅ Match |
+| V2 venues, categories | `Venue`, `Category` | ✅ Match |
+| V3 events (without waitlist/dynamic pricing) | `Event` | ✅ Match (V8 adds the columns) |
+| V4 ticket_tiers | `TicketTier` | ⚠️ Missing `version` column (Issue 4) |
+| V5 bookings + tickets | `Booking`, `Ticket` | ✅ Match |
+| V6 payments + refunds + processed_stripe_events | `Payment`, `Refund` | ✅ Match |
+| V7 indexes | N/A | ✅ All 7 indexes correct |
+| V8 event features | `Event` | ✅ `waitlist_enabled`, `dynamic_pricing_enabled` match |
+| V9 seed data | N/A | ✅ 5 categories, 3 venues |
+
+> [!NOTE]
+> V9 seed data runs on every startup (`Flyway enabled: true`). This is fine for dev but must be excluded from production via Flyway location separation or a `SPRING_FLYWAY_LOCATIONS` env var override.
+
+---
+
+## Part 6 — Constitution Compliance Check
+
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| I. Domain-First Modular Monolith | ✅ | 5 domain packages, all correctly bounded |
+| II. Concurrency — Redis lock + `@Version` | ⚠️ | `@Version` on `Booking` ✅, missing on `TicketTier` ❌ |
+| III. Time — `Instant` + `TIMESTAMPTZ` + soft delete | ✅ | All verified |
+| III. Webhook idempotency via DB constraint | ✅ | `processed_stripe_events` UNIQUE verified |
+| IV. Test-First Delivery | ⚠️ | 3 stub tests in place, Day 2 needs 2 more before start |
+| V. Constructor injection | ✅ | No `@Autowired` found in any entity or config |
+| V. DTOs at API boundaries | ⬜ | No DTOs yet — expected (Day 2 task) |
+| V. `@PreAuthorize` on sensitive endpoints | ⬜ | No controllers yet — expected (Day 2 task) |
+| V. `BusinessConstants` — no magic numbers | ✅ | All 12 constants defined; scheduler lock TTL gap noted |
+| V. `X-Correlation-ID` propagation | ✅ | Filter + MDC verified |
+| Non-negotiable: Java 21 | ✅ | Confirmed in `pom.xml` |
+| Non-negotiable: `@EnableStateMachineFactory` | ⬜ | Day 8 — session prompt explicitly enforces this |
+| Non-negotiable: async QR via queue | ⬜ | Day 10 — session prompt correctly addresses Fix 10.2 |
+| Non-negotiable: no hardcoded secrets | ✅ | All credentials are in `application-local.yml` (not committed) |
+
+---
+
+## Part 7 — Prioritized Fix List for Day 2 Start
+
+Do these **before writing any Day 2 code**, in this order:
+
+```
+Priority  Fix                                                    File(s)
+────────────────────────────────────────────────────────────────────────────
+🔴 P1     Verify actual Spring Boot version, lock it in pom.xml  pom.xml
+🔴 P2     Replace @Where → @SQLRestriction on Booking            Booking.java
+🔴 P3     Replace spring-statemachine-core:3.2.0 → 4.0.0        pom.xml
+🔴 P4     Add @Version to TicketTier + add column to migration   TicketTier.java + V10 SQL
+🔴 P5     Pin Testcontainers to postgres:17 / redis:7 / rabbit:4 TestcontainersConfiguration.java
+
+🟡 P6     Add spring-boot-starter-mail + mail config             pom.xml + application-local.yml
+🟡 P7     Add @EnableScheduling to main app class                TicketingPlatformApplication.java
+🟡 P8     Add EXPIRY_LOCK_TTL_SECONDS to BusinessConstants       BusinessConstants.java
+🟡 P9     Add 2 missing EventService test stubs (Day 2 TDD)      EventServiceTest.java
+🟡 P10    Add health checks to docker-compose                    docker-compose.yml
+
+🟢 P11    Add hibernate.jdbc.time_zone: UTC to app config        application-local.yml
+🟢 P12    Clarify Plans/ vs root Adjustments_and_Fixes.md        File management
+🟢 P13    Add UNIQUE constraint to tickets.qr_code               V10 or V11 SQL + Ticket.java
+🟢 P14    Decide on BookingState.AVAILABLE (Fix 11.2)            BookingState.java
+```
+
+---
+
+## Part 8 — Pending Overlay Fixes Status (From PROGRESS.md)
+
+| Fix ID | Severity | Status | Note |
+|--------|----------|--------|------|
+| Fix 1.1 | 🔴 | ✅ Applied | All `Instant` confirmed |
+| Fix 1.2 | 🟡 | ✅ Applied | ENUM type confirmed |
+| Fix 1.3 | 🟢 | ✅ Applied | `deleted_at` confirmed |
+| Fix 2.1 | 🟡 | ⬜ Day 2 | `@Transactional(readOnly=true)` on services |
+| Fix 2.2 | 🟡 | ⬜ Day 2 | `@RequiredArgsConstructor` + no `@Autowired` |
+| Fix 5.1 | 🔴 | ⬜ Day 5 | Lua floor guard in `InventoryService` |
+| Fix 5.2 | 🟡 | ⬜ Day 5 | `InventoryWarmupHealthIndicator` |
+| Fix 7.1 | 🟡 | ❌ NOT applied | `@Version` on `TicketTier` **missing** — must be done NOW |
+| Fix 8.1 | 🔴 | ⬜ Day 8 | TOCTOU double-check inside lock |
+| Fix 8.2 | 🟡 | ⬜ Day 8 | CheckIn two-layer guard |
+| Fix 8.3 | 🟡 | ⬜ Day 8 | ExpiryJob distributed lock |
+| Fix 8.4 | 🟡 | ⬜ Day 8 | `expiresAt` uses `BusinessConstants` |
+| Fix 9.1 | 🔴 | ⬜ Day 9 | Controller NOT `@Transactional` |
+| Fix 9.2 | 🔴 | ⬜ Day 9 | `DataIntegrityViolationException` idempotency |
+| Fix 10.1 | 🟡 | ⬜ Day 10 | DenyRefundNotificationAction |
+| Fix 10.2 | 🟡 | ⬜ Day 10 | Async QR via queue |
+| Fix 11.1 | 🟡 | ⬜ Day 8 | CANCELLED state + EVENT_CANCELLED event |
+| Fix 11.2 | 🟡 | ⬜ Day 11 | RELEASE/AVAILABLE clarification |
+| Fix 12.1 | 🟢 | ⬜ Day 12 | refund_denial_reason field |
+| Fix 16.1 | 🔴 | ⬜ Day 16 | 80% test coverage gate |
+| Fix CC-1 | 🟢 | ✅ Applied | CorrelationIdFilter with MDC |
+| Fix CC-2 | 🟡 | ✅ Applied | BusinessConstants |
+| Fix PW3-1 | 🔴 | ✅ Applied | Stripe account + CLI |
+
+---
+
+## Part 9 — Overall Assessment
+
+**Scaffold quality: 8/10**  
+The domain model is clean, migrations are rigorous, and the tooling layer (instructions, agents, session prompts) is the most complete and well-structured I have seen for a self-directed AI-assisted build. The TDD loop in session prompts is correctly ordered (Red → Green → Refactor). The constitution is a genuine governance document — not boilerplate.
+
+**The 5 critical bugs** are all fixable in under 30 minutes total and none of them indicate a design flaw — they are version/annotation migration issues from Hibernate 5→6 and SSM 2→4 ecosphere changes.
+
+Once the P1–P5 fixes are applied and `./mvnw test` returns green (context loads, Flyway runs, Testcontainers connects), the project is genuinely ready for Day 2.
+
+**Day 2 readiness gate:**
+```
+[ ] ./mvnw dependency:resolve  → no errors (version exists)
+[ ] ./mvnw compile             → zero errors
+[ ] ./mvnw test -Dtest=TicketingPlatformApplicationTests → context loads
+[ ] @SQLRestriction in Booking (not @Where)
+[ ] TicketTier.version field exists
+[ ] SSM dependency is 4.0.0
+[ ] TestcontainersConfiguration uses pinned versions
+```

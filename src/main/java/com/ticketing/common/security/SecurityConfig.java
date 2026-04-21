@@ -33,15 +33,18 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf.disable())
-            .cors(Customizer.withDefaults())
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**", "/actuator/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/events", "/api/events/**").permitAll()
-                .anyRequest().authenticated())
-            .authenticationProvider(authenticationProvider())
-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+                .csrf(csrf -> csrf.disable())
+                .cors(Customizer.withDefaults())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/auth/**", "/actuator/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/events", "/api/events/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/search/events").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/venues", "/api/venues/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/**").permitAll()
+                        .anyRequest().authenticated())
+                .authenticationProvider(authenticationProvider())
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

@@ -12,7 +12,7 @@
 | 0 | Pre-flight Setup | ✅ Complete | — | Run constitution, verify scripts |
 | 1 | Project Init + Entities + Migrations | ✅ Complete | Passing | |
 | 2 | Event Domain + Auth (JWT) | ✅ Complete | 20/20 passing ✅ | Event/Auth services, endpoints, and Application Context validated |
-| 3 | Venue + Category + Search | ⬜ Not Started | — | |
+| 3 | Venue + Category + Search | ✅ Complete | 56/56 passing ✅ (2 Docker/Testcontainers skipped — pre-existing, no Docker Desktop) | VenueService, CategoryService, EventSearchService, controllers, migrations V8+V9, TestSecurityConfig, @PreAuthorize enforced |
 | 4 | Next.js Frontend + Home Page | ⬜ Not Started | — | |
 | 5 | Inventory (Redis + Lua) + RabbitMQ Config | ⬜ Not Started | — | |
 | 6 | N+1 Fixes + Integration Tests | ⬜ Not Started | — | |

@@ -1,0 +1,110 @@
+Your Best Workflow — Definitive Answer
+
+First, Let's Be Clear About What You Actually Have
+Looking at your screenshot carefully, here is what each tool actually is and what it costs you:
+ToolWhat It IsCostNormal Agent ModeCopilot Pro with terminal access — reads files, writes code, runs ./mvnw test, commits✅ Pro plan — unlimitedPlan ModeAntigravity — reads your whole codebase, synthesizes across files, strategic decisions⚠️ Limited creditsSE: Architect, SE: Security, SE: Tech Writer, etc.Awesome-copilot custom instruction presets — they are still just Copilot Agent mode with a specific role prompt loaded✅ Pro plan — unlimitedagentic-workflows, Implementation Plan Generation Mode, etc.More awesome-copilot presets — Copilot Agent with specialized behaviors✅ Pro plan — unlimitedspeckit.checklist, speckit.implement, etc.SpecKit agents — read .specify/ folder, generate structured tasks, mark completion✅ Pro plan — unlimited
+The most important thing you need to understand: The SE modes and awesome-copilot modes you see in the dropdown are not Antigravity. They are GitHub Copilot Pro wearing different hats. They cost you zero extra. The only thing that costs you precious credits is the Plan mode (Antigravity).
+
+What the Deep Review Reveals About Your Current State
+The document shows you have already completed Day 2 with 20 out of 20 tests passing. Antigravity already ran a full project review and proposed a hybrid pipeline — SpecKit scaffolds empty files, Antigravity does business logic implementation. But it also correctly identified something important in that proposal: "SpecKit struggles to enforce TDD because it cannot run local terminal environments to verify Maven tests before writing code."
+This is the critical insight for your workflow decision. The tool that enforces your TDD mandate most reliably is the normal Agent mode, because it has terminal access and can actually run ./mvnw test and see the output.
+
+The Recommended Workflow — Three Tiers
+
+Tier 1 — Your Primary Daily Driver (Normal Agent Mode)
+This is what you use for 90% of every implementation day. It costs nothing extra on your Pro plan, it has terminal access, it reads your files, it writes code, it runs your tests, it commits. It is the correct choice for daily implementation.
+How to set it up correctly for every session:
+Session Start Ritual (3 minutes, every day):
+
+Step 1 — Select "Agent" from the dropdown (normal agent mode, not Plan, not any custom mode)
+
+Step 2 — Paste the FULL content of intsructions.txt as your VERY FIRST message
+          (paste as text, not attach as a file — this puts it in conversation history)
+
+Step 3 — Attach a MAXIMUM of 2 files:
+          File 1 → Phase1A_Adjustments_and_Fixes.md  (always)
+          File 2 → The relevant Plan Text file for today's day
+
+Step 4 — Attach 1 SKILL.md only when doing complex backend implementation:
+          Plans/skills/java-springboot.SKILL.md  (for booking, state machine, Redis, Stripe)
+          Plans/skills/java-junit.SKILL.md       (for test coverage days)
+          Plans/skills/sql-optimization.SKILL.md (for migration/query days)
+          ← Never attach more than one skill per session
+
+Step 5 — Type your day prompt (from your session-prompts folder)
+The .github/copilot-instructions.md and all .github/instructions/*.instructions.md files inject automatically — you never need to attach them. Spring Boot rules, security rules, OOP rules, all of it fires automatically on Java files.
+
+Tier 2 — Awesome-Copilot Custom Modes (Strategic Switching, Still Free)
+These are already installed in your workspace. They are not Antigravity. They are Copilot Pro in a specialized role. Use them when you want Copilot to think from a specific professional lens.
+The ones most useful for your project are:
+SE: Security — Switch to this mode when you are working on anything involving JWT, the Stripe webhook handler, or the @PreAuthorize annotations. The security-and-owasp rules already auto-inject from your instructions folder, but putting Copilot in Security mode makes it even more focused on OWASP concerns during that work block.
+SE: Architect — Switch to this mode when you are making a structural decision — package placement of a new class, whether a service dependency makes sense, state machine guard vs service logic placement. Not for writing code, for reasoning about structure.
+Implementation Plan Generation Mode — Useful at the start of a complex day (Day 8 state machine, Day 9 Stripe) when you want Copilot to break down the work before you start. It maps closely to what SpecKit's speckit.tasks does but without needing the .specify/ folder.
+The switching rule: You do not need to restart the session when switching modes. You can be in normal Agent mode writing code, switch to SE: Security to review what you just wrote, switch back. The conversation history carries through.
+
+Tier 3 — Antigravity (Plan Mode) — Use Surgically, Never Casually
+This is your most expensive resource and your most powerful one. Based on the deep review document, Antigravity has already demonstrated it can read your entire codebase, synthesize across all files simultaneously, identify architectural issues, and propose structural improvements that Copilot Agent mode cannot see because of context window limitations.
+Save it for exactly these situations:
+End-of-week audit (Day 7, Day 14, Day 21) — Trigger a single, comprehensive Antigravity session to review the entire week's work at once. Make your prompt maximally efficient — give it one focused question, all context in that single message.
+When something is fundamentally broken — If you have a test that refuses to pass and you cannot figure out why after 20 minutes of normal Agent mode debugging, switch to Antigravity with the exact error, the relevant files named explicitly, and a precise single question.
+Complex architectural decisions — Day 8 (state machine) and Day 9 (Stripe webhook) are the two hardest days. Before starting either, a single Antigravity session asking "given this design, what are the three most likely correctness bugs I will introduce?" is a precision use of one credit that saves hours of debugging.
+Never use Antigravity for:
+
+Generating boilerplate code
+Writing tests that follow a pattern already established
+Git operations
+Anything the normal Agent mode can do
+
+The Antigravity prompt rule: Every Antigravity prompt must contain: context (what day, what feature), the specific question (one question, not five), and the reference documents (by name, not by attachment). Keep it under 150 words. Long vague prompts waste credits. Short precise questions get precise answers.
+
+The SpecKit Question — Should You Use It At All?
+This is what you are really asking and the honest answer is: for implementation, you can skip it. For one specific thing, you still need it.
+Here is why. SpecKit's value is its structured workflow — it reads constitution.md, creates plan.md, then tasks.md, then implements. But you have already done the work that SpecKit's plan and tasks phases do. Your session-prompts folder has pre-written day prompts with all the context, fix tables, and expected deliverables. Your overlay has all the fixes. Running speckit.plan and speckit.tasks before implementation just reformats what you already have, which is redundant.
+The normal Agent mode in VS Code can do everything speckit.implement does — it reads files, writes code, and can run terminal commands. The one thing it cannot do that SpecKit's implement agent does automatically is mark [x] in tasks.md as tasks complete. You handle that manually by updating PROGRESS.md at session end, which you are already doing.
+The one SpecKit thing you still need: speckit.constitution must be run once if it has not been filled. The deep review from the previous batch flagged that constitution.md was blank. If it is still blank, every SpecKit agent call runs without project memory. Run it once with intsructions.txt attached, and then you are done with it.
+
+The Complete Daily Loop — What This Looks Like in Practice
+BEFORE OPENING VS CODE (2 minutes):
+  → Open PROGRESS.md → read where you left off
+  → Open Docs/AI_Sessions/day-{N-1}-handoff.md → read "Next session start" line
+  → Open Plans/session-prompts/day-{N}-*.md → know today's fixes and TDD gate
+
+SESSION START (3 minutes):
+  → Mode: Normal Agent
+  → Message 1: Paste full intsructions.txt text
+  → Attach: Phase1A_Adjustments_and_Fixes.md + relevant Plan .txt file
+  → Attach: java-springboot.SKILL.md (for backend days only)
+  → Type your day prompt from session-prompts folder
+
+DURING IMPLEMENTATION (the loop):
+  → Agent writes test class first (Red phase — all tests fail)
+  → Run: ./mvnw test -Dtest={TestClassName} — confirm ALL fail
+  → Agent writes implementation with overlay fixes applied inline
+  → Run: ./mvnw test -Dtest={TestClassName} — confirm ALL pass
+  → Run: ./mvnw compile — confirm zero errors
+  → Agent confirms which Fix IDs were applied in that block
+
+IF WORKING ON SECURITY/AUTH CODE:
+  → Switch mode to SE: Security
+  → Ask it to review the code just written against OWASP rules
+  → Switch back to normal Agent to apply any corrections
+
+IF COMPLETELY STUCK (>20 min, test won't pass):
+  → Switch to Plan mode (Antigravity)
+  → One precise question: "Given this error [paste], in this method [name], 
+    what is the root cause and the fix?"
+  → Switch back to normal Agent to implement the answer
+
+END OF SESSION (10 minutes):
+  → Run: ./mvnw test — ALL green, zero failures
+  → Ask Agent to print SESSION HANDOFF in the exact intsructions.txt format
+  → Save handoff to Docs/AI_Sessions/day-{N}-handoff.md
+  → git add . → git commit (conventional format) → git push
+  → Open PR on GitHub → Copilot reviews it automatically → merge
+  → Update PROGRESS.md (day status, fix statuses, metrics)
+
+The Answer to Your Direct Question
+You asked whether you should use only normal Agent mode and attach instructions + SKILL.md for complex features. The answer is yes, with one refinement.
+The normal Agent mode with your auto-injecting .instructions.md files, manually pasted intsructions.txt, and a single attached SKILL.md per session is the correct primary workflow for this project given your constraints. It is unlimited on your Pro plan, it has terminal access for running tests, and it reads all your project files. The awesome-copilot custom modes (SE: Security, SE: Architect) add value and cost nothing extra — use them for specific focused review moments, not for implementation.
+SpecKit is not needed day-to-day because your session prompts replace what speckit.plan and speckit.tasks would generate, and normal Agent mode replaces what speckit.implement does. The only exception is speckit.constitution which must be filled once.
+Antigravity stays as your strategic reserve — three targeted uses across the 21 days (end of each week) plus emergency debugging when you are genuinely stuck. Every Antigravity prompt should be one precise question, fully contextualized, under 150 words.

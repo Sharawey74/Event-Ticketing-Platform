@@ -36,18 +36,12 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new ValidationException("Email is already registered");
-        }
-
-        Role role = request.getRole() == null ? Role.USER : request.getRole();
-
         User user = User.builder()
             .email(request.getEmail())
             .passwordHash(passwordEncoder.encode(request.getPassword()))
             .firstName(request.getFirstName())
             .lastName(request.getLastName())
-            .role(role)
+            .role(Role.USER) // Force role to USER to prevent privilege escalation
             .build();
 
         User saved;

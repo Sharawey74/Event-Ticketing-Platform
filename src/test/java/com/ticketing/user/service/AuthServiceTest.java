@@ -3,7 +3,7 @@ package com.ticketing.user.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -55,17 +55,16 @@ class AuthServiceTest {
     @DisplayName("register with existing email should throw validation exception")
     void register_withExistingEmail_shouldThrowValidationException() {
         RegisterRequest request = createRegisterRequest();
-        when(userRepository.existsByEmail(request.getEmail())).thenReturn(true);
+        when(userRepository.save(any(com.ticketing.user.model.User.class)))
+            .thenThrow(new org.springframework.dao.DataIntegrityViolationException("Email registered"));
 
         assertThrows(ValidationException.class, () -> authService.register(request));
-        verify(userRepository, never()).save(any(com.ticketing.user.model.User.class));
     }
 
     @Test
     @DisplayName("register with valid data should return auth response")
     void register_withValidData_shouldReturnAuthResponse() {
         RegisterRequest request = createRegisterRequest();
-        when(userRepository.existsByEmail(request.getEmail())).thenReturn(false);
         when(passwordEncoder.encode("Password@123")).thenReturn("encoded-password");
 
         com.ticketing.user.model.User savedUser = com.ticketing.user.model.User.builder()
@@ -92,6 +91,43 @@ class AuthServiceTest {
         assertEquals(savedUser.getEmail(), response.getEmail());
         assertEquals(Role.USER, response.getRole());
     }
+
+    @Test
+    @DisplayName("register with ADMIN role in request should force USER role")
+    void register_withAdminRole_shouldForceUserRole() {
+        RegisterRequest request = createRegisterRequest();
+        request.setRole(Role.ADMIN); // Attempt privilege escalation
+        
+        when(passwordEncoder.encode("Password@123")).thenReturn("encoded-password");
+
+        com.ticketing.user.model.User savedUser = com.ticketing.user.model.User.builder()
+            .id(8L)
+            .email(request.getEmail())
+            .passwordHash("encoded-password")
+            .firstName(request.getFirstName())
+            .lastName(request.getLastName())
+            .role(Role.USER) // Forced
+            .build();
+            
+        when(userRepository.save(any(com.ticketing.user.model.User.class))).thenReturn(savedUser);
+
+        UserDetails userDetails = User.withUsername(savedUser.getEmail())
+            .password("encoded-password")
+            .authorities("ROLE_USER")
+            .build();
+        when(userDetailsService.loadUserByUsername(savedUser.getEmail())).thenReturn(userDetails);
+        when(jwtService.generateToken(userDetails)).thenReturn("jwt-token");
+
+        AuthResponse response = authService.register(request);
+
+        assertEquals(Role.USER, response.getRole());
+        
+        // Verify that the user builder was called with Role.USER
+        org.mockito.ArgumentCaptor<com.ticketing.user.model.User> userCaptor = org.mockito.ArgumentCaptor.forClass(com.ticketing.user.model.User.class);
+        verify(userRepository).save(userCaptor.capture());
+        assertEquals(Role.USER, userCaptor.getValue().getRole());
+    }
+
 
     @Test
     @DisplayName("login with valid credentials should return auth response")
