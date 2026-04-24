@@ -45,3 +45,259 @@ Tests status      : ./mvnw test — 56 passed, 0 failed, 0 skipped
 Day 2 regression  : NONE
 Next session start: Day 4 — Next.js Frontend Setup + Home Page
   First task: npx create-next-app@latest frontend/ --typescript --tailwind --eslint --app --src-dir
+
+---
+PHASE 6 — Day 4 Frontend Status (April 23, 2026)
+
+Day 4 core implementation status: COMPLETE ✅
+
+Completed Day 4 deliverables:
+- Next.js frontend scaffolded in `frontend/` with TypeScript strict mode.
+- Build gate passed with `npm run build` (webpack mode).
+- Global React Query provider wired in root layout.
+- Axios API client implemented with `NEXT_PUBLIC_API_URL` + JWT interceptor.
+- Zustand auth store created.
+- Home page implemented with:
+  - Hero search controls (query/city/date)
+  - Category filter pills
+  - Real backend data from `/api/events`, `/api/search/events`, `/api/categories`, `/api/venues`
+  - Event cards showing title/date/city/price CTA
+
+Environment note:
+- Native SWC binding is invalid on this Windows host; build succeeds via webpack fallback.
+
+Backlog to continue after Day 4 core:
+- Add dedicated search results page (`/search`) with URL-driven filters.
+- Wire navbar search box to search route.
+- Add frontend test coverage for home/search filter flows.
+
+Continuation starting now:
+- Implement `/search` page + navbar search navigation.
+
+Continuation result:
+- `frontend/src/app/search/page.tsx` added and working.
+- `frontend/src/components/layout/navbar.tsx` now submits search query to `/search?q=...`.
+- Frontend build re-verified: PASS (`npm run build`).
+What remains if you want me to keep going:
+
+Add frontend tests for homepage/search filters (recommended next).
+Add event details page skeleton at /events/[id].
+Wire category/date URL params from homepage directly into /search for shareable links.
+
+---
+PHASE 7 — Full Deployment Clarification (Local + Production Handoff)
+
+Local development stack:
+1. Start infra services from the repository root:
+  - `docker-compose up -d`
+2. Start the Spring Boot backend:
+  - `./mvnw spring-boot:run`
+3. Configure the frontend environment file:
+  - `frontend/.env.local` with `NEXT_PUBLIC_API_URL=http://localhost:8080`
+4. Start the Next.js frontend:
+  - `cd frontend && npm run dev`
+
+Required runtime dependencies:
+- PostgreSQL 17
+- Redis 7
+- RabbitMQ 4-management
+- Spring Boot backend on port 8080
+- Next.js frontend on port 3000
+
+Production deployment clarification:
+1. Backend must be deployed first so the frontend has a stable API base URL.
+2. Frontend must point `NEXT_PUBLIC_API_URL` to the public backend URL at build time.
+3. Build validation for release:
+  - Backend: `./mvnw -q -DskipTests compile`
+  - Frontend: `npm run build` inside `frontend/`
+4. Do not hardcode any Railway, Vercel, or other host URL in source code.
+5. Keep `.env.local` out of version control; commit only `frontend/.env.example`.
+
+Known deployment note:
+- On this Windows host, Next.js SWC native bindings are invalid, but the frontend build succeeds using webpack fallback. That is a local environment issue, not a code defect.
+
+---
+PHASE 8 — Day 4 Gap Review Closure
+
+Remaining Day 4 follow-up items have been addressed:
+- Shareable search URLs now work through a shared helper in `frontend/src/lib/search.ts`.
+- Home page CTA navigates to `/search` with query params.
+- Search page has an `Apply Filters` action that pushes updated URL params.
+- Event detail route added at `/events/[id]` using real API data.
+- Helper tests added for search URL/filter logic.
+
+Validation completed:
+- `npm test` — PASS (Vitest helper tests)
+- `npm run build` — PASS (routes: `/`, `/search`, `/events/[id]`)
+
+---
+PHASE 9 — Day 4 Review Addendum (No Implementation Changes)
+
+Review result:
+- Day 4 is functionally complete for the core home-page deliverable and the added search/detail pages build successfully.
+- A few prompt/plan deltas remain documented below. They were not changed in this review.
+
+Remaining documented gaps / deltas:
+- Navbar only exposes a single auth link (`Sign in`). The Day 4 prompt called for login/register links.
+- Home-page category pills trigger a filtered API call, but they do not push updated query params into the URL yet.
+- `swr` was listed in the Day 4 install list in the session prompt, but the frontend uses React Query only and does not include SWR.
+- Page-level test coverage is still thin; current coverage is limited to the search helper unit tests.
+- The event detail page is present as a minimal skeleton, but it is a later-roadmap addition rather than a Day 4 required deliverable.
+
+Changed file inventory for this branch:
+Modified or added files in this review branch:
+- `.github/instructions/lightweight-delivery-gates.instructions.md`
+- `.github/instructions/spec-driven-workflow-v1.instructions.md` (deleted)
+- `.vscode/settings.json`
+- `AI_CONTEXT.md`
+- `Artifacts/deep_review.md.resolved`
+- `Artifacts/deep_reviewv1.md.resolved`
+- `Docs/Speckit_END_TO_END_WORKFLOW.md`
+- `Docs/complete_workflow_reference.md`
+- `Latest.txt`
+- `New_flow.txt`
+- `PROGRESS.md`
+- `Plans/skills/README.md`
+- `Plans/skills/code-review-gates.SKILL.md`
+- `Plans/skills/implementation-gate-review.SKILL.md`
+- `Plans/skills/security-review-gates.SKILL.md`
+- `day3_review.txt`
+- `day3_review_utf8.txt`
+- `deep_review.md.resolved` (deleted)
+- `intsructions.txt`
+- `src/main/java/com/ticketing/booking/repository/TicketTierRepository.java`
+- `src/main/java/com/ticketing/booking/service/TicketTierService.java`
+- `src/main/java/com/ticketing/common/dto/PageResponse.java`
+- `src/main/java/com/ticketing/common/exception/GlobalExceptionHandler.java`
+- `src/main/java/com/ticketing/common/security/JwtFilter.java`
+- `src/main/java/com/ticketing/common/security/SecurityConfig.java`
+- `src/main/java/com/ticketing/event/controller/CategoryController.java`
+- `src/main/java/com/ticketing/event/controller/EventController.java`
+- `src/main/java/com/ticketing/event/controller/EventSearchController.java`
+- `src/main/java/com/ticketing/event/controller/VenueController.java`
+- `src/main/java/com/ticketing/event/dto/CategoryResponse.java`
+- `src/main/java/com/ticketing/event/dto/CreateCategoryRequest.java`
+- `src/main/java/com/ticketing/event/dto/CreateVenueRequest.java`
+- `src/main/java/com/ticketing/event/dto/VenueResponse.java`
+- `src/main/java/com/ticketing/event/repository/CategoryRepository.java`
+- `src/main/java/com/ticketing/event/repository/EventRepository.java`
+- `src/main/java/com/ticketing/event/repository/VenueRepository.java`
+- `src/main/java/com/ticketing/event/service/CategoryService.java`
+- `src/main/java/com/ticketing/event/service/EventSearchService.java`
+- `src/main/java/com/ticketing/event/service/VenueService.java`
+- `src/main/java/com/ticketing/user/dto/RegisterRequest.java`
+- `src/main/java/com/ticketing/user/service/AuthService.java`
+- `src/main/java/com/ticketing/user/service/CustomUserDetails.java`
+- `src/main/java/com/ticketing/user/service/UserDetailsServiceImpl.java`
+- `src/test/java/com/ticketing/booking/service/TicketTierServiceTest.java`
+- `src/test/java/com/ticketing/common/config/TestSecurityConfig.java`
+- `src/test/java/com/ticketing/common/security/JwtFilterTest.java`
+- `src/test/java/com/ticketing/event/controller/CategoryControllerTest.java`
+- `src/test/java/com/ticketing/event/controller/EventControllerTest.java`
+- `src/test/java/com/ticketing/event/controller/EventSearchControllerTest.java`
+- `src/test/java/com/ticketing/event/controller/VenueControllerTest.java`
+- `src/test/java/com/ticketing/event/service/CategoryServiceTest.java`
+- `src/test/java/com/ticketing/event/service/EventSearchServiceTest.java`
+- `src/test/java/com/ticketing/event/service/VenueServiceTest.java`
+- `src/test/java/com/ticketing/ticketing_platform/TestTicketingPlatformApplication.java`
+- `src/test/java/com/ticketing/ticketing_platform/TestcontainersConfiguration.java`
+- `src/test/java/com/ticketing/ticketing_platform/TicketingPlatformApplicationTests.java`
+- `src/test/java/com/ticketing/user/controller/AuthControllerTest.java`
+- `src/test/java/com/ticketing/user/service/AuthServiceTest.java`
+
+Frontend files created or modified in Day 4:
+- `frontend/.env.example`
+- `frontend/.gitignore`
+- `frontend/ARCHITECTURE.md`
+- `frontend/README.md`
+- `frontend/eslint.config.mjs`
+- `frontend/next.config.ts`
+- `frontend/package-lock.json`
+- `frontend/package.json`
+- `frontend/postcss.config.mjs`
+- `frontend/public/file.svg`
+- `frontend/public/globe.svg`
+- `frontend/public/next.svg`
+- `frontend/public/vercel.svg`
+- `frontend/public/window.svg`
+- `frontend/src/app/favicon.ico`
+- `frontend/src/app/globals.css`
+- `frontend/src/app/layout.tsx`
+- `frontend/src/app/page.tsx`
+- `frontend/src/app/search/page.tsx`
+- `frontend/src/app/events/[id]/page.tsx`
+- `frontend/src/components/events/event-card.tsx`
+- `frontend/src/components/layout/footer.tsx`
+- `frontend/src/components/layout/navbar.tsx`
+- `frontend/src/components/providers/app-providers.tsx`
+- `frontend/src/lib/api.ts`
+- `frontend/src/lib/catalog.ts`
+- `frontend/src/lib/event-details.ts`
+- `frontend/src/lib/events.ts`
+- `frontend/src/lib/queryClient.ts`
+- `frontend/src/lib/search.ts`
+- `frontend/src/lib/search.test.ts`
+- `frontend/src/store/authStore.ts`
+- `frontend/src/types/api.ts`
+- `frontend/src/types/event.ts`
+- `frontend/tsconfig.json`
+
+
+
+
+
+PS C:\Users\PC\Desktop\Event-Ticketing-Platform> git status -u
+On branch day-4-nextjs-frontend-init-home
+Your branch is up to date with 'origin/day-4-nextjs-frontend-init-home'.
+
+Changes not staged for commit:
+  (use "git add/rm <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   AI_CONTEXT.md
+        modified:   Latest.txt
+        deleted:    day3_review.txt
+        deleted:    day3_review_utf8.txt
+        modified:   src/test/java/com/ticketing/event/controller/CategoryControllerTest.java
+        modified:   src/test/java/com/ticketing/event/controller/VenueControllerTest.java
+        modified:   src/test/java/com/ticketing/ticketing_platform/TicketingPlatformApplicationTests.java
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        frontend/.env.example
+        frontend/.gitignore
+        frontend/ARCHITECTURE.md
+        frontend/README.md
+        frontend/eslint.config.mjs
+        frontend/next.config.ts
+        frontend/package-lock.json
+        frontend/package.json
+        frontend/postcss.config.mjs
+        frontend/public/file.svg
+        frontend/public/globe.svg
+        frontend/public/next.svg
+        frontend/public/vercel.svg
+        frontend/public/window.svg
+        frontend/src/app/events/[id]/page.tsx
+        frontend/src/app/favicon.ico
+        frontend/src/app/globals.css
+        frontend/src/app/layout.tsx
+        frontend/src/app/page.tsx
+        frontend/src/app/search/page.tsx
+        frontend/src/components/events/event-card.tsx
+        frontend/src/components/layout/footer.tsx
+        frontend/src/components/layout/navbar.tsx
+        frontend/src/components/providers/app-providers.tsx
+        frontend/src/lib/api.ts
+        frontend/src/lib/catalog.ts
+        frontend/src/lib/event-details.ts
+        frontend/src/lib/events.ts
+        frontend/src/lib/queryClient.ts
+        frontend/src/lib/search.test.ts
+        frontend/src/lib/search.ts
+        frontend/src/store/authStore.ts
+        frontend/src/types/api.ts
+        frontend/src/types/event.ts
+        frontend/tsconfig.json
+
+no changes added to commit (use "git add" and/or "git commit -a")
+PS C:\Users\PC\Desktop\Event-Ticketing-Platform> 
