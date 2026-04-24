@@ -97,7 +97,7 @@ class CategoryServiceTest {
     @Test
     @DisplayName("updateCategory with valid data should persist changes")
     void updateCategory_withValidData_shouldPersistChanges() {
-        CreateCategoryRequest request = CreateCategoryRequest.builder()
+        com.ticketing.event.dto.UpdateCategoryRequest request = com.ticketing.event.dto.UpdateCategoryRequest.builder()
                 .name("Technology")
                 .description("Conferences and meetups")
                 .iconUrl("laptop")
@@ -126,7 +126,7 @@ class CategoryServiceTest {
     @Test
     @DisplayName("updateCategory with invalid id should throw not found exception")
     void updateCategory_withInvalidId_shouldThrowNotFoundException() {
-        CreateCategoryRequest request = CreateCategoryRequest.builder()
+        com.ticketing.event.dto.UpdateCategoryRequest request = com.ticketing.event.dto.UpdateCategoryRequest.builder()
                 .name("Technology")
                 .description("Conferences and meetups")
                 .iconUrl("laptop")

@@ -104,12 +104,12 @@ class VenueServiceTest {
     @Test
     @DisplayName("updateVenue with valid data should persist changes")
     void updateVenue_withValidData_shouldPersistChanges() {
-        CreateVenueRequest request = CreateVenueRequest.builder()
+        com.ticketing.event.dto.UpdateVenueRequest request = com.ticketing.event.dto.UpdateVenueRequest.builder()
                 .name("Updated Arena")
                 .address("999 Updated St")
                 .city("Boston")
                 .country("US")
-                .totalCapacity(30_000)
+                .capacity(30_000)
                 .build();
 
         Venue existingVenue = Venue.builder()
@@ -138,12 +138,12 @@ class VenueServiceTest {
     @Test
     @DisplayName("updateVenue with invalid id should throw not found exception")
     void updateVenue_withInvalidId_shouldThrowNotFoundException() {
-        CreateVenueRequest request = CreateVenueRequest.builder()
+        com.ticketing.event.dto.UpdateVenueRequest request = com.ticketing.event.dto.UpdateVenueRequest.builder()
                 .name("Updated Arena")
                 .address("999 Updated St")
                 .city("Boston")
                 .country("US")
-                .totalCapacity(30_000)
+                .capacity(30_000)
                 .build();
 
         when(venueRepository.findById(404L)).thenReturn(Optional.empty());

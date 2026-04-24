@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ticketing.common.dto.ApiResponse;
+import com.ticketing.common.util.BusinessConstants;
 import com.ticketing.event.dto.EventResponse;
 import com.ticketing.event.service.EventSearchService;
 
@@ -31,10 +32,10 @@ public class EventSearchController {
     @GetMapping
     public ResponseEntity<ApiResponse<Page<EventResponse>>> searchEvents(
             @RequestParam(value = "q", required = false)
-            @Size(max = 100, message = "Search query must be 100 characters or less") String query,
+            @Size(max = BusinessConstants.MAX_SEARCH_PARAM_LENGTH, message = "Search query must be 100 characters or less") String query,
             @RequestParam(value = "category", required = false) Long categoryId,
             @RequestParam(value = "city", required = false)
-            @Size(max = 100, message = "City filter must be 100 characters or less") String city,
+            @Size(max = BusinessConstants.MAX_SEARCH_PARAM_LENGTH, message = "City filter must be 100 characters or less") String city,
             Pageable pageable) {
 
         Page<EventResponse> response = eventSearchService.searchEvents(query, categoryId, city, pageable);

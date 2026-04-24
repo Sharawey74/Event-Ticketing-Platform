@@ -61,7 +61,7 @@ public class CategoryController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CategoryResponse>> updateCategory(
             @PathVariable Long id,
-            @Valid @RequestBody CreateCategoryRequest request) {
+            @Valid @RequestBody com.ticketing.event.dto.UpdateCategoryRequest request) {
         CategoryResponse response = categoryService.updateCategory(id, request);
         logger.info("Update category endpoint finished for category {}", id);
         return ResponseEntity.ok(ApiResponse.success(response));

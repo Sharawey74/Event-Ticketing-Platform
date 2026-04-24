@@ -34,143 +34,143 @@ import com.ticketing.event.service.VenueService;
 @Import(TestSecurityConfig.class)
 class VenueControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+        @Autowired
+        private MockMvc mockMvc;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+        @Autowired
+        private ObjectMapper objectMapper;
 
-    @MockitoBean
-    private VenueService venueService;
+        @MockitoBean
+        private VenueService venueService;
 
-    @MockitoBean
-    private com.ticketing.common.security.JwtService jwtService;
+        @MockitoBean
+        private com.ticketing.common.security.JwtService jwtService;
 
-    // ─── ADMIN happy-path ────────────────────────────────────────────────────
+        // ─── ADMIN happy-path ────────────────────────────────────────────────────
 
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    @DisplayName("POST /api/venues as ADMIN should create venue and return 200")
-    void createVenue_asAdmin_shouldReturn200() throws Exception {
-        CreateVenueRequest request = CreateVenueRequest.builder()
-                .name("Grand Arena")
-                .address("100 Main St")
-                .city("New York")
-                .country("US")
-                .totalCapacity(20000)
-                .build();
+        @Test
+        @WithMockUser(roles = "ADMIN")
+        @DisplayName("POST /api/venues as ADMIN should create venue and return 200")
+        void createVenue_asAdmin_shouldReturn200() throws Exception {
+                CreateVenueRequest request = CreateVenueRequest.builder()
+                                .name("Grand Arena")
+                                .address("100 Main St")
+                                .city("New York")
+                                .country("US")
+                                .totalCapacity(20000)
+                                .build();
 
-        VenueResponse response = VenueResponse.builder()
-                .id(10L)
-                .name("Grand Arena")
-                .address("100 Main St")
-                .city("New York")
-                .country("US")
-                .totalCapacity(20000)
-                .build();
+                VenueResponse response = VenueResponse.builder()
+                                .id(10L)
+                                .name("Grand Arena")
+                                .address("100 Main St")
+                                .city("New York")
+                                .country("US")
+                                .totalCapacity(20000)
+                                .build();
 
-        when(venueService.createVenue(any(CreateVenueRequest.class))).thenReturn(response);
+                when(venueService.createVenue(any(CreateVenueRequest.class))).thenReturn(response);
 
-        mockMvc.perform(post("/api/venues").with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.id").value(10));
-    }
+                mockMvc.perform(post("/api/venues").with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true))
+                                .andExpect(jsonPath("$.data.id").value(10));
+        }
 
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    @DisplayName("PUT /api/venues/{id} as ADMIN should update venue and return 200")
-    void updateVenue_asAdmin_shouldReturn200() throws Exception {
-        CreateVenueRequest request = CreateVenueRequest.builder()
-                .name("Updated Arena")
-                .address("999 Updated St")
-                .city("Boston")
-                .country("US")
-                .totalCapacity(30000)
-                .build();
+        @Test
+        @WithMockUser(roles = "ADMIN")
+        @DisplayName("PUT /api/venues/{id} as ADMIN should update venue and return 200")
+        void updateVenue_asAdmin_shouldReturn200() throws Exception {
+                com.ticketing.event.dto.UpdateVenueRequest request = com.ticketing.event.dto.UpdateVenueRequest.builder()
+                                .name("Updated Arena")
+                                .address("999 Updated St")
+                                .city("Boston")
+                                .country("US")
+                                .capacity(30000)
+                                .build();
 
-        VenueResponse response = VenueResponse.builder()
-                .id(10L)
-                .name("Updated Arena")
-                .build();
+                VenueResponse response = VenueResponse.builder()
+                                .id(10L)
+                                .name("Updated Arena")
+                                .build();
 
-        when(venueService.updateVenue(any(Long.class), any(CreateVenueRequest.class))).thenReturn(response);
+                when(venueService.updateVenue(any(Long.class), any(com.ticketing.event.dto.UpdateVenueRequest.class))).thenReturn(response);
 
-        mockMvc.perform(put("/api/venues/10").with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.name").value("Updated Arena"));
-    }
+                mockMvc.perform(put("/api/venues/10").with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true))
+                                .andExpect(jsonPath("$.data.name").value("Updated Arena"));
+        }
 
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    @DisplayName("DELETE /api/venues/{id} as ADMIN should delete venue and return 200")
-    void deleteVenue_asAdmin_shouldReturn200() throws Exception {
-        mockMvc.perform(delete("/api/venues/10").with(csrf()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
-    }
+        @Test
+        @WithMockUser(roles = "ADMIN")
+        @DisplayName("DELETE /api/venues/{id} as ADMIN should delete venue and return 200")
+        void deleteVenue_asAdmin_shouldReturn200() throws Exception {
+                mockMvc.perform(delete("/api/venues/10").with(csrf()))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true));
+        }
 
-    // ─── ORGANIZER denied (403) ─────────────────────────────────────────────
+        // ─── ORGANIZER denied (403) ─────────────────────────────────────────────
 
-    @Test
-    @WithMockUser(roles = "ORGANIZER")
-    @DisplayName("POST /api/venues as ORGANIZER should return 403 Forbidden")
-    void createVenue_asOrganizer_shouldReturn403() throws Exception {
-        CreateVenueRequest request = CreateVenueRequest.builder()
-                .name("Rogue Venue")
-                .address("1 Hacker Lane")
-                .city("Nowhere")
-                .country("US")
-                .totalCapacity(100)
-                .build();
+        @Test
+        @WithMockUser(roles = "ORGANIZER")
+        @DisplayName("POST /api/venues as ORGANIZER should return 403 Forbidden")
+        void createVenue_asOrganizer_shouldReturn403() throws Exception {
+                CreateVenueRequest request = CreateVenueRequest.builder()
+                                .name("Rogue Venue")
+                                .address("1 Hacker Lane")
+                                .city("Nowhere")
+                                .country("US")
+                                .totalCapacity(100)
+                                .build();
 
-        mockMvc.perform(post("/api/venues").with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden());
-    }
+                mockMvc.perform(post("/api/venues").with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isForbidden());
+        }
 
-    @Test
-    @WithMockUser(roles = "ORGANIZER")
-    @DisplayName("DELETE /api/venues/{id} as ORGANIZER should return 403 Forbidden")
-    void deleteVenue_asOrganizer_shouldReturn403() throws Exception {
-        mockMvc.perform(delete("/api/venues/10").with(csrf()))
-                .andExpect(status().isForbidden());
-    }
+        @Test
+        @WithMockUser(roles = "ORGANIZER")
+        @DisplayName("DELETE /api/venues/{id} as ORGANIZER should return 403 Forbidden")
+        void deleteVenue_asOrganizer_shouldReturn403() throws Exception {
+                mockMvc.perform(delete("/api/venues/10").with(csrf()))
+                                .andExpect(status().isForbidden());
+        }
 
-    // ─── Unauthenticated (401) ──────────────────────────────────────────────
+        // ─── Unauthenticated (401) ──────────────────────────────────────────────
 
-    @Test
-    @DisplayName("POST /api/venues without authentication should return 401 Unauthorized")
-    void createVenue_unauthenticated_shouldReturn401() throws Exception {
-        CreateVenueRequest request = CreateVenueRequest.builder()
-                .name("Anon Venue")
-                .address("0 Ghost St")
-                .city("Nowhere")
-                .country("US")
-                .totalCapacity(50)
-                .build();
+        @Test
+        @DisplayName("POST /api/venues without authentication should return 401 Unauthorized")
+        void createVenue_unauthenticated_shouldReturn401() throws Exception {
+                CreateVenueRequest request = CreateVenueRequest.builder()
+                                .name("Anon Venue")
+                                .address("0 Ghost St")
+                                .city("Nowhere")
+                                .country("US")
+                                .totalCapacity(50)
+                                .build();
 
-        mockMvc.perform(post("/api/venues").with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isUnauthorized());
-    }
+                mockMvc.perform(post("/api/venues").with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isUnauthorized());
+        }
 
-    // ─── Public GET endpoints ───────────────────────────────────────────────
+        // ─── Public GET endpoints ───────────────────────────────────────────────
 
-    @Test
-    @DisplayName("GET /api/venues is public and should return 200 without authentication")
-    void listVenues_withoutAuth_shouldReturn200() throws Exception {
-        when(venueService.listVenues(any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
+        @Test
+        @DisplayName("GET /api/venues is public and should return 200 without authentication")
+        void listVenues_withoutAuth_shouldReturn200() throws Exception {
+                when(venueService.listVenues(any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
 
-        mockMvc.perform(get("/api/venues"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
-    }
+                mockMvc.perform(get("/api/venues"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true));
+        }
 }

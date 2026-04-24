@@ -50,13 +50,13 @@ public class CategoryService {
     }
 
     @Transactional
-    public CategoryResponse updateCategory(Long categoryId, CreateCategoryRequest request) {
+    public CategoryResponse updateCategory(Long categoryId, com.ticketing.event.dto.UpdateCategoryRequest request) {
         Category category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new EntityNotFoundException("Category not found: " + categoryId));
 
-        category.setName(request.getName());
-        category.setDescription(request.getDescription());
-        category.setIconUrl(request.getIconUrl());
+        if (request.getName() != null) category.setName(request.getName());
+        if (request.getDescription() != null) category.setDescription(request.getDescription());
+        if (request.getIconUrl() != null) category.setIconUrl(request.getIconUrl());
 
         Category updated = categoryRepository.save(category);
         logger.info("Category {} updated", categoryId);
