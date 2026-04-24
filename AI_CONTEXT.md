@@ -1,6 +1,6 @@
 # AI CONTEXT SNAPSHOT — Event Ticketing Platform
-## Last Updated: Day 3 Complete (2026-04-21)
-## Branch: day-03-booking-inventory
+## Last Updated: Day 4 Frontend + Deployment Clarification + Gap Closure (2026-04-23)
+## Branch: day-4-nextjs-frontend-init-home
 ## Test Status: 56/56 passing (2 Docker/Testcontainers errors are pre-existing, require Docker Desktop)
 
 ---
@@ -310,6 +310,76 @@ When adding new services, do NOT add new exception types without adding a handle
 
 ---
 
+## 9. DEPLOYMENT GUIDE — FULL CLARIFICATION
+
+This repository has two deployable parts:
+
+- Backend: Spring Boot application under the repository root.
+- Frontend: Next.js application under `frontend/`.
+
+### 9.1 Local Full-Stack Start
+
+1. Start infrastructure from the repository root:
+  - `docker-compose up -d`
+2. Start the backend:
+  - `./mvnw spring-boot:run`
+3. Set the frontend API URL:
+  - `frontend/.env.local` must contain `NEXT_PUBLIC_API_URL=http://localhost:8080`
+4. Start the frontend:
+  - `cd frontend && npm run dev`
+
+### 9.2 Production Build Order
+
+1. Build and deploy the backend first.
+2. Set `NEXT_PUBLIC_API_URL` to the public backend URL before building the frontend.
+3. Build the backend with:
+  - `./mvnw -q -DskipTests compile`
+4. Build the frontend with:
+  - `cd frontend && npm run build`
+
+### 9.3 Required Runtime Services
+
+- PostgreSQL 17
+- Redis 7
+- RabbitMQ 4-management
+- Spring Boot backend service
+- Next.js frontend service
+
+### 9.4 Deployment Rules
+
+- Never hardcode a backend host in the frontend source code.
+- Keep all API access routed through `src/lib/api.ts`.
+- Keep `.env.local` out of version control.
+- Commit only `frontend/.env.example` so the required env var is obvious.
+- Treat the Windows SWC warning as a local build environment issue if webpack fallback succeeds.
+
+### 9.5 Operational Order
+
+- Database and infrastructure must be up before backend start.
+- Backend must be reachable before frontend release or preview deployment.
+- Frontend build uses `NEXT_PUBLIC_API_URL` at build time, so the env value must be correct before `npm run build`.
+
+---
+
+## 10. DAY 4 FRONTEND GAP CLOSURE
+
+### Implemented After Initial Day 4 Core
+
+- Shared search helper added: `frontend/src/lib/search.ts`.
+- Navbar search now routes to `/search?q=...`.
+- Home page CTA routes to shareable `/search` URLs with query params.
+- Search page now has an `Apply Filters` button that updates the URL.
+- Event details page added at `frontend/src/app/events/[id]/page.tsx`.
+- Basic helper tests added for search URL and filter logic.
+
+### Validation Status
+
+- `frontend` build: PASS (`npm run build`)
+- `frontend` helper tests: PASS (`npm test`)
+- Routes present: `/`, `/search`, `/events/[id]`
+
+---
+
 ## 9. ANTI-HALLUCINATION CONSTRAINTS (READ BEFORE EVERY CODE CHANGE)
 
 1. **Do NOT modify any Flyway migration file** — create V11__ or higher instead.
@@ -348,4 +418,24 @@ npm install @tanstack/react-query axios zustand react-hook-form zod date-fns luc
 **Apply Fix CC-1 (deferred from Day 3):** Before Day 7, add MDC correlation ID to:
 - `VenueService.java` log statements
 - `CategoryService.java` log statements
+
+---
+
+## 11. DAY 4 REVIEW ADDENDUM
+
+This addendum captures the remaining Day 4 prompt/plan deltas identified in the latest review. No implementation changes were made in that review.
+
+### Documented Gaps / Deltas
+
+- Navbar still exposes only `Sign in`; the Day 4 prompt called for login/register links.
+- Home-page category pills trigger a filtered API call, but they do not push updated query params into the URL yet.
+- `swr` was listed in the prompt install set, but the frontend uses React Query only and does not include SWR.
+- Page-level frontend tests are still limited; the current suite only covers the search helper unit tests.
+- The event detail page exists as a minimal skeleton, but it is a later-roadmap addition rather than a Day 4 requirement.
+
+### File Inventory Reference
+
+- The full changed-file inventory for this branch is recorded in `Latest.txt` under the Day 4 review addendum.
+- Frontend Day 4 files include the app shell, home page, search page, event detail page, shared API/search helpers, component library, types, and helper tests.
+- Backend Day 3 files and tests remain part of the same branch history and are already validated in the earlier handoff sections.
 - `EventSearchService.java` log statements
