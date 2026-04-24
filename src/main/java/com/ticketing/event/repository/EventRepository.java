@@ -27,6 +27,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     Page<Event> findByStatusAndStartDateAfter(EventStatus status, Instant date, Pageable pageable);
 
+    @EntityGraph(attributePaths = { "organizer", "category", "venue" })
     @Query("""
             SELECT e
             FROM Event e
