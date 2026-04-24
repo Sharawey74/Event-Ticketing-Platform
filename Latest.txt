@@ -301,3 +301,27 @@ Untracked files:
 
 no changes added to commit (use "git add" and/or "git commit -a")
 PS C:\Users\PC\Desktop\Event-Ticketing-Platform> 
+
+---
+PHASE 11 — Day 3 & Day 4 Audit Remediation Completion (2026-04-24)
+
+Day 3 Backend Audit Fixes:
+- Identified that `VenueController` and `CategoryController` were re-using `Create*Request` DTOs for partial updates, risking data overrides.
+- Created `UpdateVenueRequest` and `UpdateCategoryRequest` DTOs designed for partial updates without strict `@NotBlank` validation.
+- Refactored `VenueService` and `CategoryService` to utilize these new DTOs, implementing explicit null-checks to apply partial entity updates safely.
+- Synchronized all corresponding unit tests (`VenueControllerTest`, `CategoryControllerTest`, `VenueServiceTest`, `CategoryServiceTest`) to use the new Update DTOs.
+- Validation: Unit tests run green.
+
+Day 4 Frontend Audit Fixes:
+- Removed dead, redundant client-side date-filtering logic from `frontend/src/app/page.tsx`, relying entirely on the server's API logic.
+- Resolved a `react-hooks/set-state-in-effect` linting error in `frontend/src/app/search/page.tsx` that previously warned of possible cascading renders.
+- Validation: `npm run lint` and `npm run build` run completely clean.
+
+Git History Reconstruction:
+- A previous messy merge/WIP state was squashed and reconstructed.
+- The branch `day-4-nextjs-frontend-init-home` now contains 57 clean, granular commits using proper conventional commit prefixes (e.g., `feat(audit)`, `fix(audit)`, `test(audit)`, `chore(frontend)`).
+- `Artifacts/` and metadata folders were correctly added to `.gitignore`.
+
+Next session start: Day 5 — Inventory (Redis + Lua) + RabbitMQ Config
+- Tasks: Introduce Redis for ticket inventory and RabbitMQ for message passing.
+- Ensure Fix 5.1 (Lua floor guard) and Fix 5.2 (InventoryWarmupHealthIndicator) are completed.

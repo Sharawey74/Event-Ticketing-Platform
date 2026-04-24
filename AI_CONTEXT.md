@@ -1,5 +1,5 @@
 # AI CONTEXT SNAPSHOT — Event Ticketing Platform
-## Last Updated: Day 4 Frontend + Deployment Clarification + Gap Closure (2026-04-23)
+## Last Updated: Day 3 & 4 Audit Remediation Completion (2026-04-24)
 ## Branch: day-4-nextjs-frontend-init-home
 ## Test Status: 56/56 passing (2 Docker/Testcontainers errors are pre-existing, require Docker Desktop)
 
@@ -73,7 +73,9 @@ event/
     CreateVenueRequest.java
     EventFilterRequest.java
     EventResponse.java
+    UpdateCategoryRequest.java
     UpdateEventRequest.java
+    UpdateVenueRequest.java
     VenueResponse.java
   model/
     Category.java
@@ -253,7 +255,8 @@ class YourControllerTest {
 | 1 | Project Init + Entities + Migrations | ✅ | Passing |
 | 2 | Event Domain + Auth (JWT) | ✅ | 20/20 |
 | 3 | Venue + Category + Search + Security Hardening | ✅ | 56/56 |
-| 4–21 | See PROGRESS.md | ⬜ | — |
+| 4 | Next.js Frontend + Home Page | ✅ | Passing |
+| 5–21 | See PROGRESS.md | ⬜ | — |
 
 ---
 
@@ -395,47 +398,14 @@ This repository has two deployable parts:
 
 ---
 
-## 10. NEXT SESSION START — DAY 4
+## 10. NEXT SESSION START — DAY 5
 
-**Branch to create:** `git checkout -b day-04-frontend`
+**Branch to create:** `git checkout -b day-05-inventory-rabbitmq`
 
-**First task:** Next.js Frontend Initialization
-```bash
-cd frontend
-npx -y create-next-app@latest ./ --typescript --tailwind --eslint --app --src-dir --no-git
-```
+**First task:** Redis + Lua Inventory & RabbitMQ setup
+- Add Redis for concurrent ticket inventory management.
+- Implement `InventoryService.java` with a Lua script to reserve tickets safely and prevent overselling (Fix 5.1).
+- Add `InventoryWarmupHealthIndicator` (Fix 5.2).
+- Configure RabbitMQ exchanges, queues, and bindings for async events.
 
-**Dependencies to install after init:**
-```bash
-npm install @tanstack/react-query axios zustand react-hook-form zod date-fns lucide-react
-```
-
-**Then:** Build `src/lib/api.ts` with Axios base config + JWT interceptor, then implement Home Page with:
-- Hero section, category filter row, upcoming events grid
-- Fetch from `GET /api/events?status=PUBLISHED`
-- React Query with 5-minute stale time
-
-**Apply Fix CC-1 (deferred from Day 3):** Before Day 7, add MDC correlation ID to:
-- `VenueService.java` log statements
-- `CategoryService.java` log statements
-
----
-
-## 11. DAY 4 REVIEW ADDENDUM
-
-This addendum captures the remaining Day 4 prompt/plan deltas identified in the latest review. No implementation changes were made in that review.
-
-### Documented Gaps / Deltas
-
-- Navbar still exposes only `Sign in`; the Day 4 prompt called for login/register links.
-- Home-page category pills trigger a filtered API call, but they do not push updated query params into the URL yet.
-- `swr` was listed in the prompt install set, but the frontend uses React Query only and does not include SWR.
-- Page-level frontend tests are still limited; the current suite only covers the search helper unit tests.
-- The event detail page exists as a minimal skeleton, but it is a later-roadmap addition rather than a Day 4 requirement.
-
-### File Inventory Reference
-
-- The full changed-file inventory for this branch is recorded in `Latest.txt` under the Day 4 review addendum.
-- Frontend Day 4 files include the app shell, home page, search page, event detail page, shared API/search helpers, component library, types, and helper tests.
-- Backend Day 3 files and tests remain part of the same branch history and are already validated in the earlier handoff sections.
-- `EventSearchService.java` log statements
+**Important Note:** Make sure Docker Desktop is running when working on Day 5, as Redis and RabbitMQ will require Testcontainers for validation.
