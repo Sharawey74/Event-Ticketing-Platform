@@ -52,15 +52,15 @@ public class VenueService {
     }
 
     @Transactional
-    public VenueResponse updateVenue(Long venueId, CreateVenueRequest request) {
+    public VenueResponse updateVenue(Long venueId, com.ticketing.event.dto.UpdateVenueRequest request) {
         Venue venue = venueRepository.findById(venueId)
                 .orElseThrow(() -> new EntityNotFoundException("Venue not found: " + venueId));
 
-        venue.setName(request.getName());
-        venue.setAddress(request.getAddress());
-        venue.setCity(request.getCity());
-        venue.setCountry(request.getCountry());
-        venue.setTotalCapacity(request.getTotalCapacity());
+        if (request.getName() != null) venue.setName(request.getName());
+        if (request.getAddress() != null) venue.setAddress(request.getAddress());
+        if (request.getCity() != null) venue.setCity(request.getCity());
+        if (request.getCountry() != null) venue.setCountry(request.getCountry());
+        if (request.getCapacity() != null) venue.setTotalCapacity(request.getCapacity());
 
         Venue updated = venueRepository.save(venue);
         logger.info("Venue {} updated", venueId);
