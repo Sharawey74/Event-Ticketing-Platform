@@ -88,4 +88,22 @@ class EventSearchServiceTest {
         assertEquals(0, response.getTotalElements());
         verify(eventRepository).searchPublishedEvents(eq(null), eq(null), eq(null), any(Instant.class), eq(pageable));
     }
+
+    @Test
+    @DisplayName("searchEvents with blank query should normalize to null")
+    void searchEvents_withBlankQuery_shouldNormalizeToNull() {
+        Pageable pageable = PageRequest.of(0, 10);
+        when(eventRepository.searchPublishedEvents(
+                eq(null),
+                eq(null),
+                eq(null),
+                any(Instant.class),
+                eq(pageable)))
+                .thenReturn(Page.empty(pageable));
+
+        Page<EventResponse> response = eventSearchService.searchEvents("   ", null, null, pageable);
+
+        assertEquals(0, response.getTotalElements());
+        verify(eventRepository).searchPublishedEvents(eq(null), eq(null), eq(null), any(Instant.class), eq(pageable));
+    }
 }
