@@ -60,7 +60,7 @@ public class VenueController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<VenueResponse>> updateVenue(
             @PathVariable Long id,
-            @Valid @RequestBody CreateVenueRequest request) {
+            @Valid @RequestBody com.ticketing.event.dto.UpdateVenueRequest request) {
         VenueResponse response = venueService.updateVenue(id, request);
         logger.info("Update venue endpoint finished for venue {}", id);
         return ResponseEntity.ok(ApiResponse.success(response));
