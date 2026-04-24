@@ -55,10 +55,10 @@ class TicketingPlatformApplicationTests {
 
 		Long organizerId = jdbcTemplate.queryForObject(
 				"""
-				INSERT INTO users (email, password_hash, first_name, last_name, role)
-				VALUES (?, ?, ?, ?, CAST(? AS user_role))
-				RETURNING id
-				""",
+						INSERT INTO users (email, password_hash, first_name, last_name, role)
+						VALUES (?, ?, ?, ?, CAST(? AS user_role))
+						RETURNING id
+						""",
 				Long.class,
 				"search-organizer-" + uniqueSuffix + "@example.com",
 				"hashed-password",
