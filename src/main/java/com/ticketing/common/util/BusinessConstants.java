@@ -22,4 +22,5 @@ public final class BusinessConstants {
     public static final double PARTIAL_REFUND_RATE = 0.50;
 
     public static final int EXPIRY_JOB_INTERVAL_MS = 30_000;
+    public static final int MAX_SEARCH_PARAM_LENGTH = 100;
 }
