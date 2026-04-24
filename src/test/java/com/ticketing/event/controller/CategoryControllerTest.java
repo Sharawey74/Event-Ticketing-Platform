@@ -33,91 +33,91 @@ import com.ticketing.event.service.CategoryService;
 @Import(TestSecurityConfig.class)
 class CategoryControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+        @Autowired
+        private MockMvc mockMvc;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+        @Autowired
+        private ObjectMapper objectMapper;
 
-    @MockitoBean
-    private CategoryService categoryService;
+        @MockitoBean
+        private CategoryService categoryService;
 
-    @MockitoBean
-    private com.ticketing.common.security.JwtService jwtService;
+        @MockitoBean
+        private com.ticketing.common.security.JwtService jwtService;
 
-    // ─── ADMIN happy-path ────────────────────────────────────────────────────
+        // ─── ADMIN happy-path ────────────────────────────────────────────────────
 
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    @DisplayName("POST /api/categories as ADMIN should create category and return 200")
-    void createCategory_asAdmin_shouldReturn200() throws Exception {
-        CreateCategoryRequest request = CreateCategoryRequest.builder()
-                .name("Music")
-                .description("Live concerts and tours")
-                .iconUrl("music-note")
-                .build();
+        @Test
+        @WithMockUser(roles = "ADMIN")
+        @DisplayName("POST /api/categories as ADMIN should create category and return 200")
+        void createCategory_asAdmin_shouldReturn200() throws Exception {
+                CreateCategoryRequest request = CreateCategoryRequest.builder()
+                                .name("Music")
+                                .description("Live concerts and tours")
+                                .iconUrl("music-note")
+                                .build();
 
-        CategoryResponse response = CategoryResponse.builder()
-                .id(7L)
-                .name("Music")
-                .description("Live concerts and tours")
-                .iconUrl("music-note")
-                .build();
+                CategoryResponse response = CategoryResponse.builder()
+                                .id(7L)
+                                .name("Music")
+                                .description("Live concerts and tours")
+                                .iconUrl("music-note")
+                                .build();
 
-        when(categoryService.createCategory(any(CreateCategoryRequest.class))).thenReturn(response);
+                when(categoryService.createCategory(any(CreateCategoryRequest.class))).thenReturn(response);
 
-        mockMvc.perform(post("/api/categories").with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.id").value(7));
-    }
+                mockMvc.perform(post("/api/categories").with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true))
+                                .andExpect(jsonPath("$.data.id").value(7));
+        }
 
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    @DisplayName("DELETE /api/categories/{id} as ADMIN should delete category and return 200")
-    void deleteCategory_asAdmin_shouldReturn200() throws Exception {
-        mockMvc.perform(delete("/api/categories/7").with(csrf()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
-    }
+        @Test
+        @WithMockUser(roles = "ADMIN")
+        @DisplayName("DELETE /api/categories/{id} as ADMIN should delete category and return 200")
+        void deleteCategory_asAdmin_shouldReturn200() throws Exception {
+                mockMvc.perform(delete("/api/categories/7").with(csrf()))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true));
+        }
 
-    // ─── ORGANIZER denied (403) ─────────────────────────────────────────────
+        // ─── ORGANIZER denied (403) ─────────────────────────────────────────────
 
-    @Test
-    @WithMockUser(roles = "ORGANIZER")
-    @DisplayName("POST /api/categories as ORGANIZER should return 403 Forbidden")
-    void createCategory_asOrganizer_shouldReturn403() throws Exception {
-        CreateCategoryRequest request = CreateCategoryRequest.builder()
-                .name("Rogue Category")
-                .description("Should not be created")
-                .iconUrl("skull")
-                .build();
+        @Test
+        @WithMockUser(roles = "ORGANIZER")
+        @DisplayName("POST /api/categories as ORGANIZER should return 403 Forbidden")
+        void createCategory_asOrganizer_shouldReturn403() throws Exception {
+                CreateCategoryRequest request = CreateCategoryRequest.builder()
+                                .name("Rogue Category")
+                                .description("Should not be created")
+                                .iconUrl("skull")
+                                .build();
 
-        mockMvc.perform(post("/api/categories").with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden());
-    }
+                mockMvc.perform(post("/api/categories").with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isForbidden());
+        }
 
-    @Test
-    @WithMockUser(roles = "ORGANIZER")
-    @DisplayName("DELETE /api/categories/{id} as ORGANIZER should return 403 Forbidden")
-    void deleteCategory_asOrganizer_shouldReturn403() throws Exception {
-        mockMvc.perform(delete("/api/categories/7").with(csrf()))
-                .andExpect(status().isForbidden());
-    }
+        @Test
+        @WithMockUser(roles = "ORGANIZER")
+        @DisplayName("DELETE /api/categories/{id} as ORGANIZER should return 403 Forbidden")
+        void deleteCategory_asOrganizer_shouldReturn403() throws Exception {
+                mockMvc.perform(delete("/api/categories/7").with(csrf()))
+                                .andExpect(status().isForbidden());
+        }
 
-    // ─── Public GET endpoints ───────────────────────────────────────────────
+        // ─── Public GET endpoints ───────────────────────────────────────────────
 
-    @Test
-    @DisplayName("GET /api/categories is public and should return 200 without authentication")
-    void listCategories_withoutAuth_shouldReturn200() throws Exception {
-        when(categoryService.listCategories(any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
+        @Test
+        @DisplayName("GET /api/categories is public and should return 200 without authentication")
+        void listCategories_withoutAuth_shouldReturn200() throws Exception {
+                when(categoryService.listCategories(any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
 
-        mockMvc.perform(get("/api/categories"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
-    }
+                mockMvc.perform(get("/api/categories"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true));
+        }
 }
