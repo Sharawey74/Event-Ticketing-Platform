@@ -398,13 +398,17 @@ This repository has two deployable parts:
 
 ---
 
-## 10. NEXT SESSION START — DAY 6
+## 10. NEXT SESSION START — DAY 7
 
-**Branch to create:** `git checkout -b day-06-entitygraphs-load-profiling`
+**Branch to create:** `git checkout -b day-07-week1-cleanup-docker-compose`
 
-**First task:** N+1 Query Elimination & Initial Load Profiling
-- Refactor `findAll` and search queries in Repositories using `@EntityGraph(attributePaths = {"organizer", "category", "venue", "ticketTiers"})` to eliminate N+1 queries.
-- Validate the N+1 fixes using integration tests.
-- Setup baseline API load testing (if scheduled) using k6 to validate performance targets under concurrency.
+**First task:** Week 1 Cleanup + Docker Compose
+- Apply Fix 7.1: Add `@Version` field to `Booking` and `TicketTier` entities for optimistic locking.
+- Assemble `docker-compose.yml` with all services: `postgres`, `redis`, `rabbitmq`, and `backend`.
+- Verify the full stack boots cleanly end-to-end with `docker compose up`.
+- Run `./mvnw test` and confirm all 68 tests still pass after entity changes.
 
-**Important Note:** Make sure Docker Desktop is running when working on Day 6, as the integration tests for database optimization will require Testcontainers (Postgres) for validation.
+**Active fix today:**
+- Fix 7.1 (IMPORTANT): `@Version` on `Booking` and `TicketTier` — prevents lost-update anomalies under concurrent bookings.
+
+**Important Note:** Make sure Docker Desktop is running. Both the integration tests and Docker Compose validation require it.
