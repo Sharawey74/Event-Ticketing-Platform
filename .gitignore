@@ -34,3 +34,5 @@ build/
 .specify/
 Artifacts/
 *.resolved
+.agent
+.env
