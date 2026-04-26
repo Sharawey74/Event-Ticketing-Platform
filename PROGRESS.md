@@ -16,7 +16,7 @@
 | 4 | Next.js Frontend + Home Page | ✅ Complete | Passing | Scaffolded Next.js, added standard search + details, lint and build green |
 | 5 | Inventory (Redis + Lua) + RabbitMQ Config | ✅ Complete | 63/63 passing | Implemented Lua floor guard, Warmup Health Indicator, Redis caching, RabbitMQ DLQs |
 | 6 | N+1 Fixes + Integration Tests | ✅ Complete | 68/68 passing | @EntityGraph on EventRepo/BookingRepo, EventIntegrationTest (4 tests: create/update/publish/search), BookingIntegrationTest, k6 baseline, README updated |
-| 7 | Week 1 Cleanup + Docker Compose | ⬜ Not Started | — | |
+| 7 | Week 1 Cleanup + Docker Compose | ✅ Complete | 68/68 passing | Docker Compose healthchecks, pgAdmin, Redis UI, Event Detail API |
 | 8 | Booking State Machine | ⬜ Not Started | — | |
 | 9 | Stripe Checkout + Webhook | ⬜ Not Started | — | |
 | 10 | RabbitMQ Consumers + Notifications | ⬜ Not Started | — | |
@@ -45,7 +45,7 @@
 | Fix 2.2 | IMPORTANT | 2 | ✅ | Applied in all new services/controllers/security classes |
 | Fix 5.1 | CRITICAL | 5 | ✅ | Lua floor guard in InventoryService |
 | Fix 5.2 | IMPORTANT | 5 | ✅ | InventoryWarmupHealthIndicator |
-| Fix 7.1 | IMPORTANT | 7 | ⬜ | @Version on Booking and TicketTier |
+| Fix 7.1 | IMPORTANT | 7 | ✅ | @Version on Booking and TicketTier |
 | Fix 8.1 | CRITICAL | 8 | ⬜ | TOCTOU double-check inside lock |
 | Fix 8.2 | IMPORTANT | 8 | ⬜ | CheckInGuard two-layer protection |
 | Fix 8.3 | IMPORTANT | 8 | ⬜ | ExpiryJob distributed lock |

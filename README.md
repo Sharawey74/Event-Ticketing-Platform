@@ -12,11 +12,17 @@ Production-grade event ticketing platform scaffold for Phase 1A.
 
 ## Quick Start
 1. Start infrastructure:
-   - docker-compose up -d
+   - `docker-compose up -d`
+   - PostgreSQL: 5432
+   - Redis: 6379
+   - RabbitMQ: 5672 (AMQP) / 15672 (Management UI)
+   - pgAdmin: 5050 (DB Browser)
+   - Redis Commander: 8081 (Redis UI)
+   - Mailhog: 1025 (SMTP) / 8025 (Web UI)
 2. Compile:
-   - ./mvnw compile
+   - `./mvnw compile`
 3. Run application:
-   - ./mvnw spring-boot:run
+   - `./mvnw spring-boot:run`
 
 ## Notes
 - Uses Flyway migrations in src/main/resources/db/migration.

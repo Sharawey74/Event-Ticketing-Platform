@@ -24,6 +24,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
             JOIN FETCH e.organizer o
             JOIN FETCH e.category c
             JOIN FETCH e.venue v
+            LEFT JOIN FETCH e.ticketTiers t
             WHERE e.id = :id
             """)
     Optional<Event> findByIdWithDetails(@Param("id") Long id);

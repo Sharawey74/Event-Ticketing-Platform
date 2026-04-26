@@ -104,14 +104,14 @@ class EventIntegrationTest {
 
         // Act - create
         EventResponse created = eventService.createEvent(request, organizer.getId());
-        EventResponse retrieved = eventService.getEventById(created.getId());
+        com.ticketing.event.dto.EventDetailResponse retrieved = eventService.getEventById(created.getId());
 
         // Assert - create + retrieve
         assertThat(retrieved).isNotNull();
         assertThat(retrieved.getTitle()).isEqualTo("Integration Test Event");
-        assertThat(retrieved.getCategoryId()).isEqualTo(category.getId());
-        assertThat(retrieved.getVenueId()).isEqualTo(venue.getId());
-        assertThat(retrieved.getOrganizerId()).isEqualTo(organizer.getId());
+        assertThat(retrieved.getCategory().getId()).isEqualTo(category.getId());
+        assertThat(retrieved.getVenue().getId()).isEqualTo(venue.getId());
+        assertThat(retrieved.getOrganizer().getId()).isEqualTo(organizer.getId());
         assertThat(retrieved.getStatus()).isEqualTo(EventStatus.DRAFT);
     }
 
