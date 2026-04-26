@@ -15,6 +15,9 @@ import com.ticketing.event.model.EventStatus;
 
 public interface EventRepository extends JpaRepository<Event, Long> {
 
+    @EntityGraph(attributePaths = { "organizer", "category", "venue" })
+    Page<Event> findAll(Pageable pageable);
+
     @Query("""
             SELECT e
             FROM Event e
