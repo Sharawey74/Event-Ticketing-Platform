@@ -7,8 +7,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.ticketing.common.config.RedisConfig;
 
 import com.ticketing.event.dto.CreateEventRequest;
 import com.ticketing.event.dto.EventFilterRequest;
@@ -59,6 +63,7 @@ public class EventService {
         return toResponse(saved);
     }
 
+    @Cacheable(value = RedisConfig.EVENT_CACHE, key = "#id")
     public EventResponse getEventById(Long id) {
         Event event = eventRepository.findByIdWithDetails(id)
             .orElseThrow(() -> new EntityNotFoundException("Event not found: " + id));
@@ -78,6 +83,7 @@ public class EventService {
     }
 
     @Transactional
+    @CacheEvict(value = {RedisConfig.EVENT_CACHE, RedisConfig.EVENT_LIST_CACHE}, key = "#eventId")
     public EventResponse updateEvent(Long eventId, UpdateEventRequest request, Long organizerId) {
         Event event = eventRepository.findByIdWithDetails(eventId)
             .orElseThrow(() -> new EntityNotFoundException("Event not found: " + eventId));
@@ -137,6 +143,7 @@ public class EventService {
     }
 
     @Transactional
+    @CacheEvict(value = {RedisConfig.EVENT_CACHE, RedisConfig.EVENT_LIST_CACHE}, key = "#eventId", allEntries = true)
     public EventResponse publishEvent(Long eventId, Long organizerId) {
         Event event = eventRepository.findByIdWithDetails(eventId)
             .orElseThrow(() -> new EntityNotFoundException("Event not found: " + eventId));
