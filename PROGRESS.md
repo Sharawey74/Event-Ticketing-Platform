@@ -15,7 +15,7 @@
 | 3 | Venue + Category + Search | ✅ Complete | 56/56 passing ✅ (2 Docker/Testcontainers skipped — pre-existing, no Docker Desktop) | VenueService, CategoryService, EventSearchService, controllers, migrations V8+V9, TestSecurityConfig, @PreAuthorize enforced |
 | 4 | Next.js Frontend + Home Page | ✅ Complete | Passing | Scaffolded Next.js, added standard search + details, lint and build green |
 | 5 | Inventory (Redis + Lua) + RabbitMQ Config | ✅ Complete | 63/63 passing | Implemented Lua floor guard, Warmup Health Indicator, Redis caching, RabbitMQ DLQs |
-| 6 | N+1 Fixes + Integration Tests | ⬜ Not Started | — | |
+| 6 | N+1 Fixes + Integration Tests | ✅ Complete | 68/68 passing | @EntityGraph on EventRepo/BookingRepo, EventIntegrationTest (4 tests: create/update/publish/search), BookingIntegrationTest, k6 baseline, README updated |
 | 7 | Week 1 Cleanup + Docker Compose | ⬜ Not Started | — | |
 | 8 | Booking State Machine | ⬜ Not Started | — | |
 | 9 | Stripe Checkout + Webhook | ⬜ Not Started | — | |
@@ -68,7 +68,7 @@
 
 | Metric | Current | Target |
 |--------|---------|--------|
-| `./mvnw test` passing | 63 / 63 Tests Passing | 100% |
+| `./mvnw test` passing | 68 / 68 Tests Passing | 100% |
 | Test coverage | N/A | 80%+ |
 | Active @Autowired usages | 0 | 0 |
 | Active LocalDateTime usages | 0 | 0 |
