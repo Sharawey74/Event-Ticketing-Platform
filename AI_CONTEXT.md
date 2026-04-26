@@ -1,7 +1,7 @@
 # AI CONTEXT SNAPSHOT — Event Ticketing Platform
-## Last Updated: Day 3 & 4 Audit Remediation Completion (2026-04-24)
-## Branch: day-4-nextjs-frontend-init-home
-## Test Status: 56/56 passing (2 Docker/Testcontainers errors are pre-existing, require Docker Desktop)
+## Last Updated: Day 5 Inventory & RabbitMQ Infrastructure Completion (2026-04-26)
+## Branch: day-5-inventory-redis-rabbitmq
+## Test Status: 63/63 passing (Testcontainers for Postgres, Redis, and RabbitMQ properly configured)
 
 ---
 
@@ -398,14 +398,13 @@ This repository has two deployable parts:
 
 ---
 
-## 10. NEXT SESSION START — DAY 5
+## 10. NEXT SESSION START — DAY 6
 
-**Branch to create:** `git checkout -b day-05-inventory-rabbitmq`
+**Branch to create:** `git checkout -b day-06-entitygraphs-load-profiling`
 
-**First task:** Redis + Lua Inventory & RabbitMQ setup
-- Add Redis for concurrent ticket inventory management.
-- Implement `InventoryService.java` with a Lua script to reserve tickets safely and prevent overselling (Fix 5.1).
-- Add `InventoryWarmupHealthIndicator` (Fix 5.2).
-- Configure RabbitMQ exchanges, queues, and bindings for async events.
+**First task:** N+1 Query Elimination & Initial Load Profiling
+- Refactor `findAll` and search queries in Repositories using `@EntityGraph(attributePaths = {"organizer", "category", "venue", "ticketTiers"})` to eliminate N+1 queries.
+- Validate the N+1 fixes using integration tests.
+- Setup baseline API load testing (if scheduled) using k6 to validate performance targets under concurrency.
 
-**Important Note:** Make sure Docker Desktop is running when working on Day 5, as Redis and RabbitMQ will require Testcontainers for validation.
+**Important Note:** Make sure Docker Desktop is running when working on Day 6, as the integration tests for database optimization will require Testcontainers (Postgres) for validation.

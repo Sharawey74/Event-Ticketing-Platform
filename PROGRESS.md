@@ -14,7 +14,7 @@
 | 2 | Event Domain + Auth (JWT) | ✅ Complete | 20/20 passing ✅ | Event/Auth services, endpoints, and Application Context validated |
 | 3 | Venue + Category + Search | ✅ Complete | 56/56 passing ✅ (2 Docker/Testcontainers skipped — pre-existing, no Docker Desktop) | VenueService, CategoryService, EventSearchService, controllers, migrations V8+V9, TestSecurityConfig, @PreAuthorize enforced |
 | 4 | Next.js Frontend + Home Page | ✅ Complete | Passing | Scaffolded Next.js, added standard search + details, lint and build green |
-| 5 | Inventory (Redis + Lua) + RabbitMQ Config | ⬜ Not Started | — | |
+| 5 | Inventory (Redis + Lua) + RabbitMQ Config | ✅ Complete | 63/63 passing | Implemented Lua floor guard, Warmup Health Indicator, Redis caching, RabbitMQ DLQs |
 | 6 | N+1 Fixes + Integration Tests | ⬜ Not Started | — | |
 | 7 | Week 1 Cleanup + Docker Compose | ⬜ Not Started | — | |
 | 8 | Booking State Machine | ⬜ Not Started | — | |
@@ -43,8 +43,8 @@
 | Fix 1.3 | GOOD | 1 | ✅ | deleted_at TIMESTAMPTZ on bookings table |
 | Fix 2.1 | IMPORTANT | 2 | ✅ | Applied on EventService, AuthService, UserDetailsServiceImpl |
 | Fix 2.2 | IMPORTANT | 2 | ✅ | Applied in all new services/controllers/security classes |
-| Fix 5.1 | CRITICAL | 5 | ⬜ | Lua floor guard in InventoryService |
-| Fix 5.2 | IMPORTANT | 5 | ⬜ | InventoryWarmupHealthIndicator |
+| Fix 5.1 | CRITICAL | 5 | ✅ | Lua floor guard in InventoryService |
+| Fix 5.2 | IMPORTANT | 5 | ✅ | InventoryWarmupHealthIndicator |
 | Fix 7.1 | IMPORTANT | 7 | ⬜ | @Version on Booking and TicketTier |
 | Fix 8.1 | CRITICAL | 8 | ⬜ | TOCTOU double-check inside lock |
 | Fix 8.2 | IMPORTANT | 8 | ⬜ | CheckInGuard two-layer protection |
@@ -53,7 +53,7 @@
 | Fix 9.1 | CRITICAL | 9 | ⬜ | StripeWebhookController NOT @Transactional |
 | Fix 9.2 | CRITICAL | 9 | ⬜ | DataIntegrityViolationException idempotency |
 | Fix 10.1 | IMPORTANT | 10 | ⬜ | DLQ listeners declared |
-| Fix 10.2 | IMPORTANT | 10 | ⬜ | Async QR generation via queue |
+| Fix 10.2 | IMPORTANT | 10 | ✅ | Async QR generation via queue (Queue configured in Day 5) |
 | Fix 11.1 | IMPORTANT | 8 | ⬜ | CANCELLED state in state machine |
 | Fix 11.2 | IMPORTANT | 11 | ⬜ | RELEASE event / AVAILABLE state clarified |
 | Fix 12.1 | GOOD | 12 | ⬜ | Refund days calculated with ChronoUnit |
@@ -68,7 +68,7 @@
 
 | Metric | Current | Target |
 |--------|---------|--------|
-| `./mvnw test` passing | 20 / 20 Tests Passing | 100% |
+| `./mvnw test` passing | 63 / 63 Tests Passing | 100% |
 | Test coverage | N/A | 80%+ |
 | Active @Autowired usages | 0 | 0 |
 | Active LocalDateTime usages | 0 | 0 |

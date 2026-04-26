@@ -325,3 +325,26 @@ Git History Reconstruction:
 Next session start: Day 5 — Inventory (Redis + Lua) + RabbitMQ Config
 - Tasks: Introduce Redis for ticket inventory and RabbitMQ for message passing.
 - Ensure Fix 5.1 (Lua floor guard) and Fix 5.2 (InventoryWarmupHealthIndicator) are completed.
+
+---
+PHASE 12 — Day 5 Inventory & RabbitMQ Infrastructure Completion (2026-04-26)
+
+Day 5 Core Implementation Status: COMPLETE ✅
+
+Files Created:
+- `src/test/java/com/ticketing/inventory/service/InventoryServiceTest.java` (TDD tests with Testcontainers)
+- `src/main/java/com/ticketing/inventory/service/InventoryService.java` (Redis Lua floor guard implementation for concurrency)
+- `src/main/java/com/ticketing/inventory/service/InventoryWarmupHealthIndicator.java` (Fix 5.2 - Startup safety block)
+- `src/main/java/com/ticketing/common/config/RedisConfig.java` (Jackson serialization & Cache TTLs)
+- `src/main/java/com/ticketing/common/config/RabbitMQConfig.java` (Exchanges, Queues, DLQs)
+
+Files Modified:
+- `src/main/java/com/ticketing/event/service/EventService.java` (Added @Cacheable and @CacheEvict to support Redis caching)
+- `AI_CONTEXT.md` (Updated test count and branch status)
+
+Why did the initial Test Gates Fail? (Clarification)
+1. **Initial Issue:** The test `InventoryServiceTest` failed with `Connection to localhost:5432 refused`.
+2. **The Cause:** We used `@SpringBootTest` to run our integration tests. This annotation attempts to boot up the ENTIRE backend application, including the database (PostgreSQL) and message broker (RabbitMQ). Even though we provided a mocked Redis container, the application still tried to connect to a local PostgreSQL database to run Flyway migrations, which wasn't running outside of Docker on localhost.
+3. **The Fix:** We added `PostgreSQLContainer` and `RabbitMQContainer` directly into the `InventoryServiceTest` class alongside Redis. This provided the Spring Boot context with a fully isolated, ephemeral infrastructure environment, allowing the application to boot successfully and the tests to pass (63/63 green).
+
+Next session start: Day 6 — EntityGraphs for N+1 Queries and k6 Load Profiling Setup.
