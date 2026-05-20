@@ -21,6 +21,6 @@ public final class BusinessConstants {
     public static final int PARTIAL_REFUND_DAYS_THRESHOLD = 3;
     public static final double PARTIAL_REFUND_RATE = 0.50;
 
-    public static final int EXPIRY_JOB_INTERVAL_MS = 30_000;
+    public static final long EXPIRY_JOB_INTERVAL_MS = 30_000L;
     public static final int MAX_SEARCH_PARAM_LENGTH = 100;
 }
