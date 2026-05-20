@@ -97,7 +97,7 @@ class EventControllerTest {
     @Test
     @DisplayName("GET /api/events/{id} should return event")
     void getEvent_shouldReturnEvent() throws Exception {
-        EventResponse response = EventResponse.builder()
+        com.ticketing.event.dto.EventDetailResponse response = com.ticketing.event.dto.EventDetailResponse.builder()
             .id(1L)
             .title("Tech Conference")
             .status(EventStatus.PUBLISHED)

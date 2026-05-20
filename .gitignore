@@ -1,5 +1,17 @@
 HELP.md
+New_flow.txt
+new_flow.txt
+Plans/
 target/
+Artifacts/
+artifacts/
+Docs/
+docs/
+R/
+Latest.txt
+latest.txt
+intsructions.txt
+instructions.txt
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
@@ -32,7 +44,7 @@ build/
 ### VS Code ###
 .vscode/
 .specify/
-Artifacts/
 *.resolved
 .agent
 .env
+Plans/

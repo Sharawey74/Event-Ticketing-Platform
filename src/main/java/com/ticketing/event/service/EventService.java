@@ -64,12 +64,12 @@ public class EventService {
     }
 
     @Cacheable(value = RedisConfig.EVENT_CACHE, key = "#id")
-    public EventResponse getEventById(Long id) {
+    public com.ticketing.event.dto.EventDetailResponse getEventById(Long id) {
         Event event = eventRepository.findByIdWithDetails(id)
             .orElseThrow(() -> new EntityNotFoundException("Event not found: " + id));
 
         logger.info("Event {} fetched", id);
-        return toResponse(event);
+        return toDetailResponse(event);
     }
 
     public Page<EventResponse> getEvents(EventFilterRequest filter, Pageable pageable) {
@@ -206,8 +206,52 @@ public class EventService {
             .salesCloseDate(event.getSalesCloseDate())
             .coverImageUrl(event.getCoverImageUrl())
             .status(event.getStatus())
+            .waitlistEnabled(event.getWaitlistEnabled())
+            .build();
+    }
+
+    private com.ticketing.event.dto.EventDetailResponse toDetailResponse(Event event) {
+        return com.ticketing.event.dto.EventDetailResponse.builder()
+            .id(event.getId())
+            .title(event.getTitle())
+            .description(event.getDescription())
+            .startDate(event.getStartDate())
+            .endDate(event.getEndDate())
+            .salesOpenDate(event.getSalesOpenDate())
+            .salesCloseDate(event.getSalesCloseDate())
+            .coverImageUrl(event.getCoverImageUrl())
+            .status(event.getStatus())
             .dynamicPricingEnabled(event.getDynamicPricingEnabled())
             .waitlistEnabled(event.getWaitlistEnabled())
+            .organizer(event.getOrganizer() == null ? null : com.ticketing.event.dto.EventDetailResponse.OrganizerInfo.builder()
+                .id(event.getOrganizer().getId())
+                .name(event.getOrganizer().getFirstName() + " " + event.getOrganizer().getLastName())
+                .email(event.getOrganizer().getEmail())
+                .build())
+            .category(event.getCategory() == null ? null : com.ticketing.event.dto.CategoryResponse.builder()
+                .id(event.getCategory().getId())
+                .name(event.getCategory().getName())
+                .description(event.getCategory().getDescription())
+                .build())
+            .venue(event.getVenue() == null ? null : com.ticketing.event.dto.VenueResponse.builder()
+                .id(event.getVenue().getId())
+                .name(event.getVenue().getName())
+                .address(event.getVenue().getAddress())
+                .city(event.getVenue().getCity())
+                .country(event.getVenue().getCountry())
+                .totalCapacity(event.getVenue().getTotalCapacity())
+                .build())
+            .ticketTiers(event.getTicketTiers() == null ? java.util.List.of() : event.getTicketTiers().stream()
+                .map(t -> com.ticketing.event.dto.TicketTierResponse.builder()
+                    .id(t.getId())
+                    .tierName(t.getTierName())
+                    .description(t.getDescription())
+                    .basePrice(t.getBasePrice())
+                    .totalCapacity(t.getTotalCapacity())
+                    .availableCount(t.getAvailableCount())
+                    .maxPerBooking(t.getMaxPerBooking())
+                    .build())
+                .toList())
             .build();
     }
 }

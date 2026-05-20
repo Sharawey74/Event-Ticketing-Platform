@@ -55,8 +55,8 @@ public class EventController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<EventResponse>> getEvent(@PathVariable Long id) {
-        EventResponse response = eventService.getEventById(id);
+    public ResponseEntity<ApiResponse<com.ticketing.event.dto.EventDetailResponse>> getEvent(@PathVariable Long id) {
+        com.ticketing.event.dto.EventDetailResponse response = eventService.getEventById(id);
         logger.info("Get event endpoint finished for event {}", id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }

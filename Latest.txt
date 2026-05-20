@@ -348,3 +348,30 @@ Why did the initial Test Gates Fail? (Clarification)
 3. **The Fix:** We added `PostgreSQLContainer` and `RabbitMQContainer` directly into the `InventoryServiceTest` class alongside Redis. This provided the Spring Boot context with a fully isolated, ephemeral infrastructure environment, allowing the application to boot successfully and the tests to pass (63/63 green).
 
 Next session start: Day 6 â€” EntityGraphs for N+1 Queries and k6 Load Profiling Setup.
+---
+PHASE 13 — Day 6 N+1 Query Optimization & Integration Testing Completion (2026-04-26)
+
+Day 6 Core Implementation Status: COMPLETE ?
+
+Files Created:
+- src/main/java/com/ticketing/booking/repository/BookingRepository.java
+- src/test/java/com/ticketing/booking/repository/BookingIntegrationTest.java
+- src/test/java/com/ticketing/event/service/EventIntegrationTest.java
+- src/test/k6/load-test.js
+
+Files Modified:
+- src/main/java/com/ticketing/user/model/User.java (Fixed Enum mapping for PostgreSQL custom type)
+- src/main/java/com/ticketing/event/repository/EventRepository.java (Added @EntityGraph to eliminate N+1 queries)
+- README.md (Added Performance section with before/after query counts)
+- PROGRESS.md (Updated Day 6 status and test counts)
+- AI_CONTEXT.md (Pointed next session to Day 7)
+
+Key Achievements:
+- Eliminated JPA N+1 lazy loading queries by using @EntityGraph in repositories.
+- Reduced the number of queries for listing paginated events from 31+ to a single JOIN FETCH query.
+- Established a robust Testcontainers-based integration testing suite that validates the full event creation-to-search lifecycle.
+- 68/68 Tests passing successfully.
+- Added a baseline k6 load testing script.
+
+Next session start: Day 7 — Week 1 Cleanup + Docker Compose
+- Tasks: Apply Fix 7.1 (@Version optimistic locking on Booking/TicketTier), create docker-compose.yml, and ensure the full stack boots cleanly end-to-end.
