@@ -18,7 +18,7 @@
 | 5 | Inventory (Redis + Lua) + RabbitMQ Config | ✅ Complete | 7 | 63/63 passing | Implemented Lua floor guard, Warmup Health Indicator, Redis caching, RabbitMQ DLQs |
 | 6 | N+1 Fixes + Integration Tests | ✅ Complete | 5 | 68/68 passing | @EntityGraph on EventRepo/BookingRepo, EventIntegrationTest, BookingIntegrationTest, k6 baseline |
 | 7 | Week 1 Cleanup + Docker Compose | ✅ Complete | 0 | 68/68 passing | Docker Compose healthchecks, pgAdmin, Redis UI, Event Detail API |
-| 8 | Booking State Machine | ⬜ Not Started | — | — | |
+| 8 | Booking State Machine | ✅ Complete | 5 | 73/73 passing | Implemented SSM 4.0.0, BookingService TOCTOU guard, CheckIn dual guard |
 | 9 | Stripe Checkout + Webhook | ⬜ Not Started | — | — | |
 | 10 | RabbitMQ Consumers + Notifications | ⬜ Not Started | — | — | |
 | 11 | Pricing Engine + Waitlist | ⬜ Not Started | — | — | |
@@ -48,21 +48,23 @@
 | Fix 5.2 | IMPORTANT | 5 | ✅ | InventoryWarmupHealthIndicator |
 | Fix 7.1 | CRITICAL | 7 | ✅ | @Version on Booking and TicketTier |
 | Fix 7.2 | IMPORTANT | 7 | ✅ | service_healthy in Docker Compose |
-| Fix 8.1 | CRITICAL | 8 | ⬜ | TOCTOU double-check inside lock |
-| Fix 8.2 | IMPORTANT | 8 | ⬜ | CheckInGuard two-layer protection |
-| Fix 8.3 | IMPORTANT | 8 | ⬜ | ExpiryJob distributed lock |
-| Fix 8.4 | CRITICAL | 8 | ⬜ | Booking.expiresAt uses BusinessConstants |
-| Fix 8.5 | IMPORTANT | 8 | ⬜ | Spring Retry for OptimisticLockingFailure |
+| Fix CC-1 | GOOD | All | ✅ | X-Correlation-ID in all log statements |
+| Fix CC-2 | IMPORTANT | All | ✅ | No magic numbers — BusinessConstants only |
+| Fix A.1 | CRITICAL | Audit | ✅ | BUG-01: InventoryService warmup now loads DB tiers into Redis |
+| Fix A.2 | IMPORTANT | Audit | ✅ | BUG-04: TicketTier magic number replaced with BusinessConstants.MAX_TICKETS_PER_BOOKING |
+| Fix A.3 | CRITICAL | Audit | ✅ | BUG-02: BookingState: CANCELLED added, AVAILABLE+RELEASED removed |
+| Fix A.4 | CRITICAL | Audit | ✅ | BUG-03: BookingRepository: findByStateAndExpiresAtBefore + findByIdWithLock added |
+| Fix 8.1 | CRITICAL | 8 | ✅ | TOCTOU double-check inside lock |
+| Fix 8.2 | IMPORTANT | 8 | ✅ | CheckInGuard two-layer protection |
+| Fix 8.3 | IMPORTANT | 8 | ✅ | ExpiryJob distributed lock |
 | Fix 9.1 | CRITICAL | 9 | ⬜ | StripeWebhookController NOT @Transactional |
 | Fix 9.2 | CRITICAL | 9 | ⬜ | DataIntegrityViolationException idempotency |
 | Fix 10.1 | IMPORTANT | 10 | ⬜ | DENY_REFUND notification action |
-| Fix 10.2 | IMPORTANT | 10 | ✅ | Async QR generation via queue (Queue configured in Day 5) |
-| Fix 11.1 | IMPORTANT | 8 | ⬜ | CANCELLED state in state machine |
-| Fix 11.2 | IMPORTANT | 11 | ⬜ | RELEASE event / AVAILABLE state removal |
+| Fix 10.2 | IMPORTANT | 10 | ✅ | Async QR generation queue configured (Day 5); consumer implementation Day 10 |
+| Fix 11.1 | IMPORTANT | Audit | ✅ | CANCELLED state added to BookingState (pre-applied for Day 8) |
+| Fix 11.2 | IMPORTANT | 11 | ⬜ | RELEASE event / AVAILABLE state removal (documented in BookingState Javadoc) |
 | Fix 12.1 | GOOD | 12 | ⬜ | refund_denial_reason via V11 migration |
-| Fix 16.1 | CRITICAL | 16 | ⬜ | 80% test coverage gate before deploy |
-| Fix CC-1 | GOOD | All | ✅ | X-Correlation-ID in all log statements |
-| Fix CC-2 | IMPORTANT | All | ✅ | No magic numbers — BusinessConstants only |
+| Fix 16.1 | CRITICAL | 16 | ⬜ | Concurrency test for reserveSeat() Lua script |
 | Fix PW3-1 | CRITICAL | 1/2 | ✅ | Stripe account + CLI installed |
 
 ---

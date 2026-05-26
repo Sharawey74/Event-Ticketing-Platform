@@ -20,6 +20,42 @@
 - 🟡 IMPORTANT — Skipping this causes maintainability or subtle runtime issues
 - 🟢 GOOD PRACTICE — Skipping this is safe for Phase 1A but adds real value
 
+## RECENT DISCOVERIES & AUDIT UPDATES (Pre-Day 8)
+*The following fixes were discovered during the pre-Day 8 deep audit and MUST be addressed before proceeding.*
+
+### BUG-01 — `InventoryService.warmUpInventoryCache()` Is Hollow (HIGH RISK)
+**Severity:** 🔴 CRITICAL  
+**Affects:** `InventoryService.java`
+**Why:** The warm-up is commented out as a placeholder. The `InventoryWarmupHealthIndicator` marks itself `UP` immediately without loading any data into Redis. On a fresh deploy, every `reserveSeat()` call returns `-2` (key missing), causing ALL reservations to fail.
+**Exact Fix:** Inject `TicketTierRepository` into `InventoryService` and load all tier counts into Redis before marking the health indicator `UP`.
+
+### BUG-02 — `BookingState` Missing `AVAILABLE` and `CANCELLED` (Day 8 Design Conflict)
+**Severity:** 🔴 CRITICAL  
+**Affects:** `BookingState.java`, Day 8 State Machine
+**Why:** Conflicting requirements. Day 8 prompt uses `AVAILABLE → RESERVED`. Fix 11.2 says to remove `AVAILABLE`. `CANCELLED` is missing.
+**Exact Fix:** Remove `AVAILABLE` and `RELEASED` from the `BookingState` enum (they are not states, but actions/inventory counts). Add `CANCELLED` (for Fix 11.1).
+
+### BUG-03 — `BookingRepository` Missing Critical Query Methods (Day 8 Blocker)
+**Severity:** 🔴 CRITICAL  
+**Affects:** `BookingRepository.java`
+**Why:** The Day 8 `ReservationExpirationJob` requires `findByStateAndExpiresAtBefore`. `BookingService` requires `findByIdWithLock`.
+**Exact Fix:** Add these methods to `BookingRepository`.
+
+### BUG-04 — `TicketTier.maxPerBooking` Uses a Magic Number (Fix CC-2 Violation)
+**Severity:** 🟡 IMPORTANT  
+**Affects:** `TicketTier.java`, `BusinessConstants.java`
+**Why:** Hardcoded `10` for max tickets per booking violates the rule to use `BusinessConstants`.
+**Exact Fix:** Add `MAX_TICKETS_PER_BOOKING = 10` to `BusinessConstants` and use it in `TicketTier.@PrePersist`.
+
+### INC-01 to INC-07 — Documentation Inconsistencies
+**Severity:** 🟡 IMPORTANT  
+**Affects:** Planning Documents
+**Why:** Conflicting naming (`CheckInGuard` vs `IsEventOrganizerGuard`), mismatched Next.js versions (14 vs 15), and `RELEASED` orphan states cause agent confusion.
+**Exact Fix:** 
+- Use `CheckInGuard`.
+- Treat `Next.js 15` as the true version.
+- Remove `RELEASED` state from prompts.
+
 ---
 
 ## DAY 1 — Project Initialization + Database Schema

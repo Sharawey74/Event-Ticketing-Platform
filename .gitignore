@@ -4,13 +4,11 @@ new_flow.txt
 Plans/
 target/
 Artifacts/
-artifacts/
 Docs/
 docs/
 R/
 Latest.txt
 latest.txt
-intsructions.txt
 instructions.txt
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
@@ -47,4 +45,3 @@ build/
 *.resolved
 .agent
 .env
-Plans/
