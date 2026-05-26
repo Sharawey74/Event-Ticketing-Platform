@@ -23,4 +23,7 @@ public final class BusinessConstants {
 
     public static final long EXPIRY_JOB_INTERVAL_MS = 30_000L;
     public static final int MAX_SEARCH_PARAM_LENGTH = 100;
+
+    // Ticket tier limits
+    public static final int MAX_TICKETS_PER_BOOKING = 10; // Default max tickets per single booking
 }

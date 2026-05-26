@@ -1,6 +1,6 @@
 # AI CONTEXT SNAPSHOT — Event Ticketing Platform
 
-## Last Updated: Day 7 Week 1 Cleanup & Optimization (2026-04-27)
+## Last Updated: Day 8 (2026-05-27) — Booking State Machine Complete
 
 ## Branch: day-07-week1-cleanup-docker-compose
 
@@ -38,132 +38,20 @@ Every agent session must enforce these without exception:
 
 ---
 
-## 2. PROJECT STRUCTURE — Complete File Map
+## 2. PROJECT STRUCTURE — Overview
 
 ### Main Source (`src/main/java/com/ticketing/`)
-
-```text
-booking/
-  model/
-    Booking.java            — JPA entity, includes @Version for optimistic locking
-    BookingState.java       — Enum: AVAILABLE, RESERVED, PAYMENT_PENDING, CONFIRMED, etc.
-    Ticket.java             — JPA entity
-    TicketTier.java         — JPA entity, price/capacity per tier
-  repository/
-    TicketTierRepository.java
-  service/
-    TicketTierService.java  — getAvailableCount(Long tierId) [COMPLETE, tested]
-
-common/
-  config/
-    WebConfig.java          — CORS configuration
-  dto/
-    ApiResponse.java        — Generic response wrapper: success(data), failure(msg)
-    PageResponse.java       — Paginated response wrapper
-  exception/
-    GlobalExceptionHandler.java  — @ControllerAdvice handling all exceptions [COMPLETE]
-  filter/
-    CorrelationIdFilter.java     — Sets MDC X-Correlation-ID on every request
-  security/
-    JwtFilter.java          — OncePerRequestFilter: extracts + validates JWT from Authorization header
-    JwtService.java         — generateToken, extractUsername, isTokenValid
-    SecurityConfig.java     — @EnableMethodSecurity, SecurityFilterChain, public GET rules
-  util/
-    BusinessConstants.java  — All magic-number-free constants
-
-event/
-  controller/
-    CategoryController.java — CRUD: POST/GET/PUT/DELETE. Write ops: @PreAuthorize("hasRole('ADMIN')")
-    EventController.java    — CRUD: POST/GET/PUT/DELETE/PUBLISH. @PreAuthorize ORGANIZER/ADMIN
-    EventSearchController.java — GET /api/search/events. @Validated + @Size(max=100) on q and city
-    VenueController.java    — CRUD: POST/GET/PUT/DELETE. Write ops: @PreAuthorize("hasRole('ADMIN')")
-  dto/
-    CategoryResponse.java
-    CreateCategoryRequest.java
-    CreateEventRequest.java
-    CreateVenueRequest.java
-    EventFilterRequest.java
-    EventResponse.java
-    UpdateCategoryRequest.java
-    UpdateEventRequest.java
-    UpdateVenueRequest.java
-    VenueResponse.java
-  model/
-    Category.java
-    Event.java              — includes dynamicPricingEnabled, waitlistEnabled (added V8)
-    EventStatus.java        — DRAFT, PUBLISHED, SALES_OPEN, SALES_CLOSED, COMPLETED, ARCHIVED
-    Venue.java
-  repository/
-    CategoryRepository.java
-    EventRepository.java    — searchPublishedEvents with @EntityGraph (prevents N+1)
-    VenueRepository.java
-  service/
-    CategoryService.java    — Full CRUD, @Transactional(readOnly=true) pattern [COMPLETE]
-    EventSearchService.java — searchEvents(query, categoryId, city, pageable) [COMPLETE]
-    EventService.java       — Full CRUD + publish [COMPLETE]
-    VenueService.java       — Full CRUD, @Transactional(readOnly=true) pattern [COMPLETE]
-
-payment/
-  model/
-    Payment.java
-    PaymentStatus.java
-    Refund.java
-    RefundStatus.java
-
-user/
-  controller/
-    AuthController.java     — POST /api/auth/register, POST /api/auth/login
-  dto/
-    AuthResponse.java, LoginRequest.java, RegisterRequest.java
-  model/
-    Role.java               — Enum: USER, ORGANIZER, ADMIN
-    User.java
-  repository/
-    UserRepository.java
-  service/
-    AuthService.java        — register, login with JWT
-    CustomUserDetails.java  — Wraps User for Spring Security
-    UserDetailsServiceImpl.java — Loads UserDetails by username
-
-TicketingPlatformApplication.java
-```
+- `booking/`: Handles Booking domain, state machine logic (`BookingState`, `BookingEvent`, `CheckInGuard`), and ticket generation.
+- `common/`: Security (JWT filters), `GlobalExceptionHandler`, DTO wrappers, Redis/RabbitMQ configs, `DistributedLockService`, and `BusinessConstants`.
+- `event/`: Domain logic for Events, Venues, Categories, and Search. Includes `EventSearchService`.
+- `inventory/`: High-performance seat reservation via Redis and Lua scripts (`InventoryService`).
+- `payment/`: (Pending) Stripe webhooks and payment processing.
+- `user/`: Authentication, JWT generation, and User entity management.
 
 ### Test Source (`src/test/java/com/ticketing/`)
-
-```text
-booking/service/
-  TicketTierServiceTest.java        — 3 tests: getAvailableCount, tier not found [PASSING]
-
-common/config/
-  TestSecurityConfig.java           — @TestConfiguration, @EnableMethodSecurity,
-                                      in-memory UserDetailsService (ADMIN + ORGANIZER users),
-                                      HttpStatusEntryPoint(UNAUTHORIZED) for 401 enforcement,
-                                      NO JwtFilter in test chain
-common/security/
-  JwtFilterTest.java                — [PASSING]
-
-event/controller/
-  CategoryControllerTest.java       — 5 tests: ADMIN create/delete 200, ORGANIZER 403, public GET 200 [PASSING]
-  EventControllerTest.java          — 6 tests [PASSING]
-  EventSearchControllerTest.java    — 3 tests: valid search 200, no params 200, oversized query 400 [PASSING]
-  VenueControllerTest.java          — 7 tests: ADMIN create/update/delete 200, ORGANIZER 403, unauthenticated 401, public GET 200 [PASSING]
-
-event/service/
-  CategoryServiceTest.java          — 7 tests [PASSING]
-  EventSearchServiceTest.java       — 2 tests [PASSING]
-  EventServiceTest.java             — 7 tests [PASSING]
-  VenueServiceTest.java             — 7 tests [PASSING]
-
-ticketing_platform/
-  TestcontainersConfiguration.java  — PostgreSQL + Redis containers
-  TestTicketingPlatformApplication.java
-  TicketingPlatformApplicationTests.java — 2 ERRORS (requires Docker Desktop — pre-existing blocker)
-
-user/controller/
-  AuthControllerTest.java           — 3 tests [PASSING]
-user/service/
-  AuthServiceTest.java              — 5 tests [PASSING]
-```
+- Full test coverage for `event`, `user`, and `inventory` packages.
+- `TestSecurityConfig.java` in `common/config/` is strictly required for any `@WebMvcTest`.
+- `TestcontainersConfiguration.java` provisions PostgreSQL and Redis.
 
 ### Database Migrations (`src/main/resources/db/migration/`)
 
@@ -235,30 +123,32 @@ class YourControllerTest {
 
 | Fix ID | Severity | Description | Status | Applied Where |
 | :--- | :--- | :--- | :--- | :--- |
-| Fix 1.1 | CRITICAL | Instant vs LocalDateTime on all entities | ✅ Done | All entities |
-| Fix 1.2 | IMPORTANT | ENUM type for user_role in SQL | ✅ Done | V1 migration |
-| Fix 1.3 | GOOD | deleted_at TIMESTAMPTZ on bookings | ✅ Done | V5 migration |
-| Fix 2.1 | IMPORTANT | @Transactional(readOnly=true) at class level | ✅ Done | EventService, AuthService, VenueService, CategoryService, EventSearchService |
-| Fix 2.2 | IMPORTANT | @RequiredArgsConstructor, zero @Autowired | ✅ Done | All classes |
-| Fix CC-1 | GOOD | X-Correlation-ID in all log statements | ✅ Done | CorrelationIdFilter + all services |
-| Fix CC-2 | IMPORTANT | No magic numbers, BusinessConstants only | ✅ Done | BusinessConstants.java |
-| Fix 5.1 | CRITICAL | Lua floor guard in InventoryService | ✅ Done | InventoryService |
-| Fix 5.2 | IMPORTANT | InventoryWarmupHealthIndicator | ✅ Done | InventoryService |
-| Fix 7.1 | CRITICAL | @Version on Booking and TicketTier | ✅ Done | V10 migration |
-| Fix 7.2 | IMPORTANT | Docker Compose service_healthy enforcement | ✅ Done | docker-compose.yml |
-| Fix 8.1 | CRITICAL | TOCTOU double-check inside Redis lock | ⬜ Day 8 | |
-| Fix 8.2 | IMPORTANT | CheckInGuard two-layer protection | ⬜ Day 8 | |
-| Fix 8.3 | IMPORTANT | ExpiryJob distributed lock | ⬜ Day 8 | |
-| Fix 8.4 | CRITICAL | Booking.expiresAt uses BusinessConstants | ⬜ Day 8 | |
-| Fix 8.5 | IMPORTANT | Spring Retry for Optimistic Locking Failures | ⬜ Day 8 | |
-| Fix 9.1 | CRITICAL | StripeWebhookController NOT @Transactional | ⬜ Day 9 | |
-| Fix 9.2 | CRITICAL | DataIntegrityViolationException idempotency | ⬜ Day 9 | |
-| Fix 10.1 | IMPORTANT | DENY_REFUND notification action | ⬜ Day 10 | |
-| Fix 10.2 | IMPORTANT | Async QR generation via queue | ✅ Done | RabbitMQ configuration |
-| Fix 11.1 | IMPORTANT | CANCELLED state in state machine | ⬜ Day 8 | |
-| Fix 11.2 | IMPORTANT | RELEASE event / AVAILABLE state removed | ⬜ Day 11 | |
-| Fix 12.1 | GOOD | refund_denial_reason (V11 migration) | ⬜ Day 12 | |
-| Fix 16.1 | CRITICAL | 80% test coverage gate before deploy | ⬜ Day 16 | |
+| **1.1** | Use `Instant` (UTC) instead of `LocalDateTime` | DB / Models | ✅ Applied | ✅ Verified |
+| **1.2** | PostgreSQL ENUM for `user_role` | DB / Models | ✅ Applied | ✅ Verified |
+| **1.3** | Soft delete column `deleted_at` on bookings | DB / Models | ✅ Applied | ✅ Verified |
+| **2.1** | `@Transactional(readOnly = true)` on read methods | Services | ✅ Applied | ✅ Verified |
+| **2.2** | Constructor injection ONLY (No `@Autowired`) | All Classes | ✅ Applied | ✅ Verified |
+| **5.1** | Lua script floor guard for `reserveSeat()` | Inventory | ✅ Applied | ✅ Verified |
+| **5.2** | Redis Startup Health Indicator (`InventoryWarmupHealthIndicator`) | Infra | ✅ Applied | ✅ Verified |
+| **7.1** | `@Version` for optimistic locking | Models | ✅ Applied | ✅ Verified |
+| **7.2** | Docker Compose `service_healthy` conditions | Infra | ✅ Applied | ✅ Verified |
+| **CC-1** | `X-Correlation-ID` Propagation | Config | ✅ Applied | ✅ Verified |
+| **CC-2** | Business Constants (No magic numbers) | Util | ✅ Applied | ✅ Verified |
+| **A.1** | BUG-01: Hollow warmup in InventoryService | Inventory | ✅ Applied | ✅ Verified |
+| **A.2** | BUG-04: `maxPerBooking` magic number 10 removed | Models | ✅ Applied | ✅ Verified |
+| **A.3** | BUG-02: `CANCELLED` state added, `AVAILABLE` removed | Models | ✅ Applied | ✅ Verified |
+| **A.4** | BUG-03: `BookingRepository` required methods added | DB / Models | ✅ Applied | ✅ Verified |
+| **8.1** | Double-Check availability inside Lock (TOCTOU guard) | Booking | ✅ Applied | ✅ Verified |
+| **8.2** | `CHECK_IN` dual-guard (HTTP + State Machine) | Booking | ✅ Applied | ✅ Verified |
+| **8.3** | `@Scheduled` Expiry Job distributed lock | Booking | ✅ Applied | ✅ Verified |
+| **9.1** | Webhook HTTP 200 *after* commit (NOT `@Transactional` controller) | Payment | ⏳ Pending | - |
+| **9.2** | Webhook Idempotency with Concurrent Delivery Guard (`DataIntegrityViolationException`) | Payment | ⏳ Pending | - |
+| **10.1** | Add `DENY_REFUND` Notification Action | Notifications | ⏳ Pending | - |
+| **10.2** | Offload QR Generation to Async Queue (`ticket.generation.queue`) | Notifications | ✅ Applied | ✅ Verified |
+| **11.1** | Add `CANCELLED` State for Organizer Event Cancellation | Booking | ✅ Applied | ✅ Verified |
+| **11.2** | Clarify `RELEASE` event caller / Terminal States | Booking | ⏳ Pending | - |
+| **12.1** | Add `refund_denial_reason` field for transparency | Booking | ⏳ Pending | - |
+| **16.1** | Test `reserveSeat()` Lua Script explicitly (concurrency test) | Tests | ⏳ Pending | - |
 
 ---
 
@@ -267,7 +157,7 @@ class YourControllerTest {
 | Day | Theme | Status | Tests |
 | :--- | :--- | :--- | :--- |
 | 1–7 | Week 1: Core Domain + Inventory + Cleanup | ✅ | 68/68 |
-| 8 | Booking State Machine | ⬜ | — |
+| 8 | Booking State Machine | ✅ | 73/73 |
 | 9–21 | See PROGRESS.md | ⬜ | — |
 
 ---
@@ -413,15 +303,12 @@ This repository has two deployable parts:
 
 ---
 
-## 10. NEXT SESSION START — DAY 8
+## 10. NEXT SESSION START — DAY 9
 
-**Branch to create:** `git checkout -b day-08-booking-state-machine`
+**Branch to create:** `git checkout -b day-09-stripe-webhook`
 
-**First task:** Booking State Machine Implementation
-- Apply Fix 8.1: Double-check availability inside the lock.
-- Apply Fix 8.2: Implement `CheckInGuard`.
-- Apply Fix 8.3: Add distributed lock to `ReservationExpirationJob`.
-- Apply Fix 8.4: Use `BusinessConstants` for `expiresAt`.
-- Apply Fix 8.5: Add `@Retryable` for optimistic locking.
-
-**Important Note:** Day 8 is a high-concurrency logic day. Ensure all tests run with Testcontainers enabled.
+**First task:** Stripe Checkout & Webhook Implementation
+- Review `day-09-stripe-webhook.md`.
+- CRITICAL REMINDER: Ensure `ProcessedStripeEvent` entity is created before writing webhook handlers.
+- Apply Fix 9.1: Webhook HTTP 200 *after* commit (NOT `@Transactional` controller).
+- Apply Fix 9.2: Webhook Idempotency with Concurrent Delivery Guard (`DataIntegrityViolationException`).
