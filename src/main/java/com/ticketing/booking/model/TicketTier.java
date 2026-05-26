@@ -3,6 +3,7 @@ package com.ticketing.booking.model;
 import java.math.BigDecimal;
 import java.time.Instant;
 
+import com.ticketing.common.util.BusinessConstants;
 import com.ticketing.event.model.Event;
 
 import jakarta.persistence.Column;
@@ -58,6 +59,7 @@ public class TicketTier {
 
     @Version
     @Column(nullable = false)
+    @Builder.Default
     private Long version = 0L;
 
     @Column(name = "max_per_booking", nullable = false)
@@ -74,8 +76,9 @@ public class TicketTier {
         Instant now = Instant.now();
         createdAt = now;
         updatedAt = now;
+        // Fix A.2: Use BusinessConstants instead of magic number (Fix CC-2 compliance)
         if (maxPerBooking == null) {
-            maxPerBooking = 10;
+            maxPerBooking = BusinessConstants.MAX_TICKETS_PER_BOOKING;
         }
     }
 
