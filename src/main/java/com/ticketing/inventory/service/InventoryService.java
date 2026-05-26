@@ -7,7 +7,10 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
+import com.ticketing.booking.repository.TicketTierRepository;
+
 import java.util.Collections;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -16,6 +19,8 @@ public class InventoryService {
 
     private final StringRedisTemplate redisTemplate;
     private final InventoryWarmupHealthIndicator inventoryWarmupHealthIndicator;
+    // Fix A.1: Inject TicketTierRepository so the warm-up can load real data from the DB
+    private final TicketTierRepository ticketTierRepository;
 
     private static final String RESERVE_SEAT_LUA =
         "local count = redis.call('GET', KEYS[1]) " +
@@ -26,14 +31,39 @@ public class InventoryService {
         "  return -1 " +                                     // insufficient stock
         "end";
 
+    /**
+     * Fix A.1: Loads ALL ticket tier available counts from the DB into Redis on startup.
+     *
+     * WHY THIS MATTERS: Between the moment Spring starts accepting HTTP requests and the
+     * moment this @PostConstruct completes, any call to reserveSeat() would find no Redis
+     * key and return -2 (key missing), causing ALL seat reservations to fail with an error.
+     * This warm-up loop eliminates that window by populating Redis before marking the app
+     * as ready (InventoryWarmupHealthIndicator.markWarmupComplete()).
+     *
+     * CROSS-DOMAIN NOTE: InventoryService uses TicketTierRepository from the booking domain.
+     * This is a deliberate pragmatic choice for the warm-up path. If this domain is ever
+     * extracted to a microservice, replace this with a REST call to the booking service.
+     */
     @PostConstruct
     public void warmUpInventoryCache() {
-        log.info("Starting inventory warm-up...");
-        // In a real scenario, we would load all tier counts from TicketTierRepository here
-        // e.g. ticketTierRepository.findAll().forEach(tier -> setAvailableCount(tier.getId(), tier.getAvailableCount()));
-        
+        log.info("Inventory warm-up started — loading tier counts from database into Redis...");
+
+        List<com.ticketing.booking.model.TicketTier> allTiers = ticketTierRepository.findAll();
+        int loadedCount = 0;
+
+        for (com.ticketing.booking.model.TicketTier tier : allTiers) {
+            try {
+                setAvailableCount(tier.getId(), tier.getAvailableCount());
+                loadedCount++;
+            } catch (Exception e) {
+                log.error("Failed to warm up inventory for tier {} (name: {}). Continuing with remaining tiers.",
+                    tier.getId(), tier.getTierName(), e);
+            }
+        }
+
         inventoryWarmupHealthIndicator.markWarmupComplete();
-        log.info("Inventory warm-up completed. Health indicator marked UP.");
+        log.info("Inventory warm-up completed. Loaded {}/{} tiers into Redis. Health indicator marked UP.",
+            loadedCount, allTiers.size());
     }
 
     private String getTierKey(Long tierId) {
@@ -62,7 +92,7 @@ public class InventoryService {
             log.warn("Failed to reserve {} seats for tier {}. Result: {}", quantity, tierId, result);
             return false; // -1 = insufficient stock, -2 = key missing
         }
-        
+
         log.info("Reserved {} seats for tier {}. Remaining: {}", quantity, tierId, result);
         return true; // result = new count (>= 0)
     }
