@@ -1,10 +1,10 @@
 # AI CONTEXT SNAPSHOT — Event Ticketing Platform
 
-## Last Updated: Day 9 (2026-05-28) — Stripe Checkout and Webhook Complete
+## Last Updated: Day 10 (2026-05-28) — RabbitMQ Consumers & Notifications Complete
 
-## Branch: day-09-stripe-webhook
+## Branch: day-10-rabbitmq-consumers
 
-## Test Status: 80/80 passing (PostgreSQL 17, Redis 7, RabbitMQ 4)
+## Test Status: 83/83 passing (PostgreSQL 17, Redis 7, RabbitMQ 4)
 
 ---
 
@@ -143,7 +143,7 @@ class YourControllerTest {
 | **8.3** | `@Scheduled` Expiry Job distributed lock | Booking | ✅ Applied | ✅ Verified |
 | **9.1** | Webhook HTTP 200 *after* commit (NOT `@Transactional` controller) | Payment | ✅ Applied | ✅ Verified |
 | **9.2** | Webhook Idempotency with Concurrent Delivery Guard (`DataIntegrityViolationException`) | Payment | ✅ Applied | ✅ Verified |
-| **10.1** | Add `DENY_REFUND` Notification Action | Notifications | ⏳ Pending | - |
+| **10.1** | Add `DENY_REFUND` Notification Action | Notifications | ✅ Applied | ✅ Verified |
 | **10.2** | Offload QR Generation to Async Queue (`ticket.generation.queue`) | Notifications | ✅ Applied | ✅ Verified |
 | **11.1** | Add `CANCELLED` State for Organizer Event Cancellation | Booking | ✅ Applied | ✅ Verified |
 | **11.2** | Clarify `RELEASE` event caller / Terminal States | Booking | ⏳ Pending | - |
@@ -159,7 +159,8 @@ class YourControllerTest {
 | 1–7 | Week 1: Core Domain + Inventory + Cleanup | ✅ | 68/68 |
 | 8 | Booking State Machine | ✅ | 73/73 |
 | 9 | Stripe Checkout + Webhook | ✅ | 80/80 |
-| 10–21 | See PROGRESS.md | ⬜ | — |
+| 10 | RabbitMQ Consumers + Notifications | ✅ | 83/83 |
+| 11–21 | See PROGRESS.md | ⬜ | — |
 
 ---
 
@@ -304,11 +305,10 @@ This repository has two deployable parts:
 
 ---
 
-## 10. NEXT SESSION START — DAY 10
+## 10. NEXT SESSION START — DAY 11
 
-**Branch to create:** `git checkout -b day-10-rabbitmq-consumers`
+**Branch to create:** `git checkout -b day-11-pricing-waitlist`
 
-**First task:** RabbitMQ Consumers + Notifications
-- Review Day 10 plan for RabbitMQ consumers.
-- Implement consumer for async QR generation queue (`ticket.generation.queue`).
-- Apply Fix 10.1: Add `DENY_REFUND` Notification Action.
+**First task:** Pricing Engine + Waitlist
+- Review Day 11 plan for Dynamic Pricing and Waitlist features.
+- Implement Fix 11.2 (RELEASE event / AVAILABLE state removal).
