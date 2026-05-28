@@ -1,10 +1,10 @@
 # AI CONTEXT SNAPSHOT — Event Ticketing Platform
 
-## Last Updated: Day 8 (2026-05-27) — Booking State Machine Complete
+## Last Updated: Day 9 (2026-05-28) — Stripe Checkout and Webhook Complete
 
-## Branch: day-07-week1-cleanup-docker-compose
+## Branch: day-09-stripe-webhook
 
-## Test Status: 68/68 passing (PostgreSQL 17, Redis 7, RabbitMQ 4)
+## Test Status: 80/80 passing (PostgreSQL 17, Redis 7, RabbitMQ 4)
 
 ---
 
@@ -45,7 +45,7 @@ Every agent session must enforce these without exception:
 - `common/`: Security (JWT filters), `GlobalExceptionHandler`, DTO wrappers, Redis/RabbitMQ configs, `DistributedLockService`, and `BusinessConstants`.
 - `event/`: Domain logic for Events, Venues, Categories, and Search. Includes `EventSearchService`.
 - `inventory/`: High-performance seat reservation via Redis and Lua scripts (`InventoryService`).
-- `payment/`: (Pending) Stripe webhooks and payment processing.
+- `payment/`: Stripe webhooks and checkout payment processing.
 - `user/`: Authentication, JWT generation, and User entity management.
 
 ### Test Source (`src/test/java/com/ticketing/`)
@@ -141,8 +141,8 @@ class YourControllerTest {
 | **8.1** | Double-Check availability inside Lock (TOCTOU guard) | Booking | ✅ Applied | ✅ Verified |
 | **8.2** | `CHECK_IN` dual-guard (HTTP + State Machine) | Booking | ✅ Applied | ✅ Verified |
 | **8.3** | `@Scheduled` Expiry Job distributed lock | Booking | ✅ Applied | ✅ Verified |
-| **9.1** | Webhook HTTP 200 *after* commit (NOT `@Transactional` controller) | Payment | ⏳ Pending | - |
-| **9.2** | Webhook Idempotency with Concurrent Delivery Guard (`DataIntegrityViolationException`) | Payment | ⏳ Pending | - |
+| **9.1** | Webhook HTTP 200 *after* commit (NOT `@Transactional` controller) | Payment | ✅ Applied | ✅ Verified |
+| **9.2** | Webhook Idempotency with Concurrent Delivery Guard (`DataIntegrityViolationException`) | Payment | ✅ Applied | ✅ Verified |
 | **10.1** | Add `DENY_REFUND` Notification Action | Notifications | ⏳ Pending | - |
 | **10.2** | Offload QR Generation to Async Queue (`ticket.generation.queue`) | Notifications | ✅ Applied | ✅ Verified |
 | **11.1** | Add `CANCELLED` State for Organizer Event Cancellation | Booking | ✅ Applied | ✅ Verified |
@@ -158,7 +158,8 @@ class YourControllerTest {
 | :--- | :--- | :--- | :--- |
 | 1–7 | Week 1: Core Domain + Inventory + Cleanup | ✅ | 68/68 |
 | 8 | Booking State Machine | ✅ | 73/73 |
-| 9–21 | See PROGRESS.md | ⬜ | — |
+| 9 | Stripe Checkout + Webhook | ✅ | 80/80 |
+| 10–21 | See PROGRESS.md | ⬜ | — |
 
 ---
 
@@ -303,12 +304,11 @@ This repository has two deployable parts:
 
 ---
 
-## 10. NEXT SESSION START — DAY 9
+## 10. NEXT SESSION START — DAY 10
 
-**Branch to create:** `git checkout -b day-09-stripe-webhook`
+**Branch to create:** `git checkout -b day-10-rabbitmq-consumers`
 
-**First task:** Stripe Checkout & Webhook Implementation
-- Review `day-09-stripe-webhook.md`.
-- CRITICAL REMINDER: Ensure `ProcessedStripeEvent` entity is created before writing webhook handlers.
-- Apply Fix 9.1: Webhook HTTP 200 *after* commit (NOT `@Transactional` controller).
-- Apply Fix 9.2: Webhook Idempotency with Concurrent Delivery Guard (`DataIntegrityViolationException`).
+**First task:** RabbitMQ Consumers + Notifications
+- Review Day 10 plan for RabbitMQ consumers.
+- Implement consumer for async QR generation queue (`ticket.generation.queue`).
+- Apply Fix 10.1: Add `DENY_REFUND` Notification Action.

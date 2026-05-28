@@ -19,7 +19,7 @@
 | 6 | N+1 Fixes + Integration Tests | ✅ Complete | 5 | 68/68 passing | @EntityGraph on EventRepo/BookingRepo, EventIntegrationTest, BookingIntegrationTest, k6 baseline |
 | 7 | Week 1 Cleanup + Docker Compose | ✅ Complete | 0 | 68/68 passing | Docker Compose healthchecks, pgAdmin, Redis UI, Event Detail API |
 | 8 | Booking State Machine | ✅ Complete | 5 | 73/73 passing | Implemented SSM 4.0.0, BookingService TOCTOU guard, CheckIn dual guard |
-| 9 | Stripe Checkout + Webhook | ⬜ Not Started | — | — | |
+| 9 | Stripe Checkout + Webhook | ✅ Complete | 7 | 80/80 passing | Checkout session creation, webhook processing, idempotency |
 | 10 | RabbitMQ Consumers + Notifications | ⬜ Not Started | — | — | |
 | 11 | Pricing Engine + Waitlist | ⬜ Not Started | — | — | |
 | 12 | Refund Logic + Concurrency Polish | ⬜ Not Started | — | — | |
@@ -57,8 +57,8 @@
 | Fix 8.1 | CRITICAL | 8 | ✅ | TOCTOU double-check inside lock |
 | Fix 8.2 | IMPORTANT | 8 | ✅ | CheckInGuard two-layer protection |
 | Fix 8.3 | IMPORTANT | 8 | ✅ | ExpiryJob distributed lock |
-| Fix 9.1 | CRITICAL | 9 | ⬜ | StripeWebhookController NOT @Transactional |
-| Fix 9.2 | CRITICAL | 9 | ⬜ | DataIntegrityViolationException idempotency |
+| Fix 9.1 | CRITICAL | 9 | ✅ | StripeWebhookController NOT @Transactional |
+| Fix 9.2 | CRITICAL | 9 | ✅ | DataIntegrityViolationException idempotency |
 | Fix 10.1 | IMPORTANT | 10 | ⬜ | DENY_REFUND notification action |
 | Fix 10.2 | IMPORTANT | 10 | ✅ | Async QR generation queue configured (Day 5); consumer implementation Day 10 |
 | Fix 11.1 | IMPORTANT | Audit | ✅ | CANCELLED state added to BookingState (pre-applied for Day 8) |
@@ -73,7 +73,7 @@
 
 | Metric | Current | Target |
 | :--- | :--- | :--- |
-| `./mvnw test` passing | 68 / 68 Tests Passing | 100% |
+| `./mvnw test` passing | 80 / 80 Tests Passing | 100% |
 | Test coverage | N/A | 80%+ |
 | Active @Autowired usages | 0 | 0 |
 | Active LocalDateTime usages | 0 | 0 |
