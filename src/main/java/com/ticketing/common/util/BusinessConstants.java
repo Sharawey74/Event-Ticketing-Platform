@@ -26,4 +26,8 @@ public final class BusinessConstants {
 
     // Ticket tier limits
     public static final int MAX_TICKETS_PER_BOOKING = 10; // Default max tickets per single booking
+
+    // QR Code generation (ZXing) — Fix CC-2
+    public static final int QR_CODE_SIZE   = 300; // pixels (width and height)
+    public static final int QR_CODE_MARGIN = 1;   // quiet zone modules around QR pattern
 }
