@@ -42,6 +42,8 @@ public class TestSecurityConfig {
                         org.springframework.http.HttpStatus.UNAUTHORIZED)))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
+                // Webhook endpoint: security = Stripe signature verification, not JWT
+                .requestMatchers("/api/webhooks/stripe").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET,
                     "/api/events", "/api/events/**",
                     "/api/search/events",

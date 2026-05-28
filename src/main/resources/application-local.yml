@@ -51,5 +51,8 @@ frontend:
   url: ${FRONTEND_URL:https://ticketing-platform.vercel.app}
 
 stripe:
-  public-key: ${STRIPE_PUBLIC_KEY}
-  secret-key: ${STRIPE_SECRET_KEY}
+  public-key: ${STRIPE_PUBLIC_KEY:pk_test_placeholder}
+  secret-key: ${STRIPE_SECRET_KEY:sk_test_placeholder}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_placeholder}
+  success-url: http://localhost:3000/bookings/{bookingId}/confirmation?session_id={CHECKOUT_SESSION_ID}
+  cancel-url: http://localhost:3000/cart
