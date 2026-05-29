@@ -144,10 +144,10 @@ class YourControllerTest {
 | **9.1** | Webhook HTTP 200 *after* commit (NOT `@Transactional` controller) | Payment | ✅ Applied | ✅ Verified |
 | **9.2** | Webhook Idempotency with Concurrent Delivery Guard (`DataIntegrityViolationException`) | Payment | ✅ Applied | ✅ Verified |
 | **10.1** | Add `DENY_REFUND` Notification Action | Notifications | ✅ Applied | ✅ Verified |
-| **10.2** | Offload QR Generation to Async Queue (`ticket.generation.queue`) | Notifications | ✅ Applied | ✅ Verified |
-| **11.1** | Add `CANCELLED` State for Organizer Event Cancellation | Booking | ✅ Applied | ✅ Verified |
-| **11.2** | Clarify `RELEASE` event caller / Terminal States | Booking | ⏳ Pending | - |
-| **12.1** | Add `refund_denial_reason` field for transparency | Booking | ⏳ Pending | - |
+| **10.2** | RabbitMQ integration active (ticket/email queues) | Notifications | ✅ Applied | ✅ Verified |
+| **11.1** | Pricing Engine + Waitlist Service | Pricing | ✅ Applied | ✅ Verified |
+| **11.2** | Clarify `RELEASE` event caller / Terminal States | Booking | ✅ Applied | ✅ Verified |
+| **12.1** | Add `refund_denial_reason` field for transparency | Booking | ✅ Applied | ✅ Verified |
 | **16.1** | Test `reserveSeat()` Lua Script explicitly (concurrency test) | Tests | ⏳ Pending | - |
 
 ---
