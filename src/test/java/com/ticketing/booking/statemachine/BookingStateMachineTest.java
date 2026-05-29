@@ -40,6 +40,9 @@ class BookingStateMachineTest {
     @MockitoBean(name = "denyRefundNotificationAction")
     private Action<BookingState, BookingEvent> denyRefundNotificationAction;
 
+    @MockitoBean(name = "cancelBookingAction")
+    private Action<BookingState, BookingEvent> cancelBookingAction;
+
     @MockitoBean(name = "checkInGuard")
     private Guard<BookingState, BookingEvent> checkInGuard;
 

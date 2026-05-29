@@ -21,7 +21,7 @@
 | 8 | Booking State Machine | ✅ Complete | 5 | 73/73 passing | Implemented SSM 4.0.0, BookingService TOCTOU guard, CheckIn dual guard |
 | 9 | Stripe Checkout + Webhook | ✅ Complete | 7 | 80/80 passing | Checkout session creation, webhook processing, idempotency |
 | 10 | RabbitMQ Consumers + Notifications | ✅ Complete | 3 | 83/83 passing | Implemented BookingNotificationListener for async emails and QR code generation |
-| 11 | Pricing Engine + Waitlist | ⬜ Not Started | — | — | |
+| 11 | Pricing Engine + Waitlist | ✅ Complete | 5 | 88/88 passing | Pricing engine logic, waitlist implementation, cancel booking action |
 | 12 | Refund Logic + Concurrency Polish | ⬜ Not Started | — | — | |
 | 13 | Frontend Event Detail + Booking Flow | ⬜ Not Started | — | — | |
 | 14 | Frontend User Dashboard + QR Display | ⬜ Not Started | — | — | |

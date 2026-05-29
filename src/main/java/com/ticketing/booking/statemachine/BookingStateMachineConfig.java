@@ -29,6 +29,7 @@ public class BookingStateMachineConfig extends StateMachineConfigurerAdapter<Boo
     private final Action<BookingState, BookingEvent> confirmBookingAction;
     private final Action<BookingState, BookingEvent> releaseSeatsAction;
     private final Action<BookingState, BookingEvent> denyRefundNotificationAction;
+    private final Action<BookingState, BookingEvent> cancelBookingAction;
     private final Guard<BookingState, BookingEvent> checkInGuard;
 
     @Override
@@ -87,14 +88,18 @@ public class BookingStateMachineConfig extends StateMachineConfigurerAdapter<Boo
                 .source(BookingState.REFUND_REQUESTED).target(BookingState.REFUND_DENIED).event(BookingEvent.DENY_REFUND)
                 .action(denyRefundNotificationAction)
                 .and()
+            // Fix 11.1: EVENT_CANCELLED transitions for all non-terminal source states
             .withExternal()
                 .source(BookingState.CONFIRMED).target(BookingState.CANCELLED).event(BookingEvent.EVENT_CANCELLED)
+                .action(cancelBookingAction)    // full refund + notify user
                 .and()
             .withExternal()
                 .source(BookingState.RESERVED).target(BookingState.CANCELLED).event(BookingEvent.EVENT_CANCELLED)
+                .action(releaseSeatsAction)     // release Redis inventory + notify waitlist
                 .and()
             .withExternal()
                 .source(BookingState.PAYMENT_PENDING).target(BookingState.CANCELLED).event(BookingEvent.EVENT_CANCELLED)
+                .action(releaseSeatsAction)     // release Redis inventory + notify waitlist
                 .and()
             .withExternal()
                 .source(BookingState.CONFIRMED).target(BookingState.ATTENDED).event(BookingEvent.CHECK_IN)
