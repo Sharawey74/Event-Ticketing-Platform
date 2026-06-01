@@ -29,9 +29,9 @@
 | 16 | Backend Test Coverage Push (80%+) | ⬜ Not Started | — | — | |
 | 17 | Docker Multi-stage + Compose Polish | ⬜ Not Started | — | — | |
 | 18 | CI/CD Pipeline (GitHub Actions) | ⬜ Not Started | — | — | |
-| 19 | Performance + k6 Load Tests | ⬜ Not Started | — | — | |
-| 20 | Code Quality + Technical Debt | ⬜ Not Started | — | — | |
-| 21 | Final Cleanup + Deploy to Railway + Vercel | ⬜ Not Started | — | — | |
+| 19 | Performance + k6 Load Tests + Swagger/OpenAPI | ⬜ Not Started | — | — | E-002 Swagger annotations, k6 Railway baseline + booking scenarios |
+| 20 | Code Quality + Security Hardening (M-002, M-004) | ⬜ Not Started | — | — | Bucket4j rate limiting, JWT denylist, CC-1/CC-2 final audit |
+| 21 | Final Cleanup + Deploy to Railway + Vercel | ⬜ Not Started | — | — | Production smoke test, env var audit, README, KNOWN_ISSUES |
 
 ---
 

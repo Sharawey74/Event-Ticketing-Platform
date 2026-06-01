@@ -1,17 +1,21 @@
 # Day 17 — Session Prompt
+
 **Date:** Sunday, April 20, 2026 | **Planned Hours:** 5 hrs
 
 ---
 
-## YOUR FIRST MESSAGE TO COPILOT
+## YOUR FIRST MESSAGE
+>
 > After pasting `instructions.txt` content, send this as your next message:
 
 ```
-We are on Day 17 — Docker Multi-stage + Compose Polish.
+We are on Day 17 — Docker Multi-stage + Compose Polish + Security Headers.
 Feature: docker-polish
 
 Active fixes today:
 - Fix 7.2 — IMPORTANT: Ensure docker-compose.yml `app` service requires `service_healthy` conditions for infrastructure.
+- Fix E-009 — SECURITY: Add X-Frame-Options + HSTS to SecurityConfig.java (backend only)
+- Fix E-009F — SECURITY: Add Content Security Policy headers to next.config.ts (frontend only)
 - Cross-cutting: Fix CC-1, Fix CC-2
 
 Pre-conditions confirmed:
@@ -26,6 +30,7 @@ Non-negotiable rules:
 - App container must run as a non-root user.
 - Environment variables injected from .env.
 - The `app` service in docker-compose.yml must use depends_on: condition: service_healthy for postgres, redis, and rabbitmq.
+- DO NOT add CSP to SecurityConfig.java — the backend serves JSON, not HTML. CSP on the backend breaks Swagger UI.
 
 Start with: Create Dockerfile with multi-stage build.
 ```
@@ -41,6 +46,7 @@ We are preparing the backend application to be deployed as a container. We need 
 Spring Boot starts faster than PostgreSQL/RabbitMQ can accept connections. We already added health checks to the infrastructure on Day 7. Now we wire the `app` service to depend on them using `condition: service_healthy`.
 
 **Pre-conditions from Day 16:**
+
 - Code coverage >= 80% ✅
 - Concurrency test passing ✅
 
@@ -112,12 +118,60 @@ Update `docker-compose.yml` to include the `app` service:
         condition: service_healthy
 ```
 
-### Evening (1 hr) — Verification + Git
+### Evening (1 hr) — Security Headers + Verification + Git
+
+#### Fix E-009 — HTTP Security Headers (Backend: SecurityConfig.java)
+
+Add to the `SecurityFilterChain` in `SecurityConfig.java`. **DO NOT add CSP here** — the backend only serves JSON API responses and Swagger UI. Adding `default-src 'self'` would break Swagger UI's inline JavaScript.
+
+```java
+.headers(headers -> headers
+    .frameOptions(frame -> frame.deny())       // Prevents Clickjacking (X-Frame-Options: DENY)
+    .httpStrictTransportSecurity(hsts -> hsts  // Forces HTTPS in production (HSTS)
+        .includeSubDomains(true)
+        .maxAgeInSeconds(31536000))
+    // CSP is NOT added here — it belongs on the Next.js frontend (next.config.ts)
+)
+```
+
+**⚠️ Stripe webhook note:** `POST /api/webhooks/stripe` must always remain in a `permitAll` matcher and must be excluded from any CSRF protection if CSRF is ever re-enabled in the future. Stripe cannot send a CSRF token — this exclusion is a permanent requirement.
+
+#### Fix E-009F — Content Security Policy (Frontend: next.config.ts)
+
+Add HTTP security headers to `next.config.ts`. The CSP explicitly allows Google Fonts (for Inter typography) and Stripe.js. Without these allowances the Kinetic Premier design system breaks.
+
+```typescript
+async headers() {
+  return [{
+    source: '/(.*)',
+    headers: [{
+      key: 'Content-Security-Policy',
+      value: [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' js.stripe.com",       // Stripe.js required
+        "style-src 'self' 'unsafe-inline' fonts.googleapis.com", // Inter from Google Fonts
+        "font-src 'self' fonts.gstatic.com",
+        "connect-src 'self' https://*.railway.app https://api.stripe.com",
+        "frame-src js.stripe.com",                               // Stripe checkout iFrame
+      ].join('; ')
+    }]
+  }]
+}
+```
+
+**After applying E-009F, verify:**
+
+- Inter font still loads correctly (Kinetic Premier typography intact)
+- Stripe checkout iFrame opens successfully
+- Swagger UI at `/swagger-ui.html` is unaffected (served from a different origin)
+
+#### Final Verification + Git
 
 - Run `docker-compose build`
 - Run `docker-compose up -d`
 - Wait for all services to start, then test `curl http://localhost:8080/actuator/health`
-- Git commit: `chore: add multi-stage Dockerfile and wire app service in docker-compose`
+- Verify `X-Frame-Options: DENY` header present on API responses
+- Git commit: `chore: add multi-stage Dockerfile, wire app service in docker-compose, add security headers`
 
 ---
 
@@ -129,13 +183,22 @@ Update `docker-compose.yml` to include the `app` service:
 [ ] docker-compose.yml includes `app` service
 [ ] `app` service uses `depends_on: condition: service_healthy` (Fix 7.2)
 [ ] `docker-compose up -d` successfully starts the entire stack
+[ ] E-009: SecurityConfig.java has X-Frame-Options: DENY and HSTS configured
+[ ] E-009: NO CSP added to SecurityConfig.java (backend is JSON-only)
+[ ] E-009F: next.config.ts has CSP headers with Google Fonts + Stripe.js allowances
+[ ] Inter font loads correctly in browser (design system intact)
+[ ] Stripe checkout iFrame works correctly (frame-src allowed)
 ```
 
 ---
 
 ## Skills to Attach This Session
+
 - `Plans/skills/docker-expert.SKILL.md`
 
 ## ⚠️ Critical Reminders
+
 1. Do not commit `.env` files to git.
 2. The `depends_on` syntax with `condition: service_healthy` is required to prevent connection refused errors.
+3. **DO NOT add CSP to `SecurityConfig.java`** — the backend serves JSON, not HTML. CSP on Spring Boot breaks Swagger UI and protects nothing on the Next.js frontend.
+4. `POST /api/webhooks/stripe` must always be excluded from CSRF checking if CSRF is ever re-enabled.

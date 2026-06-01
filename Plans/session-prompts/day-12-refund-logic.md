@@ -1,9 +1,11 @@
 # Day 12 — Session Prompt
+
 **Date:** Tuesday, April 15, 2026 | **Planned Hours:** 6 hrs
 
 ---
 
-## YOUR FIRST MESSAGE TO COPILOT
+## YOUR FIRST MESSAGE
+>
 > After pasting `instructions.txt` content, send this as your next message:
 
 ```
@@ -52,6 +54,7 @@ The refund window is calculated relative to the event's start date, not the book
 Flyway migrations are immutable once run. Editing `V6__create_payments_and_refunds.sql` to add `refund_denial_reason` would corrupt the Flyway checksum and break all environments. The correct path is a new `V11__add_refund_denial_reason.sql`.
 
 **Pre-conditions from Day 11:**
+
 - PricingEngine: 3/3 tests passing ✅
 - WaitlistService: 2/2 tests passing ✅
 - CANCELLED + EVENT_CANCELLED state machine transitions wired ✅
@@ -93,6 +96,7 @@ private String refundDenialReason;
 ```
 
 Verify Flyway applies cleanly:
+
 ```bash
 ./mvnw spring-boot:run
 # Observe: "Successfully applied 1 migration to schema \"public\" (V11)"
@@ -212,9 +216,11 @@ public ResponseEntity<ApiResponse<RefundResponse>> requestRefund(
 ---
 
 ## Skills to Attach This Session
+
 - `Plans/skills/java-springboot.SKILL.md`
 
 ## ⚠️ Critical Reminders
+
 1. **NEVER edit `V6__create_payments_and_refunds.sql`** — Flyway checksums are immutable (Fix 12.1)
 2. Use `ChronoUnit.DAYS.between(Instant.now(), event.getStartDate())` — day-aligned calculation
 3. The `< 3 days` branch must save `refundDenialReason` AND fire `DENY_REFUND` state machine event
