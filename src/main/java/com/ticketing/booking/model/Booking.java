@@ -75,6 +75,15 @@ public class Booking {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    /**
+     * Fix 12.1 — Refund denial transparency.
+     * Set when a refund request is denied (< 3 days before event).
+     * Stored in the DB via V11 migration: ALTER TABLE bookings ADD COLUMN refund_denial_reason VARCHAR(500).
+     * Exposed in BookingResponse and RefundResponse so the user sees the reason on their dashboard.
+     */
+    @Column(name = "refund_denial_reason", length = 500)
+    private String refundDenialReason;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 

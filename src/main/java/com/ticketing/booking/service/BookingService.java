@@ -1,5 +1,6 @@
 package com.ticketing.booking.service;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -19,6 +20,7 @@ import com.ticketing.event.model.Event;
 import com.ticketing.event.model.EventStatus;
 import com.ticketing.event.repository.EventRepository;
 import com.ticketing.inventory.service.InventoryService;
+import com.ticketing.pricing.service.PricingEngine;
 import com.ticketing.user.model.User;
 import com.ticketing.user.repository.UserRepository;
 import org.springframework.statemachine.config.StateMachineFactory;
@@ -40,6 +42,7 @@ public class BookingService {
     private final InventoryService inventoryService;
     private final DistributedLockService lockService;
     private final StateMachineFactory<BookingState, BookingEvent> stateMachineFactory;
+    private final PricingEngine pricingEngine;
 
     @Transactional
     public Booking reserveTickets(Long userId, Long eventId, Long tierId, int quantity) {
@@ -90,11 +93,24 @@ public class BookingService {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
 
+            // PricingEngine integration (Day 12): calculate the final per-ticket price
+            // using the authoritative available count from inside the lock.
+            // Order of rules: earlyBird → group discount → dynamic surge (all from BusinessConstants).
+            int sold = tier.getTotalCapacity() - available;
+            BigDecimal pricePerTicket = pricingEngine.calculateFinalPrice(
+                    tier.getBasePrice(),
+                    event.getStartDate(),
+                    quantity,
+                    sold,
+                    tier.getTotalCapacity()
+            );
+            BigDecimal totalAmount = pricePerTicket.multiply(BigDecimal.valueOf(quantity));
+
             Booking booking = Booking.builder()
                     .user(user)
                     .event(event)
                     .state(BookingState.RESERVED)
-                    .totalAmount(tier.getBasePrice().multiply(java.math.BigDecimal.valueOf(quantity)))
+                    .totalAmount(totalAmount)
                     .expiresAt(Instant.now().plusSeconds(BusinessConstants.RESERVATION_TTL_SECONDS))
                     .build();
 
