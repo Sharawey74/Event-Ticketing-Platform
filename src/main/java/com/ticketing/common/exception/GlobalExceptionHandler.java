@@ -28,6 +28,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.failure(exception.getMessage()));
     }
 
+    /**
+     * HTTP 409 — the request conflicts with the current state of the resource.
+     * Example: requesting a refund on a booking that is not in CONFIRMED state.
+     */
+    @ExceptionHandler(com.ticketing.common.exception.ConflictException.class)
+    public ResponseEntity<ApiResponse<Void>> handleConflict(
+            com.ticketing.common.exception.ConflictException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.failure(exception.getMessage()));
+    }
+
     @ExceptionHandler(ValidationException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidation(ValidationException exception) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.failure(exception.getMessage()));
