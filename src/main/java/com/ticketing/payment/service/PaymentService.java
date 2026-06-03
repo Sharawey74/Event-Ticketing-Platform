@@ -1,5 +1,6 @@
 package com.ticketing.payment.service;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -154,5 +155,34 @@ public class PaymentService {
                 .sessionId(stripeSession.getId())
                 .bookingId(bookingId)
                 .build();
+    }
+
+    /**
+     * Issues a (partial or full) Stripe refund against the given Payment Intent.
+     *
+     * Called by RefundService after determining the applicable refund tier.
+     * Uses the fully-qualified Stripe class name to avoid collision with
+     * com.ticketing.payment.model.Refund.
+     *
+     * @param paymentIntentId Stripe Payment Intent ID (stored on Payment entity)
+     * @param amount          refund amount in application currency (USD); converted to cents for Stripe
+     */
+    @Transactional
+    public void refundAmount(String paymentIntentId, BigDecimal amount) {
+        String correlationId = MDC.get("correlationId");
+        try {
+            com.stripe.param.RefundCreateParams params = com.stripe.param.RefundCreateParams.builder()
+                    .setPaymentIntent(paymentIntentId)
+                    // Stripe amounts are in cents (integer)
+                    .setAmount(amount.multiply(BigDecimal.valueOf(100)).longValue())
+                    .build();
+            com.stripe.model.Refund.create(params);
+            log.info("[{}] [payment] Stripe refund of {} issued for payment intent {}",
+                    correlationId, amount, paymentIntentId);
+        } catch (com.stripe.exception.StripeException e) {
+            log.error("[{}] [payment] Stripe refund failed for payment intent {}: {}",
+                    correlationId, paymentIntentId, e.getMessage());
+            throw new RuntimeException("Failed to issue Stripe refund for payment intent: " + paymentIntentId, e);
+        }
     }
 }
