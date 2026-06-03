@@ -10,9 +10,9 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.ticketing.booking.repository.BookingRepository;
 import com.ticketing.booking.model.Booking;
 import com.ticketing.booking.model.BookingState;
-import com.ticketing.booking.repository.BookingRepository;
 import com.ticketing.common.exception.ConflictException;
 import com.ticketing.common.util.BusinessConstants;
 import com.ticketing.payment.dto.RefundResponse;
@@ -22,6 +22,9 @@ import com.ticketing.payment.model.RefundStatus;
 import com.ticketing.payment.repository.PaymentRepository;
 import com.ticketing.payment.repository.RefundRepository;
 
+import com.ticketing.booking.statemachine.BookingStateMachineService;
+
+import com.ticketing.booking.model.BookingEvent;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,7 +55,8 @@ public class RefundService {
     private final BookingRepository bookingRepository;
     private final PaymentRepository paymentRepository;
     private final RefundRepository  refundRepository;
-    private final PaymentService    paymentService;
+    private final PaymentService             paymentService;
+    private final BookingStateMachineService  bookingStateMachineService;
 
     /**
      * Processes a refund request for a confirmed booking.
@@ -125,7 +129,9 @@ public class RefundService {
     private Refund processFullRefund(Booking booking, Payment payment, String correlationId) {
         BigDecimal amount = booking.getTotalAmount();
         paymentService.refundAmount(payment.getStripePaymentIntentId(), amount);
-        booking.setState(BookingState.REFUND_APPROVED);
+        
+        fireStateMachineEvents(booking, BookingEvent.APPROVE_REFUND, null);
+        
         log.info("[{}] [refund] Full refund of {} approved for booking {}",
                 correlationId, amount, booking.getId());
         return buildRefund(payment, amount, RefundStatus.APPROVED, null);
@@ -142,7 +148,9 @@ public class RefundService {
                 .multiply(BigDecimal.valueOf(BusinessConstants.PARTIAL_REFUND_RATE))
                 .setScale(2, RoundingMode.HALF_UP);
         paymentService.refundAmount(payment.getStripePaymentIntentId(), partial);
-        booking.setState(BookingState.REFUND_APPROVED);
+        
+        fireStateMachineEvents(booking, BookingEvent.APPROVE_REFUND, null);
+        
         log.info("[{}] [refund] Partial refund of {} ({}%) approved for booking {}",
                 correlationId, partial, (int)(BusinessConstants.PARTIAL_REFUND_RATE * 100), booking.getId());
         return buildRefund(payment, partial, RefundStatus.APPROVED, null);
@@ -154,7 +162,6 @@ public class RefundService {
      * Transitions booking to REFUND_DENIED.
      */
     private Refund processDeniedRefund(Booking booking, Payment payment, String correlationId) {
-        // Fix 12.1: Store denial reason on Booking so it appears on the user's dashboard
         String reason = String.format(
                 "Refund not eligible: event starts in less than %d days. "
                 + "Event date: %s. Refund request received: %s",
@@ -162,7 +169,9 @@ public class RefundService {
                 booking.getEvent().getStartDate(),
                 Instant.now());
         booking.setRefundDenialReason(reason);
-        booking.setState(BookingState.REFUND_DENIED);
+        
+        fireStateMachineEvents(booking, BookingEvent.DENY_REFUND, reason);
+        
         log.info("[{}] [refund] Refund denied for booking {} — within {}-day window",
                 correlationId, booking.getId(), BusinessConstants.PARTIAL_REFUND_DAYS_THRESHOLD);
         // payment is always present for a CONFIRMED booking — required by payment_id NOT NULL FK
@@ -170,6 +179,25 @@ public class RefundService {
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    private void fireStateMachineEvents(Booking booking, BookingEvent finalEvent, String denialReason) {
+        var sm = bookingStateMachineService.acquireForRefund(
+                booking.getId(),
+                booking.getUser().getEmail(),
+                denialReason);
+
+        // Transition 1: CONFIRMED -> REFUND_REQUESTED
+        sm.sendEvent(reactor.core.publisher.Mono.just(
+                org.springframework.messaging.support.MessageBuilder
+                        .withPayload(BookingEvent.REQUEST_REFUND).build()
+        )).blockLast();
+
+        // Transition 2: REFUND_REQUESTED -> REFUND_APPROVED | REFUND_DENIED
+        sm.sendEvent(reactor.core.publisher.Mono.just(
+                org.springframework.messaging.support.MessageBuilder
+                        .withPayload(finalEvent).build()
+        )).blockLast();
+    }
 
     private Refund buildRefund(Payment payment, BigDecimal amount, RefundStatus status, String reason) {
         return Refund.builder()

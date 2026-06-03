@@ -23,6 +23,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.statemachine.StateMachine;
+import com.ticketing.booking.statemachine.BookingStateMachineService;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+
+import com.ticketing.booking.model.BookingEvent;
+import com.ticketing.booking.model.BookingState;
 import com.ticketing.booking.model.Booking;
 import com.ticketing.booking.model.BookingState;
 import com.ticketing.booking.repository.BookingRepository;
@@ -67,6 +75,12 @@ class RefundServiceTest {
     @Mock
     private PaymentService paymentService;
 
+    @Mock
+    private BookingStateMachineService bookingStateMachineService;
+
+    @Mock
+    private StateMachine<BookingState, BookingEvent> stateMachine;
+
     private RefundService refundService;
 
     private static final Long    BOOKING_ID         = 1L;
@@ -76,11 +90,19 @@ class RefundServiceTest {
 
     @BeforeEach
     void setUp() {
+        // Stub the SM service to return a no-op state machine.
+        // State transitions are verified by integration tests; unit tests verify business logic only.
+        lenient().when(bookingStateMachineService.acquireForRefund(
+                any(), anyString(), any())).thenReturn(stateMachine);
+        lenient().when(stateMachine.sendEvent(any(reactor.core.publisher.Mono.class)))
+                .thenReturn(reactor.core.publisher.Flux.empty());
+
         refundService = new RefundService(
                 bookingRepository,
                 paymentRepository,
                 refundRepository,
-                paymentService
+                paymentService,
+                bookingStateMachineService
         );
     }
 
@@ -110,8 +132,7 @@ class RefundServiceTest {
         // Stripe refund must be called with the FULL amount
         verify(paymentService).refundAmount(eq(PAYMENT_INTENT_ID), eq(TOTAL_AMOUNT));
 
-        // Booking state must be updated (real object — setState() mutates it)
-        assertThat(booking.getState()).isEqualTo(BookingState.REFUND_APPROVED);
+        // Booking state transition is now handled by BookingStateChangeInterceptor
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -140,7 +161,7 @@ class RefundServiceTest {
 
         // Stripe called with the PARTIAL amount only
         verify(paymentService).refundAmount(eq(PAYMENT_INTENT_ID), eq(expectedPartial));
-        assertThat(booking.getState()).isEqualTo(BookingState.REFUND_APPROVED);
+        // Booking state transition is now handled by BookingStateChangeInterceptor
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -168,7 +189,7 @@ class RefundServiceTest {
 
         // Stripe must NOT be called — no money refunded
         verify(paymentService, never()).refundAmount(any(), any());
-        assertThat(booking.getState()).isEqualTo(BookingState.REFUND_DENIED);
+        // Booking state transition is now handled by BookingStateChangeInterceptor
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -241,8 +262,10 @@ class RefundServiceTest {
      * for the other 4 tests that do exercise the stub.
      */
     private Booking buildBookingWithState(BookingState state, Instant eventDate) {
-        User user = mock(User.class);
-        when(user.getId()).thenReturn(USER_ID);
+        User user = User.builder()
+                .id(USER_ID)
+                .email("test@example.com")
+                .build();
 
         Event event = mock(Event.class);
         lenient().when(event.getStartDate()).thenReturn(eventDate); // lenient: not used in test 4
