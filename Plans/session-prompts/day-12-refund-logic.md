@@ -8,7 +8,7 @@
 >
 > After pasting `instructions.txt` content, send this as your next message:
 
-```
+```text
 We are on Day 12 — Pricing Engine Integration + Refund Logic + V11 Migration.
 Feature: refund-logic
 
@@ -178,12 +178,14 @@ BigDecimal finalPrice = pricingEngine.calculateFinalPrice(
 #### New API Endpoint
 
 ```java
-// BookingController:
-@PostMapping("/{id}/refund")
+// BookingController (Class-level mapping: /api/v1/bookings)
+@PostMapping("/{id}/refunds")
 @PreAuthorize("hasRole('USER')")
 public ResponseEntity<ApiResponse<RefundResponse>> requestRefund(
         @PathVariable Long id,
+        @RequestHeader("Idempotency-Key") String idempotencyKey,
         @AuthenticationPrincipal UserDetails userDetails) {
+    // Note: The Idempotency-Key is mandated by core_api_protocols_and_contracts.md
     RefundResponse response = refundService.requestRefund(id, extractUserId(userDetails));
     return ResponseEntity.ok(ApiResponse.success(response));
 }
@@ -200,7 +202,7 @@ public ResponseEntity<ApiResponse<RefundResponse>> requestRefund(
 
 ## Expected Deliverable / Success Criteria
 
-```
+```text
 [ ] V11__add_refund_denial_reason.sql created (NOT V6 edited) (Fix 12.1)
 [ ] Refund.java entity has refundDenialReason field
 [ ] Flyway applies V11 cleanly on startup
@@ -209,7 +211,7 @@ public ResponseEntity<ApiResponse<RefundResponse>> requestRefund(
 [ ] Partial refund path tested (3–6 days) — 50% of total amount
 [ ] Denial path tested (< 3 days) — reason stored in refund_denial_reason column
 [ ] PricingEngine wired into BookingService.reserveTickets()
-[ ] POST /api/bookings/{id}/refund endpoint live
+[ ] POST /api/v1/bookings/{id}/refunds endpoint live with Idempotency-Key header
 [ ] ./mvnw test — entire test suite green
 ```
 

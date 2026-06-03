@@ -49,7 +49,7 @@ Start with: Organizer Events Dashboard at /organizer/events matching the Image 1
 4. **Register** (`/auth/register`) — Image 20 reference
 
 **Check-in Logic:**
-The backend `CHECK_IN` state machine transition is guarded by `CheckInGuard` which ensures the person triggering check-in is the organizer of the event. Frontend hits `POST /api/bookings/{id}/check-in`.
+The backend `CHECK_IN` state machine transition is guarded by `CheckInGuard` which ensures the person triggering check-in is the organizer of the event. Frontend hits `POST /api/v1/bookings/{id}/check-ins`.
 
 **Pre-conditions from Day 14:**
 
@@ -196,7 +196,7 @@ The backend `CHECK_IN` state machine transition is guarded by `CheckInGuard` whi
 **API call on login:**
 
 ```typescript
-const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
+const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/login`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ email, password }), // NEVER send role
@@ -242,11 +242,11 @@ useAuthStore.getState().setAuth(data.token, data.user);
 ```
 
 **⚠️ CRITICAL — E-001 Security Rule:**
-The Register form shows a role toggle (Attendee/Organizer) in the UI per the design. However, **the role field MUST NOT be sent to the backend** `POST /api/auth/register` endpoint. The backend assigns the default role automatically. Sending `role` from the client is a privilege escalation vulnerability.
+The Register form shows a role toggle (Attendee/Organizer) in the UI per the design. However, **the role field MUST NOT be sent to the backend** `POST /api/v1/auth/register` endpoint. The backend assigns the default role automatically. Sending `role` from the client is a privilege escalation vulnerability.
 
 ```typescript
 // CORRECT — do not include role in the request body:
-const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/register`, {
+const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/register`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ firstName, lastName, email, password }), // role field OMITTED
@@ -266,7 +266,7 @@ Create `frontend/app/organizer/events/page.tsx` (Client Component):
 
 ```typescript
 async function fetchOrganizerEvents(token: string) {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/organizer/events`, {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/organizer/events`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
   });
@@ -278,14 +278,14 @@ async function fetchOrganizerEvents(token: string) {
 Create `frontend/app/organizer/events/[id]/attendees/page.tsx`:
 
 ```typescript
-// Fetch: GET /api/organizer/events/{id}/attendees
+// Fetch: GET /api/v1/organizer/events/{id}/attendees
 // Display: search bar + attendee table
 // Columns: Attendee Name, Email, Tier, Booking ID, Status, Action
 // "Check In" button: visible for CONFIRMED only
 // After check-in: badge changes to "Checked In" (ATTENDED state)
 
 async function checkInTicket(bookingId: number, token: string) {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/bookings/${bookingId}/check-in`, {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/bookings/${bookingId}/check-ins`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` }
   });
@@ -329,7 +329,7 @@ Create `frontend/app/organizer/events/new/page.tsx` — matches Image 16 (multi-
 [ ] Sign In button: gradient pill hover:-translate-y-[1px]
 [ ] /auth/register: decorative background blob (blur-[100px])
 [ ] Register role toggle: Attendee/Organizer Bento cards with peer-checked styling
-[ ] E-001 ENFORCED: role field NOT sent to /api/auth/register backend endpoint
+[ ] E-001 ENFORCED: role field NOT sent to /api/v1/auth/register backend endpoint
 [ ] After login: redirect ORGANIZER → /organizer/events, ATTENDEE → /dashboard/bookings
 [ ] Password strength indicator: 4 bars (filled=bg-primary)
 [ ] No hardcoded API URLs — all via NEXT_PUBLIC_API_URL
@@ -345,7 +345,7 @@ Create `frontend/app/organizer/events/new/page.tsx` — matches Image 16 (multi-
 
 1. **E-001 — CRITICAL SECURITY RULE**: Do NOT send the `role` field to the backend register endpoint. The UI toggle is decorative — role is always assigned server-side as ATTENDEE by default.
 2. Only users with role `ORGANIZER` should access `/organizer/*` routes — enforced by middleware.ts
-3. The `POST /api/bookings/{id}/check-in` endpoint requires the user to be the event's organizer (enforced by `CheckInGuard` on the backend)
+3. The `POST /api/v1/bookings/{id}/check-ins` endpoint requires the user to be the event's organizer (enforced by `CheckInGuard` on the backend)
 4. Login/Register pages suppress the main Navbar — use a minimal absolute-positioned logo header instead
 5. The Sales chart in the Organizer Dashboard can use a simple SVG mock initially — data from a real chart library is a Day 19 polish item
 6. **NEVER use localStorage** — sessionStorage only (M-008 interim fix)

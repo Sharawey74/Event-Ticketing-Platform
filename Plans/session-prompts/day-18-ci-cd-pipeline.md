@@ -188,7 +188,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkouts@v4
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -219,7 +219,7 @@ jobs:
         working-directory: frontend
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkouts@v4
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
@@ -257,7 +257,7 @@ jobs:
     needs: []   # Uses workflow_run trigger — see note below
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkouts@v4
 
       - name: Install Railway CLI
         run: npm install -g @railway/cli
@@ -272,7 +272,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkouts@v4
 
       - name: Install Vercel CLI
         run: npm install -g vercel
@@ -312,7 +312,7 @@ jobs:
     needs: [backend-test, frontend-build]   # only runs if BOTH pass
     if: github.ref == 'refs/heads/main'     # only on main branch
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkouts@v4
       - run: npm install -g @railway/cli
       - run: railway up --service backend --detach
         env:
@@ -324,7 +324,7 @@ jobs:
     needs: [backend-test, frontend-build]
     if: github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkouts@v4
       - run: npm install -g vercel
       - run: vercel --prod --token ${{ secrets.VERCEL_TOKEN }} --yes
         working-directory: frontend
@@ -378,7 +378,7 @@ frontend/node_modules/
 - `curl https://your-app.railway.app/actuator/health` → `{"status":"UP"}`
 - Verify `X-Frame-Options: DENY` header on Railway responses:
   ```bash
-  curl -I https://your-app.railway.app/api/events
+  curl -I https://your-app.railway.app/api/v1/events
   ```
 - Check Railway logs: confirm JSON lines format (E-007 verified)
 - Check Railway logs: confirm `CORS allowed origin: https://...` message (E-003 verified)

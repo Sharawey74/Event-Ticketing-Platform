@@ -21,7 +21,7 @@ Active fixes today:
 Pre-conditions confirmed:
 - Day 12 complete: RefundService tests passing ✅
 - PricingEngine wired into BookingService ✅
-- POST /api/bookings/{id}/refund endpoint live ✅
+- POST /api/v1/bookings/{id}/refunds endpoint live ✅
 - NEXT_PUBLIC_API_URL=http://localhost:8080 set in frontend/.env.local ✅
 - Docker Desktop + backend running ✅
 - Kinetic Premier tailwind.config.ts applied (from Day 4) ✅
@@ -55,9 +55,9 @@ Start with: Event Detail page at /events/[id] matching the Image 6 HTML design r
 **The booking flow:**
 
 1. User views `/events/[id]` — sees event details + available tiers (sticky right panel)
-2. User selects tier + quantity → POST `/api/bookings` → receives `bookingId` + state `RESERVED`
+2. User selects tier + quantity → POST `/api/v1/bookings` → receives `bookingId` + state `RESERVED`
 3. 15-minute reservation countdown timer appears (NOT 5 min — backend was updated)
-4. User clicks "Proceed to Checkout" → POST `/api/bookings/{id}/checkout` → receives Stripe `checkoutUrl`
+4. User clicks "Proceed to Checkout" → POST `/api/v1/bookings/{id}/checkouts` → receives Stripe `checkoutUrl`
 5. Browser redirects to Stripe-hosted payment page (test card: 4242 4242 4242 4242)
 6. After payment, Stripe redirects to `/bookings/[id]/confirmation?session_id=...`
 7. Confirmation page shows animated checkmark + booking ref + QR code tickets
@@ -229,7 +229,7 @@ Create `frontend/app/events/[id]/page.tsx` — Server Component:
 
 ```typescript
 async function EventDetailPage({ params }: { params: { id: string } }) {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/events/${params.id}`, {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/events/${params.id}`, {
     cache: 'no-store'  // always fresh — inventory counts change
   });
   const event = await res.json();
@@ -249,9 +249,9 @@ async function EventDetailPage({ params }: { params: { id: string } }) {
 // State: selectedTierId, quantity
 // Selected tier: border-2 border-primary bg-primary/5
 // Unselected tier: border border-outline-variant hover:border-primary/50
-// On "Add to Cart" / "Reserve": POST /api/bookings → { bookingId, state: "RESERVED", expiresAt }
+// On "Add to Cart" / "Reserve": POST /api/v1/bookings (requires Idempotency-Key header) → { bookingId, state: "RESERVED", expiresAt }
 // Show <ReservationTimer> after successful reservation
-// On "Proceed to Checkout": POST /api/bookings/{bookingId}/checkout → { checkoutUrl }
+// On "Proceed to Checkout": POST /api/v1/bookings/{bookingId}/checkouts → { checkoutUrl }
 //   window.location.href = checkoutUrl
 ```
 
@@ -262,7 +262,7 @@ Create `frontend/app/bookings/[id]/confirmation/page.tsx`:
 ```typescript
 // Server Component — NO Navbar rendered on this page
 async function ConfirmationPage({ params, searchParams }: Props) {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/bookings/${params.id}`, {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/bookings/${params.id}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
   });
@@ -319,7 +319,7 @@ Git commit: `feat: implement event detail page, booking flow, and confirmation p
 [ ] Price shows tier price + fee separately
 [ ] Quantity stepper: rounded-full bg-surface border border-outline-variant
 [ ] CTA button: bg-gradient-to-r from-primary to-secondary h-14 rounded-full
-[ ] POST /api/bookings called with correct JWT auth header
+[ ] POST /api/v1/bookings (requires Idempotency-Key header) called with correct JWT auth header
 [ ] Reservation timer shows countdown from expiresAt
 [ ] Checkout redirects to Stripe-hosted payment page
 [ ] Confirmation: no navbar (suppressed for transactional screen)

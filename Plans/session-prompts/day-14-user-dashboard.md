@@ -177,12 +177,12 @@ Create `frontend/app/dashboard/bookings/page.tsx`:
 'use client';
 
 // Fetch summary stats: total bookings, upcoming count, total spent
-// Fetch upcoming events: GET /api/bookings/my?status=CONFIRMED&future=true
-// Fetch all bookings for history table: GET /api/bookings/my
+// Fetch upcoming events: GET /api/v1/bookings/my?status=CONFIRMED&future=true
+// Fetch all bookings for history table: GET /api/v1/bookings/my
 // Render: Profile card + 3 stat cards + upcoming grid + history table
 
 async function fetchMyBookings(token: string) {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/bookings/my`, {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/bookings/my`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
   });
@@ -248,7 +248,7 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
 ```typescript
 async function requestRefund(bookingId: number, token: string) {
   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/api/bookings/${bookingId}/refund`,
+    `${process.env.NEXT_PUBLIC_API_URL}/api/v1/bookings/${bookingId}/refunds`,
     { method: 'POST', headers: { Authorization: `Bearer ${token}` } }
   );
   return res.json();

@@ -134,7 +134,7 @@ Add to the `SecurityFilterChain` in `SecurityConfig.java`. **DO NOT add CSP here
 )
 ```
 
-**⚠️ Stripe webhook note:** `POST /api/webhooks/stripe` must always remain in a `permitAll` matcher and must be excluded from any CSRF protection if CSRF is ever re-enabled in the future. Stripe cannot send a CSRF token — this exclusion is a permanent requirement.
+**⚠️ Stripe webhook note:** `POST /api/v1/webhooks/stripe` must always remain in a `permitAll` matcher and must be excluded from any CSRF protection if CSRF is ever re-enabled in the future. Stripe cannot send a CSRF token — this exclusion is a permanent requirement.
 
 #### Fix E-009F — Content Security Policy (Frontend: next.config.ts)
 
@@ -201,4 +201,4 @@ async headers() {
 1. Do not commit `.env` files to git.
 2. The `depends_on` syntax with `condition: service_healthy` is required to prevent connection refused errors.
 3. **DO NOT add CSP to `SecurityConfig.java`** — the backend serves JSON, not HTML. CSP on Spring Boot breaks Swagger UI and protects nothing on the Next.js frontend.
-4. `POST /api/webhooks/stripe` must always be excluded from CSRF checking if CSRF is ever re-enabled.
+4. `POST /api/v1/webhooks/stripe` must always be excluded from CSRF checking if CSRF is ever re-enabled.

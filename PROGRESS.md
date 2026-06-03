@@ -22,8 +22,8 @@
 | 9 | Stripe Checkout + Webhook | ✅ Complete | 7 | 80/80 passing | Checkout session creation, webhook processing, idempotency |
 | 10 | RabbitMQ Consumers + Notifications | ✅ Complete | 3 | 83/83 passing | Implemented BookingNotificationListener for async emails and QR code generation |
 | 11 | Pricing Engine + Waitlist | ✅ Complete | 5 | 88/88 passing | Pricing engine logic, waitlist implementation, cancel booking action |
-| 12 | Refund Logic + Concurrency Polish | ⬜ Not Started | — | — | |
-| 13 | Frontend Event Detail + Booking Flow | ⬜ Not Started | — | — | |
+| 12 | Refund Logic + Concurrency Polish | ✅ Complete | 11 | 99/99 passing | 3-tier refund logic, Pricing Engine wired |
+| 13 | Frontend Event Detail + Booking Flow | ⏳ In Progress | — | — | |
 | 14 | Frontend User Dashboard + QR Display | ⬜ Not Started | — | — | |
 | 15 | Frontend Organizer Dashboard | ⬜ Not Started | — | — | |
 | 16 | Backend Test Coverage Push (80%+) | ⬜ Not Started | — | — | |
@@ -62,8 +62,8 @@
 | Fix 10.1 | IMPORTANT | 10 | ✅ | DENY_REFUND notification action |
 | Fix 10.2 | IMPORTANT | 10 | ✅ | Async QR generation queue configured (Day 5); consumer implementation Day 10 |
 | Fix 11.1 | IMPORTANT | Audit | ✅ | CANCELLED state added to BookingState (pre-applied for Day 8) |
-| Fix 11.2 | IMPORTANT | 11 | ⬜ | RELEASE event / AVAILABLE state removal (documented in BookingState Javadoc) |
-| Fix 12.1 | GOOD | 12 | ⬜ | refund_denial_reason via V11 migration |
+| Fix 11.2 | IMPORTANT | 11 | ✅ | RELEASE event / AVAILABLE state removal (documented in BookingState Javadoc) |
+| Fix 12.1 | GOOD | 12 | ✅ | refund_denial_reason via V11 migration |
 | Fix 16.1 | CRITICAL | 16 | ⬜ | Concurrency test for reserveSeat() Lua script |
 | Fix PW3-1 | CRITICAL | 1/2 | ✅ | Stripe account + CLI installed |
 
@@ -73,7 +73,7 @@
 
 | Metric | Current | Target |
 | :--- | :--- | :--- |
-| `./mvnw test` passing | 83 / 83 Tests Passing | 100% |
+| `./mvnw test` passing | 99 / 99 Tests Passing | 100% |
 | Test coverage | N/A | 80%+ |
 | Active @Autowired usages | 0 | 0 |
 | Active LocalDateTime usages | 0 | 0 |
