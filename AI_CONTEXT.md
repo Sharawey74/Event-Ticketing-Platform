@@ -1,20 +1,10 @@
 # AI CONTEXT SNAPSHOT — Event Ticketing Platform
 
-## Last Updated: Day 10 (2026-05-28) — RabbitMQ Consumers & Notifications Complete
+## Last Updated: Day 12 (2026-06-03) — Refund Logic & Pricing Engine Integration
 
-## Branch: day-10-rabbitmq-consumers
+## Branch: day-13-frontend-booking
 
-## Test Status: 83/83 passing (PostgreSQL 17, Redis 7, RabbitMQ 4)
-
----
-
-## 0. AGENT WORKFLOW RULES (MANDATORY)
-
-- **`speckit.plan` usage:** Use `speckit.plan` ONLY for complex multi-file architectural changes or new feature scaffolding. Skip it for daily cleanup, bug fixes, or minor refinements to existing logic.
-- **`instructions.txt` usage:** Treat `instructions.txt` as a **PASTE-ONLY** source. Never attach it as a file; always copy the relevant rules directly into the session context or this `AI_CONTEXT.md`.
-- **Session Continuity:** Always read `AI_CONTEXT.md` and `PROGRESS.md` at the start of a session.
-
----
+## Test Status: 99/99 passing (PostgreSQL 17, Redis 7, RabbitMQ 4)
 
 ## 1. NON-NEGOTIABLE RULES (From instructions.txt + Overlay)
 
@@ -41,6 +31,7 @@ Every agent session must enforce these without exception:
 ## 2. PROJECT STRUCTURE — Overview
 
 ### Main Source (`src/main/java/com/ticketing/`)
+
 - `booking/`: Handles Booking domain, state machine logic (`BookingState`, `BookingEvent`, `CheckInGuard`), and ticket generation.
 - `common/`: Security (JWT filters), `GlobalExceptionHandler`, DTO wrappers, Redis/RabbitMQ configs, `DistributedLockService`, and `BusinessConstants`.
 - `event/`: Domain logic for Events, Venues, Categories, and Search. Includes `EventSearchService`.
@@ -49,6 +40,7 @@ Every agent session must enforce these without exception:
 - `user/`: Authentication, JWT generation, and User entity management.
 
 ### Test Source (`src/test/java/com/ticketing/`)
+
 - Full test coverage for `event`, `user`, and `inventory` packages.
 - `TestSecurityConfig.java` in `common/config/` is strictly required for any `@WebMvcTest`.
 - `TestcontainersConfiguration.java` provisions PostgreSQL and Redis.
@@ -67,8 +59,9 @@ Every agent session must enforce these without exception:
 | V8__add_event_features.sql | waitlist_enabled, dynamic_pricing_enabled on events | IMMUTABLE |
 | V9__seed_data.sql | 5 categories (Music, Sports, Comedy, Theater, Festival) + 3 venues | IMMUTABLE |
 | V10__add_ticket_tier_version.sql | @Version column on ticket_tiers for optimistic locking | IMMUTABLE |
+| V11__add_waitlist_and_refund_reason.sql | waitlist_entries table + bookings.refund_denial_reason | IMMUTABLE |
 
-**NEXT MIGRATION MUST BE: V11__...**
+**NEXT MIGRATION MUST BE: V12__...**
 
 ---
 
@@ -160,7 +153,8 @@ class YourControllerTest {
 | 8 | Booking State Machine | ✅ | 73/73 |
 | 9 | Stripe Checkout + Webhook | ✅ | 80/80 |
 | 10 | RabbitMQ Consumers + Notifications | ✅ | 83/83 |
-| 11–21 | See PROGRESS.md | ⬜ | — |
+| 11 | Pricing Engine + Waitlist | ✅ | 88/88 |
+| 12 | Refund Logic + Concurrency Polish | ✅ | 99/99 |
 
 ---
 
@@ -305,10 +299,11 @@ This repository has two deployable parts:
 
 ---
 
-## 10. NEXT SESSION START — DAY 11
+## 10. NEXT SESSION START — DAY 13
 
-**Branch to create:** `git checkout -b day-11-pricing-waitlist`
+**Current Branch:** `day-13-frontend-booking`
 
-**First task:** Pricing Engine + Waitlist
-- Review Day 11 plan for Dynamic Pricing and Waitlist features.
-- Implement Fix 11.2 (RELEASE event / AVAILABLE state removal).
+**First task:** Frontend Event Detail + Booking Flow
+
+- Review Day 13 plan for frontend updates.
+- Connect React/Next.js frontend to the new reservation/refund backend APIs.

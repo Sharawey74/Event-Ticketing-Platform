@@ -1,12 +1,14 @@
 # Day 12 — Session Prompt
+
 **Date:** Tuesday, April 15, 2026 | **Planned Hours:** 6 hrs
 
 ---
 
-## YOUR FIRST MESSAGE TO COPILOT
+## YOUR FIRST MESSAGE
+>
 > After pasting `instructions.txt` content, send this as your next message:
 
-```
+```text
 We are on Day 12 — Pricing Engine Integration + Refund Logic + V11 Migration.
 Feature: refund-logic
 
@@ -52,6 +54,7 @@ The refund window is calculated relative to the event's start date, not the book
 Flyway migrations are immutable once run. Editing `V6__create_payments_and_refunds.sql` to add `refund_denial_reason` would corrupt the Flyway checksum and break all environments. The correct path is a new `V11__add_refund_denial_reason.sql`.
 
 **Pre-conditions from Day 11:**
+
 - PricingEngine: 3/3 tests passing ✅
 - WaitlistService: 2/2 tests passing ✅
 - CANCELLED + EVENT_CANCELLED state machine transitions wired ✅
@@ -93,6 +96,7 @@ private String refundDenialReason;
 ```
 
 Verify Flyway applies cleanly:
+
 ```bash
 ./mvnw spring-boot:run
 # Observe: "Successfully applied 1 migration to schema \"public\" (V11)"
@@ -174,12 +178,14 @@ BigDecimal finalPrice = pricingEngine.calculateFinalPrice(
 #### New API Endpoint
 
 ```java
-// BookingController:
-@PostMapping("/{id}/refund")
+// BookingController (Class-level mapping: /api/v1/bookings)
+@PostMapping("/{id}/refunds")
 @PreAuthorize("hasRole('USER')")
 public ResponseEntity<ApiResponse<RefundResponse>> requestRefund(
         @PathVariable Long id,
+        @RequestHeader("Idempotency-Key") String idempotencyKey,
         @AuthenticationPrincipal UserDetails userDetails) {
+    // Note: The Idempotency-Key is mandated by core_api_protocols_and_contracts.md
     RefundResponse response = refundService.requestRefund(id, extractUserId(userDetails));
     return ResponseEntity.ok(ApiResponse.success(response));
 }
@@ -196,7 +202,7 @@ public ResponseEntity<ApiResponse<RefundResponse>> requestRefund(
 
 ## Expected Deliverable / Success Criteria
 
-```
+```text
 [ ] V11__add_refund_denial_reason.sql created (NOT V6 edited) (Fix 12.1)
 [ ] Refund.java entity has refundDenialReason field
 [ ] Flyway applies V11 cleanly on startup
@@ -205,16 +211,18 @@ public ResponseEntity<ApiResponse<RefundResponse>> requestRefund(
 [ ] Partial refund path tested (3–6 days) — 50% of total amount
 [ ] Denial path tested (< 3 days) — reason stored in refund_denial_reason column
 [ ] PricingEngine wired into BookingService.reserveTickets()
-[ ] POST /api/bookings/{id}/refund endpoint live
+[ ] POST /api/v1/bookings/{id}/refunds endpoint live with Idempotency-Key header
 [ ] ./mvnw test — entire test suite green
 ```
 
 ---
 
 ## Skills to Attach This Session
+
 - `Plans/skills/java-springboot.SKILL.md`
 
 ## ⚠️ Critical Reminders
+
 1. **NEVER edit `V6__create_payments_and_refunds.sql`** — Flyway checksums are immutable (Fix 12.1)
 2. Use `ChronoUnit.DAYS.between(Instant.now(), event.getStartDate())` — day-aligned calculation
 3. The `< 3 days` branch must save `refundDenialReason` AND fire `DENY_REFUND` state machine event
