@@ -345,3 +345,25 @@ Git commit: `test: add JaCoCo 80% gate, concurrent booking test, M-001 retry, Vi
 4. The `log.error()` in GlobalExceptionHandler catch-all MUST pass `ex` as the second argument — `log.error("...", ex)` — without it, the stack trace never appears in server logs.
 5. `./mvnw verify` (not just `./mvnw test`) runs the JaCoCo check phase. Use verify to confirm the gate.
 6. **NEVER hardcode `localhost:8080`** — all config via environment variables and BusinessConstants only.
+
+---
+
+## 📋 Scope Analysis Reference
+
+> **Full scope analysis (what is in/out of scope for Days 13–21):**
+> `docs/Core/day13-21-scope-analysis.md`
+
+### Priority Items Active This Day
+
+| ID | Priority | Item | Status |
+|----|----------|------|--------|
+| BLOCKER-1 | 🔴 P1 | Verify `spring.profiles.active=local` is removed from `application.yaml` — if it is still present, remove it now before Day 18 | 🔲 Verify |
+| HIGH-12 | 🟠 P2 | Run `git ls-files` hygiene check — confirm `Plans/`, `Archive/`, `.env`, `test_output.log`, `.vscode/` are NOT tracked in Git | 🔲 Verify |
+
+### Items Confirmed Out of Scope for Day 16
+
+| Item | Why |
+|------|-----|
+| Vitest test asserting `sessionStorage` usage | `authStore.ts` uses Zustand in-memory — not `sessionStorage`. A test for sessionStorage would be factually wrong |
+| JaCoCo exclusions on service/controller classes | Exclusions are only acceptable for DTOs, entities, and config — not business logic |
+| `@Retryable` on inventory/booking Redis operations | Explicitly forbidden: retrying Redis decrement paths causes invisible inventory undercount |

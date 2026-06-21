@@ -350,3 +350,28 @@ Git commit: `feat: implement event detail page, booking flow, and confirmation p
 6. QR codes are `data:image/png;base64,...` — render inline with `<img src={...}>`, NOT as URL fetch
 7. Use `cache: 'no-store'` on event fetch — inventory counts change constantly
 8. **NEVER hardcode `localhost:8080`** — always `process.env.NEXT_PUBLIC_API_URL` (CC-2)
+
+---
+
+## 📋 Scope Analysis Reference
+
+> **Full scope analysis (what is in/out of scope for Days 13–21):**
+> `docs/Core/day13-21-scope-analysis.md`
+
+### Priority Items Active This Day
+
+The following items from the scope analysis **must be completed before closing Day 13**. Items not listed here are either handled on other days or are classified Out of Scope.
+
+| ID | Priority | Item | Status |
+|----|----------|------|--------|
+| HIGH-9 | 🟠 P2 | `POST /api/v1/bookings` call must include `Idempotency-Key: crypto.randomUUID()` header — prevents double bookings on double-click or network retry | 🔲 Required |
+| MEDIUM-17 | 🟡 P3 | QR code must be rendered as `<img src={qrBase64} />` — never `console.log(qrBase64)` | 🔲 Required |
+
+### Items Confirmed Out of Scope for Day 13
+
+| Item | Why |
+|------|-----|
+| `localStorage` migration to `sessionStorage` | `authStore.ts` already uses Zustand in-memory — no migration needed |
+| `dangerouslySetInnerHTML` removal (unless found) | Run audit only; no action if not present |
+| HttpOnly cookie migration | Phase 1B only |
+| CSP on backend Spring config | Backend is JSON-only; master prompt explicitly forbids this |

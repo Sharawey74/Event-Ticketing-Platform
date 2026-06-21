@@ -421,3 +421,32 @@ frontend/node_modules/
 5. Vercel auto-deploys on push if the GitHub integration is connected — disable auto-deploy in Vercel settings to avoid double deploys when using the CLI in GitHub Actions.
 6. **DO NOT commit `.env` files.** The `.gitignore` must cover `frontend/.env.local` explicitly.
 7. `E-004`: The JWT secret fallback `ZmFrZS1qc3QtLi4u` in `application-local.yml` is intentionally left there for local dev. It must NEVER reach Railway. The Railway `JWT_SECRET` env var overrides it.
+
+---
+
+## 📋 Scope Analysis Reference
+
+> **Full scope analysis (what is in/out of scope for Days 13–21):**
+> `docs/Core/day13-21-scope-analysis.md`
+
+### Priority Items Active This Day
+
+**Day 18 has the highest concentration of blockers. All P1 items below must be completed before committing.**
+
+| ID | Priority | Item | Status |
+|----|----------|------|--------|
+| BLOCKER-1 | 🔴 P1 | Remove `spring.profiles.active=local` from `src/main/resources/application.yaml` line 5 | 🔲 Required |
+| BLOCKER-3 | 🔴 P1 | Create `src/main/resources/application-prod.yml` — all values via `${ENV_VAR}` only, zero fallback secrets | 🔲 Required |
+| BLOCKER-4 | 🔴 P1 | Create `.github/workflows/ci.yml` with: backend-test job (Maven + JaCoCo), frontend-build job (npm install + build), repo-hygiene job (git ls-files check), and deploy job gated on `main` branch only | 🔲 Required |
+| SECURITY-7 | 🔴 P1 | Remove `.github/agents/`, `.github/instructions/`, and `.github/copilot-instructions.md` from Git tracking: `git rm -r --cached .github/agents .github/instructions .github/copilot-instructions.md` | 🔲 Required |
+| HIGH-12 | 🟠 P2 | Run full repo hygiene check: `git ls-files` — confirm `Plans/`, `Archive/`, `AI_CONTEXT.md`, `PROGRESS.md`, `instructions.md`, `Phase1A_Adjustments_and_Fixes.md`, `test_output.log`, `.env`, `target/` are NOT tracked | 🔲 Required |
+| HIGH-8 | 🟠 P2 | Confirm `application-prod.yml` uses `${JWT_SECRET}` with NO fallback — not `${JWT_SECRET:some-default}` | 🔲 Verify |
+
+### Items Confirmed Out of Scope for Day 18
+
+| Item | Why |
+|------|-----|
+| Git history rewrite | No real secrets exist in committed history — master prompt explicitly defers this unless real secrets are found |
+| Kubernetes / Terraform | Deferred to Phase 1B |
+| Full OWASP/ASVS compliance scan | Deferred to Phase 1B |
+| Major dependency upgrades | Only critical CVEs should be patched; no major version bumps |

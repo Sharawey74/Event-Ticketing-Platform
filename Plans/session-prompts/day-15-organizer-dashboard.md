@@ -349,3 +349,27 @@ Create `frontend/app/organizer/events/new/page.tsx` — matches Image 16 (multi-
 4. Login/Register pages suppress the main Navbar — use a minimal absolute-positioned logo header instead
 5. The Sales chart in the Organizer Dashboard can use a simple SVG mock initially — data from a real chart library is a Day 19 polish item
 6. **NEVER use localStorage** — sessionStorage only (M-008 interim fix)
+
+---
+
+## 📋 Scope Analysis Reference
+
+> **Full scope analysis (what is in/out of scope for Days 13–21):**
+> `docs/Core/day13-21-scope-analysis.md`
+
+### Priority Items Active This Day
+
+| ID | Priority | Item | Status |
+|----|----------|------|--------|
+| HIGH-11 | 🟠 P2 | Register form payload must be exactly `{ firstName, lastName, email, password }` — the `role` field must NEVER be sent to the backend (role escalation vulnerability) | 🔲 Required |
+| HIGH-10 | 🟠 P2 | `middleware.ts` must protect `/organizer/*` from attendee users — redirect to `/auth/login` if no token or wrong role | 🔲 Required (verify from Day 14) |
+
+### Items Confirmed Out of Scope for Day 15
+
+| Item | Why |
+|------|-----|
+| Treating frontend middleware as authorization | Backend `CheckInGuard` and role checks are the real authorization — frontend is UX only |
+| Image upload pipeline for Create Event | Master prompt explicitly defers this: "Treat uploaded image inputs as future work unless backend upload pipeline exists" — no backend upload pipeline exists |
+| HttpOnly cookie migration | Phase 1B only |
+| CSP on backend Spring config | Backend is JSON-only; master prompt explicitly forbids this |
+| Vitest test for `sessionStorage` | `authStore.ts` uses Zustand in-memory — there is no `sessionStorage` to test |
