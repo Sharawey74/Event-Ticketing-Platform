@@ -215,7 +215,7 @@ export default function DashboardBookingsPage() {
                         {new Date(booking.eventDate).toLocaleDateString()}
                       </td>
                       <td className="p-4 font-body text-on-surface">
-                        {booking.tickets?.length || (booking as Record<string, unknown>).quantity || 0}
+                        {booking.tickets?.length || (booking as unknown as Record<string, number>).quantity || 0}
                       </td>
                       <td className="p-4 font-body text-on-surface font-semibold">
                         ${(booking.totalAmount || 0).toFixed(2)}

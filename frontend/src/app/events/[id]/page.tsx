@@ -28,8 +28,9 @@ function formatDateTime(value: string): string {
   }).format(new Date(value));
 }
 
-export default async function EventDetailPage({ params }: { params: { id: string } }) {
-  const event = await getEventDetails(params.id);
+export default async function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const event = await getEventDetails(id);
 
   if (!event) {
     return (

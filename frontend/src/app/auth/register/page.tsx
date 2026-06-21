@@ -95,8 +95,9 @@ export default function RegisterPage() {
           {/* Name Grid */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block font-label-sm text-on-surface mb-1">First Name</label>
+              <label htmlFor="firstName" className="block font-label-sm text-on-surface mb-1">First Name</label>
               <input 
+                id="firstName"
                 type="text" 
                 required
                 value={firstName}
@@ -105,8 +106,9 @@ export default function RegisterPage() {
               />
             </div>
             <div>
-              <label className="block font-label-sm text-on-surface mb-1">Last Name</label>
+              <label htmlFor="lastName" className="block font-label-sm text-on-surface mb-1">Last Name</label>
               <input 
+                id="lastName"
                 type="text" 
                 required
                 value={lastName}
@@ -118,8 +120,9 @@ export default function RegisterPage() {
 
           {/* Email */}
           <div>
-            <label className="block font-label-sm text-on-surface mb-1">Email Address</label>
+            <label htmlFor="email" className="block font-label-sm text-on-surface mb-1">Email Address</label>
             <input 
+              id="email"
               type="email" 
               required
               value={email}
@@ -130,8 +133,9 @@ export default function RegisterPage() {
 
           {/* Password */}
           <div>
-            <label className="block font-label-sm text-on-surface mb-1">Password</label>
+            <label htmlFor="password" className="block font-label-sm text-on-surface mb-1">Password</label>
             <input 
+              id="password"
               type="password" 
               required
               value={password}
