@@ -1,133 +1,169 @@
-"use client";
-
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { TicketTierSelector } from "@/components/events/TicketTierSelector";
+import { EventDetailResponse } from "@/types/event";
 
-import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, MapPin, Ticket } from "lucide-react";
-
-import { fetchVenues } from "@/lib/catalog";
-import { fetchEventById } from "@/lib/event-details";
+async function getEventDetails(id: string): Promise<EventDetailResponse | null> {
+  const url = `${process.env.NEXT_PUBLIC_API_URL}/api/events/${id}`;
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) {
+      if (res.status === 404) return null;
+      throw new Error("Failed to fetch event details");
+    }
+    const json = await res.json();
+    return json.data;
+  } catch (error) {
+    console.error("Error fetching event details:", error);
+    return null;
+  }
+}
 
 function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "full",
-    timeStyle: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   }).format(new Date(value));
 }
 
-export default function EventDetailsPage() {
-  const params = useParams<{ id: string }>();
-  const eventId = Number(params.id);
+export default async function EventDetailPage({ params }: { params: { id: string } }) {
+  const event = await getEventDetails(params.id);
 
-  const { data: event, isLoading, isError } = useQuery({
-    queryKey: ["event", eventId],
-    queryFn: () => fetchEventById(eventId),
-    enabled: Number.isFinite(eventId),
-  });
-
-  const { data: venues } = useQuery({
-    queryKey: ["event-venues"],
-    queryFn: fetchVenues,
-  });
-
-  const venueCity = venues?.find((venue) => venue.id === event?.venueId)?.city;
-
-  if (!Number.isFinite(eventId)) {
+  if (!event) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-4 py-10 md:px-6">
-        <p className="rounded-xl border border-zinc-200 bg-white p-5 text-sm text-rose-700">
-          Invalid event id.
-        </p>
+      <div className="mx-auto w-full max-w-4xl px-4 py-20 text-center">
+        <h1 className="text-3xl font-bold text-error">Event Not Found</h1>
+        <p className="mt-4 text-on-surface-variant">The event you are looking for does not exist or has been removed.</p>
+        <Link href="/" className="mt-6 inline-block text-primary hover:underline">
+          Return to Home
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-10 md:px-6">
-      <div className="mb-6 flex items-center justify-between">
-        <Link href="/" className="text-sm font-medium text-emerald-700 hover:text-emerald-800">
-          Back to Home
-        </Link>
-        <Link href="/search" className="text-sm font-medium text-emerald-700 hover:text-emerald-800">
-          Search More
-        </Link>
+    <main className="pb-section-gap">
+      {/* Cover Image */}
+      <div className="w-full h-[409px] md:h-[512px] relative overflow-hidden bg-surface-container-high">
+        {event.coverImageUrl ? (
+          <img
+            alt={event.title}
+            src={event.coverImageUrl}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-primary to-secondary" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent"></div>
       </div>
 
-      {isLoading ? (
-        <p className="rounded-2xl border border-zinc-200 bg-white p-6 text-sm text-zinc-500">
-          Loading event details...
-        </p>
-      ) : null}
+      <div className="max-w-container-max mx-auto px-edge-padding -mt-32 relative z-10">
+        {/* Breadcrumbs */}
+        <nav aria-label="Breadcrumb" className="flex text-on-surface-variant font-caption text-caption mb-stack-md">
+          <ol className="inline-flex items-center space-x-1 md:space-x-3">
+            <li className="inline-flex items-center">
+              <Link className="hover:text-primary transition-colors" href="/events">
+                Events
+              </Link>
+            </li>
+            <li>
+              <div className="flex items-center">
+                <span className="material-symbols-outlined text-[16px] mx-1">chevron_right</span>
+                <Link className="hover:text-primary transition-colors" href={`/search?categoryId=${event.category?.id || ""}`}>
+                  {event.category?.name || "Category"}
+                </Link>
+              </div>
+            </li>
+            <li aria-current="page">
+              <div className="flex items-center">
+                <span className="material-symbols-outlined text-[16px] mx-1">chevron_right</span>
+                <span className="text-primary font-medium">{event.title}</span>
+              </div>
+            </li>
+          </ol>
+        </nav>
 
-      {isError ? (
-        <p className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
-          Could not load event details. Check the API and event id.
-        </p>
-      ) : null}
-
-      {event ? (
-        <article className="overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm">
-          <div className="h-56 bg-gradient-to-br from-emerald-500 via-cyan-500 to-blue-600" />
-
-          <div className="space-y-5 p-6 md:p-8">
-            <div className="flex flex-wrap items-center gap-3 text-sm text-zinc-600">
-              <span className="rounded-full bg-zinc-100 px-3 py-1 font-medium text-zinc-700">
-                {event.status}
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <CalendarDays className="h-4 w-4" />
-                {formatDateTime(event.startDate)}
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <MapPin className="h-4 w-4" />
-                {venueCity ?? "City not available"}
-              </span>
-            </div>
-
-            <div className="space-y-3">
-              <h1 className="text-3xl font-bold tracking-tight text-zinc-950 md:text-4xl">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+          {/* Left Column: Event Details */}
+          <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-stack-lg">
+            {/* Title & Badges */}
+            <div>
+              <div className="flex flex-wrap gap-2 mb-stack-sm">
+                <span className="px-4 py-1 bg-[#F5F3FF] text-primary rounded-full font-label-sm text-label-sm">
+                  {event.category?.name || "Event"}
+                </span>
+                <span className="px-4 py-1 bg-[#F5F3FF] text-primary rounded-full font-label-sm text-label-sm">
+                  {event.status}
+                </span>
+              </div>
+              <h1 className="font-hero-headline text-hero-headline text-on-surface mb-stack-sm">
                 {event.title}
               </h1>
-              <p className="text-base leading-7 text-zinc-600">
-                {event.description ?? "No description available for this event yet."}
+              <p className="font-body-lg text-body-lg text-on-surface-variant">
+                {event.description || "No description available for this event yet."}
               </p>
             </div>
 
-            <div className="grid gap-4 rounded-2xl bg-zinc-50 p-5 md:grid-cols-3">
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Event ID</p>
-                <p className="mt-1 text-sm font-medium text-zinc-900">#{event.id}</p>
+            {/* Meta Info Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-stack-md bg-surface-container-lowest p-6 rounded-xl shadow-md border border-outline-variant/10">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-primary">calendar_month</span>
+                </div>
+                <div>
+                  <h3 className="font-label-sm text-label-sm text-on-surface mb-1">Date & Time</h3>
+                  <p className="font-body text-body text-on-surface-variant">
+                    {formatDateTime(event.startDate)}
+                    <br />
+                    to {formatDateTime(event.endDate)}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Category</p>
-                <p className="mt-1 text-sm font-medium text-zinc-900">
-                  {event.categoryId ?? "Unassigned"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Venue</p>
-                <p className="mt-1 text-sm font-medium text-zinc-900">
-                  {event.venueId ?? "Not assigned"}
-                </p>
+              
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-primary">location_on</span>
+                </div>
+                <div>
+                  <h3 className="font-label-sm text-label-sm text-on-surface mb-1">Venue</h3>
+                  <p className="font-body text-body text-on-surface-variant">
+                    {event.venue?.name || "TBA"}
+                    <br />
+                    {event.venue?.city || ""} {event.venue?.country || ""}
+                  </p>
+                  {event.venue && (
+                    <a className="text-primary font-label-sm text-label-sm hover:underline mt-1 inline-block" href="#">
+                      View Map
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-4 border-t border-zinc-200 pt-5">
-              <div>
-                <p className="text-sm text-zinc-500">Tickets are managed through booking flow later in the roadmap.</p>
+            {/* Description */}
+            <div className="bg-surface-container-lowest p-6 rounded-xl shadow-md border border-outline-variant/10">
+              <h2 className="font-section-heading text-section-heading text-on-surface mb-stack-md">About This Event</h2>
+              <div className="font-body text-body text-on-surface-variant space-y-4 whitespace-pre-wrap">
+                {event.description || "No description available for this event yet."}
               </div>
-              <button
-                className="inline-flex items-center gap-2 rounded-full bg-zinc-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800"
-                type="button"
-              >
-                <Ticket className="h-4 w-4" />
-                Book Now
-              </button>
+              
+              <div className="mt-8 pt-6 border-t border-outline-variant/20">
+                <h3 className="font-label-sm text-label-sm text-on-surface mb-2">Organizer</h3>
+                <p className="font-body text-body text-on-surface-variant">
+                  {event.organizer?.name || "Unknown Organizer"}
+                </p>
+              </div>
             </div>
           </div>
-        </article>
-      ) : null}
-    </div>
+
+          {/* Right Column: Sticky Ticketing */}
+          <div className="lg:col-span-5 xl:col-span-4 relative">
+            <TicketTierSelector eventId={event.id} tiers={event.ticketTiers || []} />
+          </div>
+        </div>
+      </div>
+    </main>
   );
 }

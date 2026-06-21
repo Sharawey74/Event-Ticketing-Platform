@@ -299,3 +299,26 @@ async function requestRefund(bookingId: number, token: string) {
 4. Expired reservations (RESERVED + past `expiresAt`) must still appear in history table — state is EXPIRED, not hidden
 5. The stat cards derive from the bookings data already fetched — no extra API call needed for counts
 6. QR code is already stored in `tickets` table as Base64 — no regeneration needed on client
+
+---
+
+## 📋 Scope Analysis Reference
+
+> **Full scope analysis (what is in/out of scope for Days 13–21):**
+> `docs/Core/day13-21-scope-analysis.md`
+
+### Priority Items Active This Day
+
+| ID | Priority | Item | Status |
+|----|----------|------|--------|
+| HIGH-10 | 🟠 P2 | Create `frontend/src/middleware.ts` — protect `/dashboard/*` and `/organizer/*` paths; redirect unauthenticated users to `/auth/login` | 🔲 Required |
+| MEDIUM-17 | 🟡 P3 | QR code rendered as `<img src={qrBase64} />` only — never `console.log(qrBase64)` anywhere in dashboard or ticket card components | 🔲 Required |
+
+### Items Confirmed Out of Scope for Day 14
+
+| Item | Why |
+|------|-----|
+| Middleware as security enforcement | Middleware is UX only; backend returns 401/403 for unauthorized access — backend is the source of truth |
+| HttpOnly cookie migration | Phase 1B only |
+| Replacing `sessionStorage` with HttpOnly cookie | Phase 1B only |
+| Removing pgAdmin from docker-compose | Local dev tools stay; only needs a README note (handled Day 17) |

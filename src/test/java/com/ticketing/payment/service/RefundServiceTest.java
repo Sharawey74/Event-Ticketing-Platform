@@ -26,12 +26,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.statemachine.StateMachine;
 import com.ticketing.booking.statemachine.BookingStateMachineService;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 
-import com.ticketing.booking.model.BookingEvent;
-import com.ticketing.booking.model.BookingState;
 import com.ticketing.booking.model.Booking;
+import com.ticketing.booking.model.BookingEvent;
 import com.ticketing.booking.model.BookingState;
 import com.ticketing.booking.repository.BookingRepository;
 import com.ticketing.common.exception.ConflictException;

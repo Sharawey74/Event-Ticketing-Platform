@@ -202,3 +202,32 @@ async headers() {
 2. The `depends_on` syntax with `condition: service_healthy` is required to prevent connection refused errors.
 3. **DO NOT add CSP to `SecurityConfig.java`** — the backend serves JSON, not HTML. CSP on Spring Boot breaks Swagger UI and protects nothing on the Next.js frontend.
 4. `POST /api/v1/webhooks/stripe` must always be excluded from CSRF checking if CSRF is ever re-enabled.
+
+---
+
+## 📋 Scope Analysis Reference
+
+> **Full scope analysis (what is in/out of scope for Days 13–21):**
+> `docs/Core/day13-21-scope-analysis.md`
+
+### Priority Items Active This Day
+
+All 5 of today’s items are P1 or P2. **This is the most infrastructure-heavy day before deployment.**
+
+| ID | Priority | Item | Status |
+|----|----------|------|--------|
+| BLOCKER-2 | 🔴 P1 | Create `Dockerfile` — multi-stage (JDK build stage → JRE runtime stage), runs as non-root user, does NOT copy `.env`, `.git`, `Plans/`, logs, or `target/` | 🔲 Required |
+| BLOCKER-5 | 🔴 P1 | Create `.dockerignore` — must exclude `.env`, `.env.*` (except `.env.example`), `target/`, `Plans/`, `Archive/`, `*.log`, `.git`, `.github/agents`, `.github/instructions`, `node_modules`, `frontend/.next` | 🔲 Required |
+| HIGH-6 | 🟠 P2 | Add `X-Frame-Options: DENY` and `HSTS` to Spring Security config — 2–3 lines in `SecurityConfig.java`. Do NOT add CSP to backend (JSON-only API) | 🔲 Required |
+| HIGH-7 | 🟠 P2 | Add a prominent comment block to `docker-compose.yml` stating it is for local development only — do NOT rename or delete local dev services (pgAdmin, Redis Commander, Mailhog) | 🔲 Required |
+| MEDIUM-13 | 🟡 P3 | Add `headers()` with CSP to `frontend/next.config.ts` — allow only `self`, Stripe.js (`js.stripe.com`), and Stripe frames (`*.stripe.com`). Do NOT use wildcard `*`. Do NOT include Railway URL (not known yet) | 🔲 Required |
+
+### Items Confirmed Out of Scope for Day 17
+
+| Item | Why |
+|------|-----|
+| CSP on Spring backend (`SecurityConfig.java`) | Backend serves JSON only — master prompt explicitly forbids this: it protects nothing and breaks Swagger UI |
+| Deleting pgAdmin/Redis Commander/Mailhog | These are needed for local development — just document the Compose file as local-only |
+| Adding Railway backend URL to frontend CSP | Railway URL is not yet known at Day 17 — this is a Day 21 deployment step |
+| Google Fonts CSP entry | Frontend does not use Google Fonts — no entry needed |
+| Kubernetes / Terraform | Deferred to Phase 1B |

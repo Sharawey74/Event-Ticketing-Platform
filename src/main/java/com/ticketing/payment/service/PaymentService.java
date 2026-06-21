@@ -171,12 +171,24 @@ public class PaymentService {
     public void refundAmount(String paymentIntentId, BigDecimal amount) {
         String correlationId = MDC.get("correlationId");
         try {
+            // movePointRight(2): converts dollars to cents (e.g. 100.00 → 10000)
+            // longValueExact(): FAILS FAST if any fractional cents remain — safer than longValue()
+            //                   which silently truncates (e.g. 100.005 → 10000 without warning)
+            long amountInCents = amount.movePointRight(2).longValueExact();
+
             com.stripe.param.RefundCreateParams params = com.stripe.param.RefundCreateParams.builder()
                     .setPaymentIntent(paymentIntentId)
-                    // Stripe amounts are in cents (integer)
-                    .setAmount(amount.multiply(BigDecimal.valueOf(100)).longValue())
+                    .setAmount(amountInCents)
                     .build();
-            com.stripe.model.Refund.create(params);
+
+            // Idempotency key: if this request is retried (e.g. network timeout), Stripe will
+            // recognise the key and return the original refund instead of creating a duplicate.
+            // Key format: refund:<paymentIntentId>:<amountInCents>
+            com.stripe.net.RequestOptions requestOptions = com.stripe.net.RequestOptions.builder()
+                    .setIdempotencyKey("refund:" + paymentIntentId + ":" + amountInCents)
+                    .build();
+
+            com.stripe.model.Refund.create(params, requestOptions);
             log.info("[{}] [payment] Stripe refund of {} issued for payment intent {}",
                     correlationId, amount, paymentIntentId);
         } catch (com.stripe.exception.StripeException e) {
