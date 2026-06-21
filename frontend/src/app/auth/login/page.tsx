@@ -56,23 +56,22 @@ export default function LoginPage() {
       </header>
 
       {/* Decorative Background */}
-      <div className="absolute inset-0 opacity-40 pointer-events-none" style={{
-        backgroundImage: 'radial-gradient(circle at 80% 20%, rgba(99,14,212,0.08) 0%, transparent 40%), radial-gradient(circle at 20% 80%, rgba(75,65,225,0.08) 0%, transparent 40%)'
-      }} />
-
+      <div className="absolute inset-0 opacity-40 pointer-events-none bg-[radial-gradient(circle_at_80%_20%,rgba(99,14,212,0.08)_0%,transparent_40%),radial-gradient(circle_at_20%_80%,rgba(75,65,225,0.08)_0%,transparent_40%)]" />
       {/* Login Card */}
       <div className="w-full max-w-[420px] bg-surface-container-lowest rounded-xl shadow-lg relative z-10 p-stack-lg border border-surface-variant overflow-hidden">
         
         {/* Top gradient accent bar */}
-        <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-primary to-secondary"></div>
+        <div className="absolute top-1/4 left-10 w-64 h-64 bg-primary-fixed-dim/20 rounded-full mix-blend-multiply filter blur-[80px] animate-blob"></div>
+        <div className="absolute top-1/3 right-10 w-64 h-64 bg-secondary-fixed-dim/20 rounded-full mix-blend-multiply filter blur-[80px] animate-blob animation-delay-2000"></div>
+        <div className="absolute -bottom-8 left-1/2 w-64 h-64 bg-tertiary-fixed-dim/20 rounded-full mix-blend-multiply filter blur-[80px] animate-blob animation-delay-4000"></div>
         
         <h1 className="font-section-heading text-section-heading text-on-surface text-center mb-stack-lg mt-2">Sign in to your account</h1>
         
-        {error && (
+        {error ? (
           <div className="mb-4 p-3 bg-error-container text-on-error-container rounded-lg font-label-sm text-center">
             {error}
           </div>
-        )}
+        ) : null}
 
         <form className="space-y-stack-md" onSubmit={handleLogin}>
           
@@ -120,7 +119,7 @@ export default function LoginPage() {
           <button 
             type="submit" 
             disabled={isLoading}
-            className="w-full bg-linear-to-r from-primary to-secondary text-on-primary rounded-full py-3 font-bold hover:shadow-lg hover:-translate-y-[1px] transition-all disabled:opacity-70 disabled:hover:translate-y-0"
+            className="btn-gradient w-full py-3 px-4 rounded-full text-on-primary font-label-md mt-6 shadow-md hover:shadow-lg hover:-translate-y-1 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-md flex justify-center items-center gap-2"
           >
             {isLoading ? "Signing in..." : "Sign In"}
           </button>

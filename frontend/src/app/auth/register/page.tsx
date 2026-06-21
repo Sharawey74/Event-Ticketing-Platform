@@ -84,11 +84,11 @@ export default function RegisterPage() {
         <h1 className="font-section-heading text-section-heading text-on-surface mb-2">Create your account</h1>
         <p className="font-body text-body text-on-surface-variant mb-6">Join VividPass to unlock premium experiences.</p>
         
-        {error && (
+        {error ? (
           <div className="mb-4 p-3 bg-error-container text-on-error-container rounded-lg font-label-sm">
             {error}
           </div>
-        )}
+        ) : null}
 
         <form className="flex flex-col gap-5" onSubmit={handleRegister}>
           
@@ -198,7 +198,7 @@ export default function RegisterPage() {
           <button 
             type="submit" 
             disabled={isLoading}
-            className="w-full bg-linear-to-r from-primary to-secondary text-on-primary rounded-full py-3.5 font-bold hover:shadow-lg hover:-translate-y-[1px] transition-all disabled:opacity-70 disabled:hover:translate-y-0 mt-2"
+            className="btn-gradient w-full py-3 px-4 rounded-full text-on-primary font-label-md mt-6 shadow-md hover:shadow-lg hover:-translate-y-px transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-md flex justify-center items-center gap-2"
           >
             {isLoading ? "Creating Account..." : "Create Account"}
           </button>
