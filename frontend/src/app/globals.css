@@ -1,28 +1,240 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --font-geist-sans: "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
-  --font-geist-mono: "Cascadia Mono", "Consolas", "Courier New", monospace;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-surface: #f7f9fb;
+  --color-surface-dim: #d8dadc;
+  --color-surface-bright: #f7f9fb;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f2f4f6;
+  --color-surface-container: #eceef0;
+  --color-surface-container-high: #e6e8ea;
+  --color-surface-container-highest: #e0e3e5;
+  
+  --color-on-surface: #191c1e;
+  --color-on-surface-variant: #4a4455;
+  
+  --color-inverse-surface: #2d3133;
+  --color-inverse-on-surface: #eff1f3;
+  
+  --color-outline: #7b7487;
+  --color-outline-variant: #ccc3d8;
+  
+  --color-surface-tint: #732ee4;
+  --color-primary: #630ed4;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #7c3aed;
+  --color-on-primary-container: #ede0ff;
+  --color-inverse-primary: #d2bbff;
+  
+  --color-secondary: #4b41e1;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #645efb;
+  --color-on-secondary-container: #fffbff;
+  
+  --color-tertiary: #474e64;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #5e667d;
+  --color-on-tertiary-container: #dee5ff;
+  
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  --color-background: #f7f9fb;
+  --color-on-background: #191c1e;
+
+  /* Typography */
+  --font-body: "Inter", sans-serif;
+  --font-caption: "Inter", sans-serif;
+  --font-hero-headline-mobile: "Inter", sans-serif;
+  --font-section-heading: "Inter", sans-serif;
+  --font-hero-headline: "Inter", sans-serif;
+  --font-body-lg: "Inter", sans-serif;
+  --font-label-sm: "Inter", sans-serif;
+
+  /* Font Sizes / Line Heights - mapped to custom class names in classes if needed */
+  --text-body: 16px;
+  --text-body--line-height: 24px;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-hero-headline-mobile: 36px;
+  --text-hero-headline-mobile--line-height: 1.2;
+  --text-section-heading: 24px;
+  --text-section-heading--line-height: 32px;
+  --text-hero-headline: 56px;
+  --text-hero-headline--line-height: 1.1;
+  --text-body-lg: 18px;
+  --text-body-lg--line-height: 28px;
+  --text-label-sm: 14px;
+  --text-label-sm--line-height: 20px;
+
+  /* Spacing */
+  --spacing-edge-padding: 24px;
+  --spacing-stack-sm: 8px;
+  --spacing-stack-md: 16px;
+  --spacing-stack-lg: 32px;
+  --spacing-section-gap: 80px;
+  --spacing-gutter: 24px;
+  --spacing-container-max: 1280px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+@utility font-hero-headline {
+  font-family: var(--font-hero-headline);
+  font-size: var(--text-hero-headline);
+  font-weight: 700;
+  line-height: var(--text-hero-headline--line-height);
+  letter-spacing: -0.02em;
+}
+
+@utility font-hero-headline-mobile {
+  font-family: var(--font-hero-headline-mobile);
+  font-size: var(--text-hero-headline-mobile);
+  font-weight: 700;
+  line-height: var(--text-hero-headline-mobile--line-height);
+  letter-spacing: -0.02em;
+}
+
+@utility font-section-heading {
+  font-family: var(--font-section-heading);
+  font-size: var(--text-section-heading);
+  font-weight: 700;
+  line-height: var(--text-section-heading--line-height);
+  letter-spacing: -0.01em;
+}
+
+@utility font-body-lg {
+  font-family: var(--font-body-lg);
+  font-size: var(--text-body-lg);
+  font-weight: 400;
+  line-height: var(--text-body-lg--line-height);
+}
+
+@utility font-body {
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  font-weight: 400;
+  line-height: var(--text-body--line-height);
+}
+
+@utility font-label-sm {
+  font-family: var(--font-label-sm);
+  font-size: var(--text-label-sm);
+  font-weight: 600;
+  line-height: var(--text-label-sm--line-height);
+  letter-spacing: 0.05em;
+}
+
+@utility font-caption {
+  font-family: var(--font-caption);
+  font-size: var(--text-caption);
+  font-weight: 400;
+  line-height: var(--text-caption--line-height);
+}
+
+@utility text-hero-headline {
+  font-size: var(--text-hero-headline);
+}
+
+@utility text-hero-headline-mobile {
+  font-size: var(--text-hero-headline-mobile);
+}
+
+@utility text-section-heading {
+  font-size: var(--text-section-heading);
+}
+
+@utility text-body-lg {
+  font-size: var(--text-body-lg);
+}
+
+@utility text-body {
+  font-size: var(--text-body);
+}
+
+@utility text-label-sm {
+  font-size: var(--text-label-sm);
+}
+
+@utility text-caption {
+  font-size: var(--text-caption);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-background);
+  color: var(--color-on-surface);
+  font-family: var(--font-body);
+}
+
+/* Glass panel */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Gradients */
+.gradient-text {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.btn-gradient {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+}
+
+/* Success Checkmark Animation for Confirmation Page */
+.success-checkmark {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: block;
+  stroke-width: 2;
+  stroke: #fff;
+  stroke-miterlimit: 10;
+  box-shadow: inset 0px 0px 0px var(--color-primary);
+  animation: fill .4s ease-in-out .4s forwards, scale .3s ease-in-out .9s both;
+  margin: 0 auto 24px;
+}
+.success-checkmark .checkmark__circle {
+  stroke-dasharray: 166;
+  stroke-dashoffset: 166;
+  stroke-width: 2;
+  stroke-miterlimit: 10;
+  stroke: var(--color-primary);
+  fill: none;
+  animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+.success-checkmark .checkmark__check {
+  transform-origin: 50% 50%;
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+}
+@keyframes stroke {
+  100% { stroke-dashoffset: 0; }
+}
+@keyframes scale {
+  0%, 100% { transform: none; }
+  50% { transform: scale3d(1.1, 1.1, 1); }
+}
+@keyframes fill {
+  100% { box-shadow: inset 0px 0px 0px 40px var(--color-primary); }
+}
+.shimmer {
+  background: #f6f7f8;
+  background-image: linear-gradient(to right, #f6f7f8 0%, #edeef1 20%, #f6f7f8 40%, #f6f7f8 100%);
+  background-repeat: no-repeat;
+  background-size: 800px 100%; 
+  animation-duration: 1.5s;
+  animation-fill-mode: forwards; 
+  animation-iteration-count: infinite;
+  animation-name: placeholderShimmer;
+  animation-timing-function: linear;
+}
+@keyframes placeholderShimmer {
+  0% { background-position: -468px 0; }
+  100% { background-position: 468px 0; }
 }

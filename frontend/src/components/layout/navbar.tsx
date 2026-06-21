@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 import { Search, ShoppingCart, Ticket } from "lucide-react";
@@ -30,6 +30,11 @@ export function Navbar() {
         categoryId: "",
       }),
     );
+  }
+
+  const pathname = usePathname() || "";
+  if (pathname.includes("/confirmation") || pathname.includes("/checkout")) {
+    return null;
   }
 
   return (
