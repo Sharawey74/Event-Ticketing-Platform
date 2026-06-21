@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/store/authStore";
@@ -42,10 +43,20 @@ export default function EventAttendeesPage() {
   const router = useRouter();
   const { token, userRole } = useAuthStore();
   
-  const [attendees, setAttendees] = useState<Attendee[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [isCheckingIn, setIsCheckingIn] = useState<number | null>(null);
+
+  const { data: attendeesData, isLoading } = useQuery({
+    queryKey: ["eventAttendees", id],
+    queryFn: async () => {
+      const res = await api.get(`/api/v1/organizer/events/${id}/attendees`);
+      return res.data?.data || [];
+    },
+    enabled: !!token && userRole === "ORGANIZER" && !!id,
+  });
+
+  const attendees = (attendeesData as Attendee[]) || [];
 
   useEffect(() => {
     if (!token) {
@@ -57,27 +68,13 @@ export default function EventAttendeesPage() {
       router.push("/dashboard/bookings");
       return;
     }
-
-    async function fetchAttendees() {
-      try {
-        const res = await api.get(`/api/v1/organizer/events/${id}/attendees`);
-        setAttendees(res.data?.data || []);
-      } catch (err) {
-        console.error("Failed to load attendees", err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchAttendees();
-  }, [id, token, userRole, router]);
+  }, [token, userRole, router]);
 
   const handleCheckIn = async (bookingId: number) => {
     setIsCheckingIn(bookingId);
     try {
       await api.post(`/api/v1/bookings/${bookingId}/check-ins`);
-      // Update local state to show as ATTENDED
-      setAttendees(prev => prev.map(a => a.bookingId === bookingId ? { ...a, state: "ATTENDED" } : a));
+      queryClient.invalidateQueries({ queryKey: ["eventAttendees", id] });
     } catch (err) {
       console.error("Check-in failed", err);
       alert("Failed to check-in attendee. They might not be in a CONFIRMED state or you are not authorized.");
@@ -93,11 +90,11 @@ export default function EventAttendeesPage() {
   );
 
   if (isLoading) {
-    return <main className="flex-grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen flex items-center justify-center"><p>Loading attendees...</p></main>;
+    return <main className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen flex items-center justify-center"><p>Loading attendees...</p></main>;
   }
 
   return (
-    <main className="flex-grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen">
+    <main className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen">
       
       {/* Back button */}
       <nav className="mb-stack-md">

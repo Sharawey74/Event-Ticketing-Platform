@@ -1,6 +1,8 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/store/authStore";
@@ -68,7 +70,7 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
         <p className="font-caption text-caption text-on-surface-variant text-center mt-2">Scan at entry</p>
       </div>
       
-      <div className="p-stack-md flex-grow flex flex-col justify-between relative">
+      <div className="p-stack-md grow flex flex-col justify-between relative">
         <div className="absolute top-0 left-0 w-4 h-4 bg-background rounded-br-full shadow-[inset_-1px_-1px_0_rgba(204,195,216,0.3)] hidden sm:block"></div>
         <div className="absolute bottom-0 left-0 w-4 h-4 bg-background rounded-tr-full shadow-[inset_-1px_1px_0_rgba(204,195,216,0.3)] hidden sm:block"></div>
         
@@ -99,33 +101,28 @@ export default function BookingDetailPage() {
   const router = useRouter();
   const { token } = useAuthStore();
   
-  const [booking, setBooking] = useState<Booking | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
+  const queryClient = useQueryClient();
   const [refundStatus, setRefundStatus] = useState<{message: string, isError: boolean} | null>(null);
   const [isRefunding, setIsRefunding] = useState(false);
 
   useEffect(() => {
     if (!token) {
-      router.push("/auth");
-      return;
+      router.push("/auth/login");
     }
+  }, [token, router]);
 
-    async function fetchBooking() {
-      try {
-        const res = await api.get(`/api/v1/bookings/${id}`);
-        setBooking(res.data?.data);
-      } catch (err: unknown) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setError((err as any)?.response?.data?.message || "Failed to load booking details.");
-      } finally {
-        setIsLoading(false);
-      }
-    }
+  const { data: booking, isLoading, error: queryError } = useQuery({
+    queryKey: ["booking", id],
+    queryFn: async () => {
+      const res = await api.get(`/api/v1/bookings/${id}`);
+      return res.data?.data as Booking;
+    },
+    enabled: !!token && !!id,
+    retry: false,
+  });
 
-    fetchBooking();
-  }, [id, token, router]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const error = queryError ? (queryError as any)?.response?.data?.message || "Failed to load booking details." : null;
 
   const handleRefund = async () => {
     if (!confirm("Are you sure you want to request a refund for this booking?")) return;
@@ -136,8 +133,8 @@ export default function BookingDetailPage() {
       const res = await api.post(`/api/v1/bookings/${id}/refunds`);
       const refund = res.data?.data;
       
-      // Update local state to reflect refund status
-      setBooking(prev => prev ? { ...prev, state: refund.status === "DENIED" ? "CONFIRMED" : "REFUND_REQUESTED", refundDenialReason: refund.denialReason } : null);
+      queryClient.invalidateQueries({ queryKey: ["booking", id] });
+      queryClient.invalidateQueries({ queryKey: ["myBookings"] });
       
       if (refund.status === "DENIED") {
         setRefundStatus({ message: `Refund denied: ${refund.denialReason}`, isError: true });
@@ -212,8 +209,8 @@ export default function BookingDetailPage() {
       </div>
 
       {/* Refund Section */}
-      {(canRefund || refundStatus) && (
-        <div className="bg-surface-container-lowest p-stack-md rounded-xl shadow-sm border border-surface-container-high">
+      {canRefund || refundStatus ? (
+        <div className="bg-surface-container-low rounded-xl p-6 border border-outline-variant">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
               <h3 className="font-label-sm text-on-surface mb-1">Manage Booking</h3>
@@ -222,30 +219,30 @@ export default function BookingDetailPage() {
               </p>
             </div>
             
-            {canRefund && (
-              <button 
+            {canRefund ? (
+              <button
                 onClick={handleRefund}
                 disabled={isRefunding}
-                className="w-full md:w-auto border border-error text-error font-label-sm px-6 py-2 rounded-full hover:bg-error-container transition-colors disabled:opacity-50"
+                className="bg-error text-on-error px-6 py-2 rounded-full font-label-sm hover:bg-error-container hover:text-on-error-container transition-colors disabled:opacity-50"
               >
                 {isRefunding ? "Processing..." : "Request Refund"}
               </button>
-            )}
+            ) : null}
           </div>
           
-          {refundStatus && (
-            <div className={`mt-4 p-3 rounded-lg text-sm font-medium ${refundStatus.isError ? "bg-error-container text-on-error-container" : "bg-[#e6f4ea] text-[#137333]"}`}>
+          {refundStatus ? (
+            <div className={`mt-4 p-4 rounded-lg font-body text-sm ${!refundStatus.isError ? "bg-primary-container text-on-primary-container" : "bg-error-container text-on-error-container"}`}>
               {refundStatus.message}
             </div>
-          )}
+          ) : null}
           
-          {booking.state === "CONFIRMED" && booking.refundDenialReason && !refundStatus && (
-            <div className="mt-4 p-3 rounded-lg text-sm font-medium bg-error-container text-on-error-container">
-              Previous refund request denied: {booking.refundDenialReason}
+          {booking.state === "CONFIRMED" && booking.refundDenialReason && !refundStatus ? (
+            <div className="mt-4 p-4 rounded-lg font-body text-sm bg-error-container text-on-error-container">
+              <strong>Refund Denied:</strong> {booking.refundDenialReason}
             </div>
-          )}
+          ) : null}
         </div>
-      )}
+      ) : null}
 
       {/* Tickets Section */}
       <div>
