@@ -1,5 +1,6 @@
 package com.ticketing.booking.statemachine;
 
+import org.slf4j.MDC;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.config.StateMachineFactory;
 import org.springframework.stereotype.Service;
@@ -72,7 +73,8 @@ public class BookingStateMachineService {
         // Step 3: Start the machine
         sm.startReactively().block();
 
-        log.debug("[SM] Acquired state machine for booking {} with interceptor attached", bookingId);
+        log.debug("[{}] [sm] Acquired state machine for booking {} with interceptor attached",
+                MDC.get("correlationId"), bookingId);
         return sm;
     }
 }

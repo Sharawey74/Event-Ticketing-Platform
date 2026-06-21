@@ -7,6 +7,8 @@ import org.springframework.statemachine.support.StateMachineInterceptorAdapter;
 import org.springframework.statemachine.transition.Transition;
 import org.springframework.stereotype.Component;
 
+import org.slf4j.MDC;
+
 import com.ticketing.booking.model.BookingEvent;
 import com.ticketing.booking.model.BookingState;
 import com.ticketing.booking.repository.BookingRepository;
@@ -29,7 +31,8 @@ public class BookingStateChangeInterceptor extends StateMachineInterceptorAdapte
         Object bookingIdObj = stateMachine.getExtendedState().getVariables().get("bookingId");
         if (bookingIdObj instanceof Long bookingId) {
             bookingRepository.findById(bookingId).ifPresent(booking -> {
-                log.info("Interceptor updating booking {} state to {}", bookingId, state.getId());
+                String correlationId = MDC.get("correlationId");
+                log.info("[{}] [sm] Updating booking {} state to {}", correlationId, bookingId, state.getId());
                 booking.setState(state.getId());
                 bookingRepository.save(booking);
             });
