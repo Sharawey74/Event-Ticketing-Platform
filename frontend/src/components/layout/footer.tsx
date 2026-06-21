@@ -1,10 +1,17 @@
 export function Footer() {
   return (
-    <footer className="border-t border-black/10 bg-zinc-950 py-8 text-zinc-300">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 px-4 md:px-6">
-        <p className="text-sm font-medium text-white">Event Ticketing Platform</p>
-        <p className="text-sm text-zinc-400">
+    <footer className="bg-inverse-surface py-stack-lg">
+      <div className="mx-auto flex w-full max-w-container-max flex-col gap-4 px-edge-padding">
+        <p className="text-section-heading text-surface font-bold tracking-tighter">VividPass</p>
+        <p className="text-surface-variant font-caption max-w-md">
           Discover events, reserve your seats, and manage bookings from one place.
+        </p>
+        <div className="flex gap-4">
+           <a href="#" className="text-surface-variant font-caption hover:text-primary-fixed-dim">Terms</a>
+           <a href="#" className="text-surface-variant font-caption hover:text-primary-fixed-dim">Privacy</a>
+        </div>
+        <p className="text-surface-variant font-caption mt-4">
+          © {new Date().getFullYear()} VividPass. All rights reserved.
         </p>
       </div>
     </footer>
