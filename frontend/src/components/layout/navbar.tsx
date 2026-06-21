@@ -65,6 +65,12 @@ export function Navbar() {
         </form>
 
         <div className="flex items-center gap-4">
+          <Link
+            className={`text-sm font-medium ${pathname.startsWith("/dashboard") ? "text-primary font-bold border-b-2 border-primary" : "text-zinc-700 hover:text-zinc-950"}`}
+            href="/dashboard/bookings"
+          >
+            Dashboard
+          </Link>
           <Link className="text-sm font-medium text-zinc-700 hover:text-zinc-950" href="/auth">
             Sign in
           </Link>
