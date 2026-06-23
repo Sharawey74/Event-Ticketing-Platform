@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         LOCAL PROFILE: Human-readable console + rolling JSON file
+         ══════════════════════════════════════════════════════════════════ -->
+
+    <!-- Readable console output for developers -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Rolling JSON file — masks sensitive field names by path -->
+    <appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/logging.json</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/logging-%d{yyyy-MM-dd}.json</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <!-- Mask sensitive field names in the JSON output -->
+            <jsonGeneratorDecorator class="net.logstash.logback.mask.MaskingJsonGeneratorDecorator">
+                <!-- These paths are masked wherever they appear in JSON keys -->
+                <path>password</path>
+                <path>passwordHash</path>
+                <path>authorization</path>
+                <path>Authorization</path>
+                <path>stripeSecretKey</path>
+                <path>webhookSecret</path>
+                <path>databaseUrl</path>
+                <path>coverImageBase64</path>
+            </jsonGeneratorDecorator>
+        </encoder>
+    </appender>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         PROD PROFILE: JSON to console only (no file I/O on server)
+         ══════════════════════════════════════════════════════════════════ -->
+
+    <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <jsonGeneratorDecorator class="net.logstash.logback.mask.MaskingJsonGeneratorDecorator">
+                <path>password</path>
+                <path>passwordHash</path>
+                <path>authorization</path>
+                <path>Authorization</path>
+                <path>stripeSecretKey</path>
+                <path>webhookSecret</path>
+                <path>databaseUrl</path>
+                <path>coverImageBase64</path>
+            </jsonGeneratorDecorator>
+        </encoder>
+    </appender>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         Profile-based root logger configuration
+         ══════════════════════════════════════════════════════════════════ -->
+
+    <springProfile name="local,default">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE" />
+            <appender-ref ref="JSON_FILE" />
+        </root>
+    </springProfile>
+
+    <springProfile name="prod">
+        <root level="INFO">
+            <appender-ref ref="JSON_CONSOLE" />
+        </root>
+    </springProfile>
+
+</configuration>
