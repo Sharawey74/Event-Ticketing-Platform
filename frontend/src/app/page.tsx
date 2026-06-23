@@ -39,9 +39,8 @@ export default function Home() {
   const [draftQuery, setDraftQuery] = useState("");
   const [draftCity, setDraftCity] = useState("");
   const [draftDate, setDraftDate] = useState("");
-  const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>(
-    initialFilters,
-  );
+  const [appliedFilters, setAppliedFilters] =
+    useState<AppliedFilters>(initialFilters);
 
   const eventFilters: EventFilters = {
     q: appliedFilters.query || undefined,
@@ -66,6 +65,7 @@ export default function Home() {
   } = useQuery({
     queryKey: ["events", eventFilters],
     queryFn: () => fetchPublishedEvents(eventFilters),
+    retry: 1,
   });
 
   const categories =
@@ -74,11 +74,9 @@ export default function Home() {
 
   const venueCityById = useMemo(() => {
     const mapping = new Map<number, string>();
-
     venuesData?.forEach((venue) => {
       mapping.set(venue.id, venue.city);
     });
-
     return mapping;
   }, [venuesData]);
 
@@ -103,28 +101,32 @@ export default function Home() {
   }
 
   return (
-    <div className="bg-zinc-50">
+    <div className="bg-surface">
+      {/* ── Hero ── */}
       <section className="relative overflow-hidden bg-zinc-950 text-white">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,#22c55e,transparent_45%),radial-gradient(circle_at_bottom_right,#0ea5e9,transparent_35%)] opacity-80" />
-        <div className="relative mx-auto w-full max-w-6xl px-4 py-16 md:px-6 md:py-20">
+        {/* Purple gradient — no green */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(99,14,212,0.75),transparent_55%),radial-gradient(ellipse_at_bottom_right,rgba(75,65,225,0.55),transparent_50%)] opacity-90" />
+
+        <div className="relative mx-auto w-full max-w-6xl px-4 py-16 md:px-6 md:py-24">
           <div className="max-w-3xl space-y-4">
-            <p className="text-sm uppercase tracking-[0.2em] text-emerald-300">
+            <p className="text-sm uppercase tracking-[0.2em] text-violet-300 font-semibold">
               Live in your city
             </p>
-            <h1 className="text-4xl font-bold tracking-tight md:text-6xl">
+            <h1 className="text-4xl font-bold tracking-tight md:text-6xl leading-tight">
               Find events worth leaving the house for.
             </h1>
-            <p className="text-base text-zinc-200 md:text-lg">
+            <p className="text-base text-zinc-300 md:text-lg max-w-xl">
               Search published events, filter by city and category, and reserve
               your seat in seconds.
             </p>
           </div>
 
-          <div className="mt-8 grid gap-3 rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-md md:grid-cols-[1.3fr_1fr_1fr_auto]">
-            <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-zinc-900">
-              <Search className="h-4 w-4 text-zinc-500" />
+          {/* Search Bar */}
+          <div className="mt-10 grid gap-3 rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-md md:grid-cols-[1.3fr_1fr_1fr_auto]">
+            <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-zinc-900">
+              <Search className="h-4 w-4 shrink-0 text-zinc-400" />
               <input
-                className="w-full bg-transparent text-sm outline-none"
+                className="w-full bg-transparent text-sm outline-none placeholder:text-zinc-400"
                 type="text"
                 placeholder="Search title or description"
                 value={draftQuery}
@@ -132,10 +134,10 @@ export default function Home() {
               />
             </label>
 
-            <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-zinc-900">
-              <MapPin className="h-4 w-4 text-zinc-500" />
+            <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-zinc-900">
+              <MapPin className="h-4 w-4 shrink-0 text-zinc-400" />
               <input
-                className="w-full bg-transparent text-sm outline-none"
+                className="w-full bg-transparent text-sm outline-none placeholder:text-zinc-400"
                 type="text"
                 placeholder="City"
                 value={draftCity}
@@ -144,8 +146,8 @@ export default function Home() {
               />
             </label>
 
-            <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-zinc-900">
-              <Calendar className="h-4 w-4 text-zinc-500" />
+            <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-zinc-900">
+              <Calendar className="h-4 w-4 shrink-0 text-zinc-400" />
               <input
                 className="w-full bg-transparent text-sm outline-none"
                 type="date"
@@ -156,7 +158,7 @@ export default function Home() {
             </label>
 
             <button
-              className="rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-400"
+              className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-container hover:shadow-lg"
               onClick={applySearch}
               type="button"
             >
@@ -166,18 +168,18 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── Category Chips ── */}
       <section className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6">
         <div className="no-scrollbar flex gap-2 overflow-x-auto pb-2">
           {categories.map((category) => {
             const isActive = appliedFilters.categoryId === category.id;
-
             return (
               <button
                 key={category.id}
-                className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+                className={`rounded-full border px-4 py-2 text-sm font-medium transition-all ${
                   isActive
-                    ? "border-emerald-600 bg-emerald-600 text-white"
-                    : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-950"
+                    ? "border-primary bg-primary text-white shadow-md"
+                    : "border-outline-variant bg-surface text-on-surface-variant hover:border-primary hover:text-primary"
                 }`}
                 onClick={() => toggleCategory(category.id)}
                 type="button"
@@ -189,24 +191,41 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── Events Grid ── */}
       <section className="mx-auto w-full max-w-6xl px-4 pb-16 md:px-6">
         <div className="mb-5 flex items-end justify-between">
-          <h2 className="text-2xl font-semibold text-zinc-950">Upcoming Events</h2>
-          <p className="text-sm text-zinc-500">
+          <h2 className="text-2xl font-semibold text-on-surface">
+            Upcoming Events
+          </h2>
+          <p className="text-sm text-on-surface-variant">
             {eventsData?.totalElements ?? 0} total events
           </p>
         </div>
 
         {isLoading ? (
-          <p className="rounded-2xl border border-zinc-200 bg-white p-6 text-sm text-zinc-500">
-            Loading events...
-          </p>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="h-64 rounded-2xl shimmer"
+              />
+            ))}
+          </div>
         ) : null}
 
         {isError ? (
-          <p className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
-            Failed to load events. Check NEXT_PUBLIC_API_URL and backend status.
-          </p>
+          <div className="rounded-2xl border border-outline-variant bg-surface-container-low p-8 text-center">
+            <p className="text-on-surface-variant text-sm font-medium">
+              Could not load events — make sure the backend is running on port
+              8081.
+            </p>
+            <p className="mt-1 text-xs text-outline">
+              Expected:{" "}
+              <code className="font-mono">
+                {process.env.NEXT_PUBLIC_API_URL}/api/events
+              </code>
+            </p>
+          </div>
         ) : null}
 
         {!isLoading && !isError ? (
@@ -216,13 +235,20 @@ export default function Home() {
                 key={event.id}
                 event={event}
                 venueCity={
-                event.venueId ? venueCityById.get(event.venueId) ?? "City not available" : "City not available"
+                  event.venueId
+                    ? (venueCityById.get(event.venueId) ?? "")
+                    : ""
+                }
+                categoryName={
+                  event.categoryId
+                    ? (categories.find(c => c.id === event.categoryId)?.name ?? "")
+                    : ""
                 }
               />
             ))}
 
             {events.length === 0 ? (
-              <p className="col-span-full rounded-2xl border border-zinc-200 bg-white p-6 text-sm text-zinc-600">
+              <p className="col-span-full rounded-2xl border border-outline-variant bg-surface-container-low p-8 text-center text-sm text-on-surface-variant">
                 No events match the current filters.
               </p>
             ) : null}

@@ -28,7 +28,7 @@ export function TicketTierSelector({ eventId, tiers }: TicketTierSelectorProps) 
   const [timeLeft, setTimeLeft] = useState<number>(0);
 
   const selectedTier = tiers.find((t) => t.id === selectedTierId);
-  const price = selectedTier ? selectedTier.price : 0;
+  const price = selectedTier ? selectedTier.basePrice : 0;
   const fee = 25; // Example fee
   const total = (price + fee) * quantity;
 
@@ -150,7 +150,7 @@ export function TicketTierSelector({ eventId, tiers }: TicketTierSelectorProps) 
         <div className="bg-surface-container-low rounded-xl p-4 border border-outline-variant/30 mb-4">
           <div className="flex justify-between items-start mb-2">
             <div>
-              <h3 className="font-label-sm text-label-sm text-on-surface">{selectedTier?.name}</h3>
+              <h3 className="font-label-sm text-label-sm text-on-surface">{selectedTier?.tierName}</h3>
               <p className="font-caption text-caption text-on-surface-variant">Quantity: {quantity}</p>
             </div>
             <span className="font-section-heading text-section-heading text-primary">
@@ -214,7 +214,7 @@ export function TicketTierSelector({ eventId, tiers }: TicketTierSelectorProps) 
             >
               <div className="flex justify-between items-start mb-2">
                 <div>
-                  <h3 className="font-label-sm text-label-sm text-on-surface">{tier.name}</h3>
+                  <h3 className="font-label-sm text-label-sm text-on-surface">{tier.tierName}</h3>
                   {tier.description && (
                     <p className="font-caption text-caption text-on-surface-variant">
                       {tier.description}
@@ -223,7 +223,7 @@ export function TicketTierSelector({ eventId, tiers }: TicketTierSelectorProps) 
                 </div>
                 <div className="text-right">
                   <span className="font-section-heading text-section-heading text-primary">
-                    ${tier.price.toFixed(2)}
+                    ${tier.basePrice.toFixed(2)}
                   </span>
                   <p className="font-caption text-caption text-on-surface-variant">
                     + ${fee.toFixed(2)} fee
@@ -283,7 +283,7 @@ export function TicketTierSelector({ eventId, tiers }: TicketTierSelectorProps) 
           {isSubmitting ? "Reserving..." : "Add to Cart"}
         </button>
         <p className="text-center font-caption text-caption text-on-surface-variant mt-4">
-          Secure checkout powered by VividPass
+          Secure checkout powered by Eventora
         </p>
       </div>
     </div>

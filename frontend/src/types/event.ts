@@ -14,9 +14,11 @@ export type OrganizerInfo = {
 
 export type TicketTierResponse = {
   id: number;
-  name: string;
-  price: number;
-  availableQuantity: number;
+  tierName: string;
+  basePrice: number;
+  availableCount: number;
+  totalCapacity: number;
+  maxPerBooking: number;
   description: string | null;
 };
 

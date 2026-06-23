@@ -2,16 +2,25 @@
 
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useEffect } from "react";
 
-import { Search, ShoppingCart } from "lucide-react";
+import { Search, ShoppingCart, LogOut, User } from "lucide-react";
 
 import { buildSearchHref } from "@/lib/search";
+import { useAuthStore } from "@/store/authStore";
 
 export function Navbar() {
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [isClient, setIsClient] = useState(false);
   const cartCount = 0;
+  
+  const { token, userEmail, clearAuth } = useAuthStore();
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsClient(true), 0);
+    return () => clearTimeout(timer);
+  }, []);
 
   function submitSearch(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -32,6 +41,13 @@ export function Navbar() {
     );
   }
 
+  const handleLogout = () => {
+    clearAuth();
+    // Also clear the middleware cookie
+    document.cookie = "token=; path=/; max-age=0;";
+    router.push("/auth/login");
+  };
+
   const pathname = usePathname() || "";
   if (pathname.includes("/confirmation") || pathname.includes("/checkout")) {
     return null;
@@ -42,7 +58,7 @@ export function Navbar() {
       <div className="mx-auto flex w-full max-w-container-max items-center justify-between gap-4 px-edge-padding">
         <Link href="/" className="inline-flex items-center gap-2">
           <span className="text-section-heading font-bold text-primary tracking-tighter">
-            VividPass
+            Eventora
           </span>
         </Link>
 
@@ -85,12 +101,28 @@ export function Navbar() {
             </span>
           </button>
           
-          <Link 
-            className="bg-linear-to-r from-primary to-secondary text-on-primary rounded-full px-6 py-2 font-label-sm hover:shadow-lg hover:scale-105 transition-all" 
-            href="/auth/login"
-          >
-            Sign in
-          </Link>
+          {isClient && token ? (
+            <div className="flex items-center gap-4 border-l border-outline-variant pl-4">
+              <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0">
+                {userEmail ? userEmail.charAt(0).toUpperCase() : <User className="h-4 w-4" />}
+              </div>
+              <button 
+                onClick={handleLogout}
+                className="text-on-surface-variant hover:text-error transition-colors p-1"
+                title="Log out"
+                aria-label="Log out"
+              >
+                <LogOut className="h-5 w-5" />
+              </button>
+            </div>
+          ) : (
+            <Link 
+              className="bg-linear-to-r from-primary to-secondary text-on-primary rounded-full px-6 py-2 font-label-sm hover:shadow-lg hover:scale-105 transition-all" 
+              href="/auth/login"
+            >
+              Sign in
+            </Link>
+          )}
         </div>
       </div>
     </header>

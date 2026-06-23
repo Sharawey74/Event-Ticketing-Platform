@@ -1,18 +1,22 @@
 export function Footer() {
   return (
-    <footer className="bg-inverse-surface py-stack-lg">
-      <div className="mx-auto flex w-full max-w-container-max flex-col gap-4 px-edge-padding">
-        <p className="text-section-heading text-surface font-bold tracking-tighter">VividPass</p>
-        <p className="text-surface-variant font-caption max-w-md">
-          Discover events, reserve your seats, and manage bookings from one place.
-        </p>
-        <div className="flex gap-4">
-           <a href="#" className="text-surface-variant font-caption hover:text-primary-fixed-dim">Terms</a>
-           <a href="#" className="text-surface-variant font-caption hover:text-primary-fixed-dim">Privacy</a>
+    <footer className="bg-surface-container-lowest border-t border-surface-container-high py-stack-lg mt-auto">
+      <div className="mx-auto flex w-full max-w-container-max flex-col md:flex-row items-center justify-between gap-4 px-edge-padding text-center md:text-left">
+        <div>
+          <p className="text-section-heading text-primary font-bold tracking-tighter">Eventora</p>
+          <p className="text-on-surface-variant font-caption mt-1">
+            Discover events, reserve your seats, and manage bookings from one place.
+          </p>
         </div>
-        <p className="text-surface-variant font-caption mt-4">
-          © {new Date().getFullYear()} VividPass. All rights reserved.
-        </p>
+        <div className="flex flex-col items-center md:items-end gap-2">
+          <div className="flex gap-4">
+             <a href="#" className="text-on-surface-variant font-caption hover:text-primary transition-colors">Terms</a>
+             <a href="#" className="text-on-surface-variant font-caption hover:text-primary transition-colors">Privacy</a>
+          </div>
+          <p className="text-on-surface-variant font-caption">
+            © {new Date().getFullYear()} Eventora. All rights reserved.
+          </p>
+        </div>
       </div>
     </footer>
   );

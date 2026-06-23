@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { format } from "date-fns";
 import { CalendarDays, MapPin } from "lucide-react";
 
@@ -6,13 +7,14 @@ import type { EventResponse } from "@/types/event";
 type EventCardProps = {
   event: EventResponse;
   venueCity: string;
+  categoryName?: string;
 };
 
 function estimatePrice(eventId: number): number {
   return 25 + ((eventId % 5) + 1) * 15;
 }
 
-export function EventCard({ event, venueCity }: EventCardProps) {
+export function EventCard({ event, venueCity, categoryName }: EventCardProps) {
   const startDate = new Date(event.startDate);
   const estimatedPrice = estimatePrice(event.id);
 
@@ -26,51 +28,57 @@ export function EventCard({ event, venueCity }: EventCardProps) {
   };
   
   const categoryClass = event.categoryId ? categoryBadgeClasses[event.categoryId] || "bg-surface-container-high text-on-surface" : "bg-surface-container-high text-on-surface";
+  const displayCategory = categoryName || (event.categoryId ? `Category ${event.categoryId}` : "Event");
 
   return (
-    <article className="group overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-md transition-shadow duration-300 hover:shadow-xl cursor-pointer">
-      <div className="relative h-40 bg-surface-dim">
-        {/* Placeholder image representation */}
-        <div className="w-full h-full bg-surface-variant flex items-center justify-center">
-           <span className="text-on-surface-variant font-caption">Event Image</span>
-        </div>
-        
-        <div className="absolute left-4 top-4 rounded-lg bg-surface/90 backdrop-blur-sm px-3 py-1.5 text-xs font-label-sm text-on-surface border border-outline-variant">
-          {format(startDate, "MMM d")}
-        </div>
-        
-        <div className={`absolute right-4 top-4 rounded-full px-3 py-1 text-xs font-label-sm border border-outline-variant ${categoryClass}`}>
-          Category {event.categoryId}
-        </div>
-      </div>
-
-      <div className="space-y-3 p-5">
-        <h3 className="line-clamp-1 font-section-heading text-lg text-on-surface group-hover:text-primary transition-colors" title={event.title}>
-          {event.title}
-        </h3>
-
-        <div className="flex items-center gap-2 text-sm text-on-surface-variant font-body">
-          <CalendarDays className="h-4 w-4 text-outline" />
-          <span>{format(startDate, "EEEE, MMM d • p")}</span>
+    <Link href={`/events/${event.id}`} className="group overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-md transition-shadow duration-300 hover:shadow-xl cursor-pointer block">
+      <article>
+        <div className="relative h-40 bg-surface-dim">
+          {/* Placeholder image representation */}
+          {event.coverImageUrl ? (
+            <img src={event.coverImageUrl} alt={event.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+          ) : (
+            <div className="w-full h-full bg-surface-variant flex items-center justify-center group-hover:scale-105 transition-transform duration-500">
+               <span className="text-on-surface-variant font-caption">Event Image</span>
+            </div>
+          )}
+          
+          <div className="absolute left-4 top-4 rounded-lg bg-surface/90 backdrop-blur-sm px-3 py-1.5 text-xs font-label-sm text-on-surface border border-outline-variant">
+            {format(startDate, "MMM d")}
+          </div>
+          
+          <div className={`absolute right-4 top-4 rounded-full px-3 py-1 text-xs font-label-sm border border-outline-variant ${categoryClass}`}>
+            {displayCategory}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 text-sm text-on-surface-variant font-body">
-          <MapPin className="h-4 w-4 text-outline" />
-          <span>{venueCity}</span>
-        </div>
+        <div className="space-y-3 p-5">
+          <h3 className="line-clamp-1 font-section-heading text-lg text-on-surface group-hover:text-primary transition-colors" title={event.title}>
+            {event.title}
+          </h3>
 
-        <div className="flex items-center justify-between pt-3 border-t border-surface-container-highest mt-2">
-          <p className="font-label-sm text-on-surface-variant">
-            From <span className="font-bold text-primary">${estimatedPrice}</span>
-          </p>
-          <button
-            className="rounded-full bg-linear-to-r from-primary to-secondary px-5 py-2 text-sm font-label-sm text-on-primary transition-all hover:scale-105 hover:shadow-lg"
-            type="button"
-          >
-            Book Now
-          </button>
+          <div className="flex items-center gap-2 text-sm text-on-surface-variant font-body">
+            <CalendarDays className="h-4 w-4 text-outline" />
+            <span>{format(startDate, "EEEE, MMM d • p")}</span>
+          </div>
+
+          <div className="flex items-center gap-2 text-sm text-on-surface-variant font-body">
+            <MapPin className="h-4 w-4 text-outline" />
+            <span>{venueCity || "TBA"}</span>
+          </div>
+
+          <div className="flex items-center justify-between pt-3 border-t border-surface-container-highest mt-2">
+            <p className="font-label-sm text-on-surface-variant">
+              From <span className="font-bold text-primary">${estimatedPrice}</span>
+            </p>
+            <span
+              className="inline-block rounded-full bg-linear-to-r from-primary to-secondary px-5 py-2 text-sm font-label-sm text-on-primary transition-all hover:scale-105 hover:shadow-lg"
+            >
+              Book Now
+            </span>
+          </div>
         </div>
-      </div>
-    </article>
+      </article>
+    </Link>
   );
 }
