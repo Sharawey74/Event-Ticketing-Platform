@@ -28,7 +28,7 @@ export default function CreateEventPage() {
   };
 
   return (
-    <main className="flex-grow pt-[104px] pb-section-gap px-edge-padding w-full min-h-screen">
+    <main className="grow pt-[104px] pb-section-gap px-edge-padding max-w-[800px] mx-auto w-full min-h-screen">
       <div className="max-w-3xl mx-auto">
         
         {/* Back Link */}
@@ -125,7 +125,7 @@ export default function CreateEventPage() {
             {/* Cover Image Upload (UI Only) */}
             <div>
               <label className="block font-label-sm text-on-surface mb-2">Cover Image</label>
-              <div className="aspect-[16/9] w-full rounded-lg border-2 border-dashed border-outline-variant bg-surface-bright hover:bg-surface-container-low transition-colors flex flex-col items-center justify-center cursor-pointer group relative overflow-hidden">
+              <div className="aspect-video bg-surface-container-high rounded-xl flex flex-col items-center justify-center border-2 border-dashed border-outline-variant hover:border-primary hover:bg-surface-container-highest transition-colors cursor-pointer group">
                 <span className="material-symbols-outlined text-[48px] text-outline group-hover:text-primary transition-colors mb-2">add_photo_alternate</span>
                 <p className="font-label-sm text-on-surface-variant group-hover:text-primary transition-colors">Click to upload image</p>
                 <p className="font-caption text-on-surface-variant mt-1">PNG, JPG or GIF up to 5MB</p>

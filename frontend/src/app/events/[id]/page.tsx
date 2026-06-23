@@ -83,6 +83,12 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
                 <span className="text-primary font-medium">{event.title}</span>
               </div>
             </li>
+            {event.venue ? (
+              <div className="flex flex-col gap-1">
+                <span className="font-medium text-on-surface">{event.venue.name}</span>
+                <span className="text-on-surface-variant text-sm">{event.venue.address}, {event.venue.city}</span>
+              </div>
+            ) : null}
           </ol>
         </nav>
 

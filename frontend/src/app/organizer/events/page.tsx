@@ -1,6 +1,8 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
@@ -20,8 +22,16 @@ interface OrganizerEvent {
 export default function OrganizerDashboardPage() {
   const router = useRouter();
   const { token, userRole } = useAuthStore();
-  const [events, setEvents] = useState<OrganizerEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: eventsData, isLoading } = useQuery({
+    queryKey: ["organizerEvents"],
+    queryFn: async () => {
+      const res = await api.get("/api/v1/organizer/events");
+      return res.data?.data || [];
+    },
+    enabled: !!token && userRole === "ORGANIZER",
+  });
+
+  const events = (eventsData as OrganizerEvent[]) || [];
 
   useEffect(() => {
     if (!token) {
@@ -33,27 +43,14 @@ export default function OrganizerDashboardPage() {
       router.push("/dashboard/bookings");
       return;
     }
-
-    async function fetchOrganizerEvents() {
-      try {
-        const res = await api.get("/api/v1/organizer/events");
-        setEvents(res.data?.data || []);
-      } catch (err) {
-        console.error("Failed to fetch organizer events", err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchOrganizerEvents();
   }, [token, userRole, router]);
 
   if (isLoading) {
-    return <main className="flex-grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen flex items-center justify-center"><p>Loading dashboard...</p></main>;
+    return <main className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen flex items-center justify-center"><p>Loading dashboard...</p></main>;
   }
 
   return (
-    <main className="flex-grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen">
+    <main className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen">
       
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-stack-md mb-stack-lg">
@@ -147,7 +144,7 @@ export default function OrganizerDashboardPage() {
                 
                 {/* Part 1 - Event Info */}
                 <div className="flex-1 flex items-center gap-4 min-w-[300px]">
-                  <div className="w-32 h-20 rounded-lg overflow-hidden bg-surface-container-high flex-shrink-0">
+                  <div className="w-32 h-20 rounded-lg overflow-hidden bg-surface-container-high shrink-0">
                     {event.thumbnailUrl ? (
                       <img src={event.thumbnailUrl} alt={event.title} className="w-full h-full object-cover" />
                     ) : (

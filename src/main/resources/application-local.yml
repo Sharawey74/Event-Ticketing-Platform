@@ -1,3 +1,6 @@
+server:
+  port: 8088
+
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/ticketing_db
@@ -53,6 +56,6 @@ frontend:
 stripe:
   public-key: ${STRIPE_PUBLIC_KEY:pk_test_placeholder}
   secret-key: ${STRIPE_SECRET_KEY:sk_test_placeholder}
-  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_placeholder}
+  webhook-secret: ${WEBHOOK_SECRET_KEY:whsec_placeholder}
   success-url: http://localhost:3000/bookings/{bookingId}/confirmation?session_id={CHECKOUT_SESSION_ID}
   cancel-url: http://localhost:3000/cart

@@ -34,9 +34,14 @@ yarn-error.log*
 .env*
 !.env.example
 
+
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Agent Artifacts
+task.md
+walkthrough.md

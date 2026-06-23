@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/store/authStore";
 import { api } from "@/lib/api";
 
 export default function RegisterPage() {
-  const router = useRouter();
   const setAuth = useAuthStore((state) => state.setAuth);
 
   const [firstName, setFirstName] = useState("");
@@ -42,24 +40,26 @@ export default function RegisterPage() {
       const registerPayload = { firstName, lastName, email, password };
       
       const res = await api.post("/api/v1/auth/register", registerPayload);
-      const { token, user } = res.data?.data || {};
+      const { token, email: userEmail, role } = res.data?.data || {};
 
-      if (token && user) {
-        setAuth(token, user.email, user.role);
+      if (token && userEmail) {
+        setAuth(token, userEmail, role);
+        // Write token to a cookie so the Next.js middleware can verify auth on navigation
+        document.cookie = `token=${token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
         
         // Redirect based on actual backend-assigned role
-        if (user.role === "ORGANIZER") {
-          router.push("/organizer/events");
+        if (role === "ORGANIZER") {
+          window.location.href = "/organizer/events";
         } else {
-          router.push("/dashboard/bookings");
+          window.location.href = "/dashboard/bookings";
         }
       } else {
         // Fallback: if backend doesn't auto-login, redirect to login
-        router.push("/auth/login?registered=true");
+        window.location.href = "/auth/login?registered=true";
       }
     } catch (err: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setError((err as any)?.response?.data?.message || "Failed to register account");
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || "Failed to register account");
     } finally {
       setIsLoading(false);
     }
@@ -71,7 +71,7 @@ export default function RegisterPage() {
       {/* Absolute Logo Header */}
       <header className="w-full py-6 px-edge-padding absolute top-0 left-0 flex justify-center sm:justify-start items-center z-50">
         <Link href="/" className="text-section-heading font-section-heading text-primary tracking-tighter">
-          VividPass
+          Eventora
         </Link>
       </header>
 
@@ -82,13 +82,13 @@ export default function RegisterPage() {
       <div className="w-full max-w-[420px] bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant/30 p-stack-lg z-10">
         
         <h1 className="font-section-heading text-section-heading text-on-surface mb-2">Create your account</h1>
-        <p className="font-body text-body text-on-surface-variant mb-6">Join VividPass to unlock premium experiences.</p>
+        <p className="font-body text-body text-on-surface-variant mb-6">Join Eventora to unlock premium experiences.</p>
         
-        {error && (
+        {error ? (
           <div className="mb-4 p-3 bg-error-container text-on-error-container rounded-lg font-label-sm">
             {error}
           </div>
-        )}
+        ) : null}
 
         <form className="flex flex-col gap-5" onSubmit={handleRegister}>
           
@@ -198,7 +198,7 @@ export default function RegisterPage() {
           <button 
             type="submit" 
             disabled={isLoading}
-            className="w-full bg-linear-to-r from-primary to-secondary text-on-primary rounded-full py-3.5 font-bold hover:shadow-lg hover:-translate-y-[1px] transition-all disabled:opacity-70 disabled:hover:translate-y-0 mt-2"
+            className="btn-gradient w-full py-3 px-4 rounded-full text-on-primary font-label-md mt-6 shadow-md hover:shadow-lg hover:-translate-y-px transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-md flex justify-center items-center gap-2"
           >
             {isLoading ? "Creating Account..." : "Create Account"}
           </button>

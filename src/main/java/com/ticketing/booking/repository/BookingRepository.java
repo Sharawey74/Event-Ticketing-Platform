@@ -22,6 +22,9 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     @EntityGraph(attributePaths = { "user", "event" })
     Page<Booking> findAll(Pageable pageable);
 
+    @EntityGraph(attributePaths = { "user", "event" })
+    List<Booking> findByUserIdOrderByCreatedAtDesc(Long userId);
+
     // BUG-03 Fix: Required by ReservationExpirationJob on Day 8
     List<Booking> findByStateAndExpiresAtBefore(BookingState state, Instant time);
 

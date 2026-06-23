@@ -202,8 +202,7 @@ function SearchPageContent() {
               key={event.id}
               event={event}
               venueCity={
-                (event.venueId && venueCityById.get(event.venueId)) ||
-                "City not available"
+                event.venueId ? venueCityById.get(event.venueId) ?? "City not available" : "City not available"
               }
             />
           ))}

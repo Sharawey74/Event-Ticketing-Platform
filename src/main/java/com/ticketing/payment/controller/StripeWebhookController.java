@@ -1,7 +1,6 @@
 package com.ticketing.payment.controller;
 
 import org.slf4j.MDC;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -34,14 +33,14 @@ import lombok.extern.slf4j.Slf4j;
  * signature verification inside WebhookService.verifyAndProcess().
  */
 @RestController  // NOT @Transactional — Fix 9.1
-@RequestMapping("/api/webhooks")
+@RequestMapping("/api/v1/payments")
 @RequiredArgsConstructor
 @Slf4j
 public class StripeWebhookController {
 
     private final WebhookService webhookService;
 
-    @PostMapping("/stripe")
+    @PostMapping("/webhook")
     public ResponseEntity<Void> handleWebhook(
             @RequestBody String payload,
             @RequestHeader("Stripe-Signature") String sigHeader) {

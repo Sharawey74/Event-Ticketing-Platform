@@ -6,6 +6,8 @@ INSERT INTO categories (name, description, icon_url) VALUES
 ('Festival', 'Multi-day and themed festival experiences', 'party-popper');
 
 INSERT INTO venues (name, address, city, country, total_capacity) VALUES
-('Grand Arena', '100 Main St', 'New York', 'US', 20000),
-('Sunset Hall', '250 Ocean Ave', 'Los Angeles', 'US', 8500),
-('Riverfront Center', '400 Lake Shore Dr', 'Chicago', 'US', 12000);
+('Cairo International Stadium', 'Al-Nasr Road, Nasr City', 'Cairo', 'EG', 75000),
+('Cairo Opera House', 'El Borg Gezira', 'Cairo', 'EG', 1200),
+('Bibliotheca Alexandrina', 'Chatby', 'Alexandria', 'EG', 2000),
+('Borg El Arab Stadium', 'Amreya', 'Alexandria', 'EG', 86000),
+('El Gouna Conference and Culture Center', 'El Gouna', 'Red Sea', 'EG', 3000);

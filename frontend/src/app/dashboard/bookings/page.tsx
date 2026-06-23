@@ -1,6 +1,7 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
@@ -43,28 +44,16 @@ interface Booking {
 export default function DashboardBookingsPage() {
   const router = useRouter();
   const { token, userEmail } = useAuthStore();
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: bookingsData, isLoading } = useQuery({
+    queryKey: ["myBookings"],
+    queryFn: async () => {
+      const res = await api.get("/api/v1/bookings/my");
+      return res.data?.data || [];
+    },
+    enabled: !!token,
+  });
 
-  useEffect(() => {
-    if (!token) {
-      router.push("/auth");
-      return;
-    }
-
-    async function fetchMyBookings() {
-      try {
-        const res = await api.get("/api/v1/bookings/my");
-        setBookings(res.data?.data || []);
-      } catch (err) {
-        console.error("Failed to fetch bookings", err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchMyBookings();
-  }, [token, router]);
+  const bookings = (bookingsData as Booking[]) || [];
 
   const totalBookings = bookings.length;
   
@@ -90,14 +79,17 @@ export default function DashboardBookingsPage() {
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
         {/* Profile Card */}
         <div className="lg:col-span-4 bg-surface-container-lowest rounded-xl p-stack-lg shadow-md border border-surface-container-high flex flex-col items-center justify-center text-center relative overflow-hidden">
-          <div className="absolute top-0 w-full bg-gradient-to-r from-primary-container to-secondary opacity-20 h-24"></div>
+          <div className="absolute top-0 w-full bg-linear-to-r from-primary-container to-secondary opacity-20 h-24"></div>
           <div className="w-24 h-24 rounded-full border-4 border-surface-container-lowest shadow-md bg-surface-container-high flex items-center justify-center relative z-10 overflow-hidden mb-4">
              {/* Initials fallback */}
              <span className="font-hero-headline-mobile text-primary">{userEmail ? userEmail.charAt(0).toUpperCase() : "U"}</span>
           </div>
           <h2 className="font-section-heading text-on-surface mb-1">Welcome Back</h2>
           <p className="font-body text-on-surface-variant mb-6">{userEmail || "user@example.com"}</p>
-          <button className="rounded-full border border-primary text-primary px-6 py-2 hover:bg-primary-container transition-colors font-label-sm">
+          <button 
+            className="rounded-full border border-primary text-primary px-6 py-2 hover:bg-primary-container transition-colors font-label-sm"
+            onClick={() => alert("Profile editing is coming in Phase 1B")}
+          >
             Edit Profile
           </button>
         </div>
@@ -140,13 +132,13 @@ export default function DashboardBookingsPage() {
                   {booking.coverImageUrl ? (
                     <img src={booking.coverImageUrl} alt={booking.eventTitle} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-primary to-secondary opacity-50 group-hover:scale-105 transition-transform duration-500" />
+                    <div className="w-full h-full bg-linear-to-br from-primary to-secondary opacity-50 group-hover:scale-105 transition-transform duration-500" />
                   )}
                   <div className="absolute top-4 right-4 bg-surface-container-lowest/90 backdrop-blur-sm px-3 py-1.5 rounded-full">
                     <span className="font-label-sm text-primary">{booking.categoryName || "Event"}</span>
                   </div>
                 </div>
-                <div className="p-stack-md flex flex-col justify-between border-x border-b border-surface-container-highest rounded-b-xl flex-grow">
+                <div className="p-stack-md flex flex-col justify-between border-x border-b border-surface-container-highest rounded-b-xl grow">
                   <div>
                     <p className="flex items-center gap-2 text-primary font-label-sm mb-2">
                       <span className="material-symbols-outlined text-[16px]">calendar_today</span>

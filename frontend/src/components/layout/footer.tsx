@@ -1,11 +1,22 @@
 export function Footer() {
   return (
-    <footer className="border-t border-black/10 bg-zinc-950 py-8 text-zinc-300">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 px-4 md:px-6">
-        <p className="text-sm font-medium text-white">Event Ticketing Platform</p>
-        <p className="text-sm text-zinc-400">
-          Discover events, reserve your seats, and manage bookings from one place.
-        </p>
+    <footer className="bg-surface-container-lowest border-t border-surface-container-high py-stack-lg mt-auto">
+      <div className="mx-auto flex w-full max-w-container-max flex-col md:flex-row items-center justify-between gap-4 px-edge-padding text-center md:text-left">
+        <div>
+          <p className="text-section-heading text-primary font-bold tracking-tighter">Eventora</p>
+          <p className="text-on-surface-variant font-caption mt-1">
+            Discover events, reserve your seats, and manage bookings from one place.
+          </p>
+        </div>
+        <div className="flex flex-col items-center md:items-end gap-2">
+          <div className="flex gap-4">
+             <a href="#" className="text-on-surface-variant font-caption hover:text-primary transition-colors">Terms</a>
+             <a href="#" className="text-on-surface-variant font-caption hover:text-primary transition-colors">Privacy</a>
+          </div>
+          <p className="text-on-surface-variant font-caption">
+            © {new Date().getFullYear()} Eventora. All rights reserved.
+          </p>
+        </div>
       </div>
     </footer>
   );
