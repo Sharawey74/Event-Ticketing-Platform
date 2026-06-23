@@ -19,8 +19,8 @@ export const useAuthStore = create<AuthState>()(
       clearAuth: () => set({ token: null, userEmail: null, userRole: null }),
     }),
     {
-      name: "vividpass-auth-storage",
-      storage: createJSONStorage(() => sessionStorage),
+      name: "eventora-auth-storage",
+      storage: createJSONStorage(() => localStorage),
     }
   )
 );
