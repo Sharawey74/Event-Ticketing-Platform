@@ -37,7 +37,7 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/actuator/**").permitAll()
+                        .requestMatchers("/api/v1/auth/**", "/api/auth/**", "/actuator/**", "/api/v1/payments/webhook").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/events", "/api/events/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/search/events").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/venues", "/api/venues/**").permitAll()
