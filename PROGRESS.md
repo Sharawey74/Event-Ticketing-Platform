@@ -23,9 +23,9 @@
 | 10 | RabbitMQ Consumers + Notifications | ✅ Complete | 3 | 83/83 passing | Implemented BookingNotificationListener for async emails and QR code generation |
 | 11 | Pricing Engine + Waitlist | ✅ Complete | 5 | 88/88 passing | Pricing engine logic, waitlist implementation, cancel booking action |
 | 12 | Refund Logic + Concurrency Polish | ✅ Complete | 11 | 99/99 passing | 3-tier refund logic, Pricing Engine wired |
-| 13 | Frontend Event Detail + Booking Flow | ⏳ In Progress | — | — | |
-| 14 | Frontend User Dashboard + QR Display | ⬜ Not Started | — | — | |
-| 15 | Frontend Organizer Dashboard | ⬜ Not Started | — | — | |
+| 13 | Frontend Event Detail + Booking Flow | ✅ Complete | — | — | |
+| 14 | Frontend User Dashboard + QR Display | ✅ Complete | — | — | |
+| 15 | Frontend Organizer Dashboard | ✅ Complete | — | — | |
 | 16 | Backend Test Coverage Push (80%+) | ⬜ Not Started | — | — | |
 | 17 | Docker Multi-stage + Compose Polish | ⬜ Not Started | — | — | |
 | 18 | CI/CD Pipeline (GitHub Actions) | ⬜ Not Started | — | — | |

@@ -25,10 +25,13 @@ import com.ticketing.waitlist.repository.WaitlistRepository;
 /**
  * TDD Red Phase — Day 11
  *
- * Tests for WaitlistService (pure unit tests using Mockito — zero Spring context, zero DB).
+ * Tests for WaitlistService (pure unit tests using Mockito — zero Spring
+ * context, zero DB).
  *
- * Fix 11.2 context: seats are released from inventory when a booking moves to EXPIRED or
- * REFUND_APPROVED. ReleaseSeatsAction calls notifyWaitlist() so the next person in line
+ * Fix 11.2 context: seats are released from inventory when a booking moves to
+ * EXPIRED or
+ * REFUND_APPROVED. ReleaseSeatsAction calls notifyWaitlist() so the next person
+ * in line
  * gets an email notification.
  */
 @ExtendWith(MockitoExtension.class)
