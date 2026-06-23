@@ -9,6 +9,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.model.EventDataObjectDeserializer;
 import com.stripe.model.checkout.Session;
@@ -48,6 +49,7 @@ public class WebhookService {
     private final ProcessedStripeEventRepository processedStripeEventRepository;
     private final BookingRepository bookingRepository;
     private final PaymentRepository paymentRepository;
+    private final com.ticketing.notification.publisher.BookingEventPublisher bookingEventPublisher;
 
     @Value("${stripe.webhook-secret:#{null}}")
     private String webhookSecret;
@@ -137,6 +139,25 @@ public class WebhookService {
 
         log.info("[{}] [webhook] Booking {} confirmed after successful payment. Session: {}",
                 correlationId, bookingId, session.getId());
+
+        // Publish event to trigger async email notification and QR code generation (Fix: previously missing!)
+        java.util.List<Long> ticketIds = booking.getTickets().stream()
+                .map(com.ticketing.booking.model.Ticket::getId)
+                .toList();
+
+        com.ticketing.notification.event.BookingConfirmedEvent confirmationEvent = 
+                com.ticketing.notification.event.BookingConfirmedEvent.builder()
+                .bookingId(booking.getId())
+                .userId(booking.getUser().getId())
+                .userEmail(booking.getUser().getEmail())
+                .eventId(booking.getEvent().getId())
+                .eventTitle(booking.getEvent().getTitle())
+                .totalAmount(booking.getTotalAmount())
+                .ticketIds(ticketIds)
+                .correlationId(correlationId)
+                .build();
+        
+        bookingEventPublisher.publishBookingConfirmation(confirmationEvent);
     }
 
     private void handlePaymentExpired(com.stripe.model.Event stripeEvent, String correlationId) {
@@ -159,11 +180,31 @@ public class WebhookService {
 
     private Session deserializeSession(com.stripe.model.Event stripeEvent) {
         EventDataObjectDeserializer deserializer = stripeEvent.getDataObjectDeserializer();
+
+        // Primary: standard deserialization (works when library version matches event API version)
         Optional<com.stripe.model.StripeObject> optional = deserializer.getObject();
-        if (optional.isEmpty() || !(optional.get() instanceof Session session)) {
-            log.error("[webhook] Could not deserialize Stripe Session from event: {}", stripeEvent.getId());
-            return null;
+        if (optional.isPresent() && optional.get() instanceof Session session) {
+            return session;
         }
-        return session;
+
+        // Fallback: use Stripe's native GSON deserializer on the raw JSON.
+        // This flawlessly handles API version mismatches between the CLI and the SDK without throwing.
+        try {
+            String rawJson = deserializer.getRawJson();
+            if (rawJson != null && !rawJson.trim().isEmpty()) {
+                Session session = com.stripe.net.ApiResource.GSON.fromJson(rawJson, Session.class);
+                if (session != null && session.getId() != null) {
+                    log.warn("[webhook] Used Stripe GSON fallback to deserialize Session from event: {} "
+                            + "(API version mismatch handled)", stripeEvent.getId());
+                    return session;
+                }
+            }
+        } catch (Exception ex) {
+            log.error("[webhook] Stripe GSON fallback failed for event {}: {}",
+                    stripeEvent.getId(), ex.getMessage());
+        }
+
+        log.error("[webhook] Could not deserialize Stripe Session from event: {}", stripeEvent.getId());
+        return null;
     }
 }
