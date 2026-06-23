@@ -86,7 +86,10 @@ export default function DashboardBookingsPage() {
           </div>
           <h2 className="font-section-heading text-on-surface mb-1">Welcome Back</h2>
           <p className="font-body text-on-surface-variant mb-6">{userEmail || "user@example.com"}</p>
-          <button className="rounded-full border border-primary text-primary px-6 py-2 hover:bg-primary-container transition-colors font-label-sm">
+          <button 
+            className="rounded-full border border-primary text-primary px-6 py-2 hover:bg-primary-container transition-colors font-label-sm"
+            onClick={() => alert("Profile editing is coming in Phase 1B")}
+          >
             Edit Profile
           </button>
         </div>

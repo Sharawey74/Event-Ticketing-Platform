@@ -21,6 +21,7 @@ function BookingStatusBadge({ state }: { state: string }) {
     REFUND_DENIED: "bg-surface-container-high text-on-surface-variant",
     PAYMENT_FAILED: "bg-error-container text-on-error-container",
   };
+  if (!state) return null;
   const cls = styleMap[state] ?? "bg-surface-container text-on-surface-variant";
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${cls}`}>
@@ -43,11 +44,14 @@ interface Booking {
   id: number;
   state: string;
   reference?: string;
-  eventTitle: string;
-  eventDate: string;
-  venueName: string;
+  event: {
+    title: string;
+    startDate: string;
+    venueName: string;
+    coverImageUrl?: string;
+  };
   tickets: Ticket[];
-  totalAmount: number;
+  totalPrice: number;
   refundDenialReason?: string;
 }
 
@@ -61,6 +65,12 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
         {ticket.qrCode ? (
            <img
              src={`data:image/png;base64,${ticket.qrCode}`}
+             alt={`QR Code for ticket ${ticket.id}`}
+             className="w-32 h-32 rounded-lg object-contain bg-white p-2"
+           />
+        ) : ticket.code ? (
+           <img
+             src={`https://api.qrserver.com/v1/create-qr-code/?size=128x128&data=${encodeURIComponent(ticket.code)}`}
              alt={`QR Code for ticket ${ticket.id}`}
              className="w-32 h-32 rounded-lg object-contain bg-white p-2"
            />
@@ -172,7 +182,7 @@ export default function BookingDetailPage() {
   }
 
   // Calculate days until event
-  const eventDate = new Date(booking.eventDate);
+  const eventDate = new Date(booking.event?.startDate || new Date());
   const now = new Date();
   const diffTime = eventDate.getTime() - now.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -191,20 +201,20 @@ export default function BookingDetailPage() {
       {/* Header & Status */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-surface-container-lowest p-stack-lg rounded-xl shadow-md border border-surface-container-high">
         <div>
-          <h1 className="font-hero-headline-mobile text-on-surface mb-2">{booking.eventTitle}</h1>
+          <h1 className="font-hero-headline-mobile text-on-surface mb-2">{booking.event?.title}</h1>
           <p className="font-body text-on-surface-variant flex items-center gap-2">
             <span className="material-symbols-outlined text-[18px]">calendar_month</span>
             {eventDate.toLocaleDateString()} at {eventDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
           </p>
           <p className="font-body text-on-surface-variant flex items-center gap-2 mt-1">
             <span className="material-symbols-outlined text-[18px]">location_on</span>
-            {booking.venueName}
+            {booking.event?.venueName}
           </p>
         </div>
         <div className="flex flex-col items-end gap-2 text-right">
           <BookingStatusBadge state={booking.state} />
           <p className="font-caption text-on-surface-variant mt-1">Booking Ref: <span className="font-mono text-on-surface">{booking.reference || `VVD-${booking.id}`}</span></p>
-          <p className="font-section-heading text-primary mt-2">${(booking.totalAmount || 0).toFixed(2)}</p>
+          <p className="font-section-heading text-primary mt-2">${(booking.totalPrice || 0).toFixed(2)}</p>
         </div>
       </div>
 
