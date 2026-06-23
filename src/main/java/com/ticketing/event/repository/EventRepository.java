@@ -55,11 +55,11 @@ public interface EventRepository extends JpaRepository<Event, Long> {
                 AND e.startDate > :now
                 AND (
                     :query IS NULL
-                    OR LOWER(e.title) LIKE LOWER(CONCAT('%', :query, '%'))
-                    OR LOWER(COALESCE(e.description, '')) LIKE LOWER(CONCAT('%', :query, '%'))
+                    OR LOWER(e.title) LIKE LOWER(CONCAT('%', CAST(:query AS string), '%'))
+                    OR LOWER(COALESCE(e.description, '')) LIKE LOWER(CONCAT('%', CAST(:query AS string), '%'))
                 )
                 AND (:categoryId IS NULL OR e.category.id = :categoryId)
-                AND (:city IS NULL OR LOWER(v.city) = LOWER(:city))
+                AND (:city IS NULL OR LOWER(v.city) = LOWER(CAST(:city AS string)))
             """)
     Page<Event> searchPublishedEvents(
             @Param("query") String query,
