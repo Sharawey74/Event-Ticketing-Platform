@@ -1,10 +1,10 @@
 # AI CONTEXT SNAPSHOT — Event Ticketing Platform
 
-## Last Updated: Day 15 (2026-06-21) — Frontend Refactoring & Dashboard Complete
+## Last Updated: Day 16A (2026-06-26) — UI Stabilization sub-session: edit event page, loading-state fix, hero auth guard, GlobalExceptionHandler HTTP codes
 
-## Branch: day-15-frontend-organizer-dashboard
+## Branch: feat/platform-enhancements
 
-## Test Status: 99/99 passing (PostgreSQL 17, Redis 7, RabbitMQ 4)
+## Test Status: 104/104 unit passing (12 Docker-only errors pre-existing — require Docker Desktop + Testcontainers)
 
 ## 1. NON-NEGOTIABLE RULES (From instructions.txt + Overlay)
 
@@ -72,6 +72,7 @@ Every agent session must enforce these without exception:
 - `@EnableWebSecurity` + `@EnableMethodSecurity` on `SecurityConfig`
 - `JwtFilter` registered before `UsernamePasswordAuthenticationFilter`
 - Public GET rules: `/api/auth/**`, `/api/events`, `/api/events/**`, `/api/search/events`, `/api/venues`, `/api/venues/**`, `/api/categories`, `/api/categories/**`
+- Public POST rules: `/api/v1/auth/**`, `/api/auth/**`, `/api/v1/payments/webhook`
 - All other requests: `.anyRequest().authenticated()`
 - Method-level security: `@PreAuthorize("hasRole('ADMIN')")` on Venue/Category write ops
 - Method-level security: `@PreAuthorize("hasRole('ORGANIZER') or hasRole('ADMIN')")` on Event write ops
@@ -141,7 +142,26 @@ class YourControllerTest {
 | **11.1** | Pricing Engine + Waitlist Service | Pricing | ✅ Applied | ✅ Verified |
 | **11.2** | Clarify `RELEASE` event caller / Terminal States | Booking | ✅ Applied | ✅ Verified |
 | **12.1** | Add `refund_denial_reason` field for transparency | Booking | ✅ Applied | ✅ Verified |
-| **16.1** | Test `reserveSeat()` Lua Script explicitly (concurrency test) | Tests | ⏳ Pending | - |
+| **15.1** | Fix Stripe Webhook 403 Forbidden (SecurityConfig) | Payment | ✅ Applied | ✅ Verified |
+| **15.2** | Fix Stripe Session Deserialization (GSON fallback) | Payment | ✅ Applied | ✅ Verified |
+| **15.3** | Fix Missing BookingConfirmedEvent publish call | Payment | ✅ Applied | ✅ Verified |
+| **15.4** | Fix Next.js middleware token missing (cookie sync) | Frontend | ✅ Applied | ✅ Verified |
+| **15.5** | Fix Dashboard nested DTO property alignment | Frontend | ✅ Applied | ✅ Verified |
+| **16A.1** | BookingQueryService: QR/ticket gated behind CONFIRMED/ATTENDED state | Booking | ✅ Applied | BookingQueryService.java |
+| **16A.2** | AuthService: ADMIN self-registration blocked; ORGANIZER correctly assignable | User | ✅ Applied | AuthService.java |
+| **16A.3** | register/page.tsx: sends role to backend; redirects to /auth/login?registered=true | Frontend | ✅ Applied | register/page.tsx |
+| **16A.4** | DataSeeder: removed "default" profile (prod seeding safety) | Config | ✅ Applied | DataSeeder.java |
+| **16A.5** | application-local.yml: STRIPE_WEBHOOK_SECRET env var name fixed | Config | ✅ Applied | application-local.yml |
+| **16A.6** | .env.example: backend port corrected to 8088 | Config | ✅ Applied | frontend/.env.example |
+| **16A.7** | BookingRepository.findByIdWithDetails: full EntityGraph (user,event,tickets,tier) | Booking | ✅ Applied | BookingRepository.java |
+| **16A.8** | BookingController: thin controller, delegates to BookingQueryService | Booking | ✅ Applied | BookingController.java |
+| **16A.9** | AuthControllerTest + StripeWebhookControllerTest: fixed wrong URL paths | Tests | ✅ Applied | Test files |
+| **16A.10** | WebhookServiceTest: added BookingEventPublisher mock + booking test data | Tests | ✅ Applied | WebhookServiceTest.java |
+| **16A.11** | GlobalExceptionHandler: 405/404/415 handlers added (were falling into 500 catch-all) | Common | ✅ Applied | GlobalExceptionHandler.java |
+| **16A.12** | page.tsx hero: "Sign In" glass button hidden when user is authenticated | Frontend | ✅ Applied | frontend/src/app/page.tsx |
+| **16A.13** | organizer/events/page.tsx: split loading guard to prevent infinite loading when query disabled | Frontend | ✅ Applied | frontend/src/app/organizer/events/page.tsx |
+| **16A.14** | organizer/events/[id]/edit/page.tsx: created missing edit event page (was 404) | Frontend | ✅ Applied | frontend/src/app/organizer/events/[id]/edit/page.tsx |
+| **16B.1** | Test `reserveSeat()` Lua Script explicitly (concurrency test) | Tests | ⏳ Pending | - |
 
 ---
 
@@ -158,6 +178,7 @@ class YourControllerTest {
 | 13 | Frontend Booking Flow | ✅ | N/A |
 | 14 | Frontend User Dashboard | ✅ | N/A |
 | 15 | Frontend Organizer Dashboard | ✅ | N/A |
+| 16A | Platform Stabilization | 🔄 In Progress | 104/104 unit |
 
 ---
 
@@ -171,8 +192,12 @@ All exceptions must flow through `GlobalExceptionHandler`. Current mapping:
 | `AccessDeniedException` | 403 | `handleAccessDenied` |
 | `ValidationException` | 400 | `handleValidation` |
 | `MethodArgumentNotValidException` | 400 | `handleMethodArgumentNotValid` |
-| `ConstraintViolationException` | 400 | `handleConstraintViolation` (added Day 3) |
+| `ConstraintViolationException` | 400 | `handleConstraintViolation` |
 | `AuthenticationException` | 401 | `handleAuthentication` |
+| `ConflictException` | 409 | `handleConflict` |
+| `Exception` (catch-all) | 500 | `handleGeneralException` |
+
+*Note: All responses now include `errorId` and `correlationId`. Structured MDC logging is active for all exceptions.*
 
 When adding new services, do NOT add new exception types without adding a handler here first.
 
@@ -201,6 +226,9 @@ When adding new services, do NOT add new exception types without adding a handle
 | POST | /api/categories | Yes | **ADMIN only** |
 | PUT | /api/categories/{id} | Yes | **ADMIN only** |
 | DELETE | /api/categories/{id} | Yes | **ADMIN only** |
+| POST | /api/v1/payments/webhook | No | (Secured via Stripe HMAC Signature) |
+| GET | /api/v1/bookings/my | Yes | USER/ORGANIZER/ADMIN (Returns flat BookingResponse) |
+| GET | /api/v1/bookings/{id} | Yes | Checked via Resource Ownership (Returns nested BookingDetailsResponse) |
 
 ---
 
@@ -302,11 +330,31 @@ This repository has two deployable parts:
 
 ---
 
-## 10. NEXT SESSION START — DAY 16
+## 10. NEXT SESSION START — DAY 16B
 
-**Current Branch:** `day-15-frontend-organizer-dashboard`
+**Current Branch:** `feat/platform-enhancements`
 
-**First task:** Backend Test Coverage Push (80%+)
+**Completed in Day 16A (all sub-sessions):**
 
-- Review Day 16 plan for backend test updates.
-- Write missing tests to hit 80%+ JaCoCo coverage (including the reserveSeat Lua script concurrency test).
+- BookingQueryService: state-gated QR/ticket access (CONFIRMED/ATTENDED only)
+- AuthService: ORGANIZER self-registration allowed, ADMIN self-registration blocked
+- register/page.tsx: sends `role` field to backend; redirects to `/auth/login?registered=true` on success
+- DataSeeder: `@Profile("local")` only — removed "default" to prevent prod seeding
+- application-local.yml: fixed `STRIPE_WEBHOOK_SECRET` env var name
+- frontend/.env.example: corrected backend port to 8088
+- BookingRepository: `findByIdWithDetails` with full EntityGraph
+- BookingController: now thin — delegates list/detail queries to BookingQueryService
+- Pre-existing test URL mismatches fixed (AuthControllerTest, StripeWebhookControllerTest)
+- WebhookServiceTest: missing BookingEventPublisher mock added
+- GlobalExceptionHandler: 405/404/415 handlers added (were returning 500 via catch-all)
+- page.tsx: hero "Sign In" button hidden when user is authenticated (useAuthStore token check)
+- organizer/events/page.tsx: TanStack Query disabled-query `isLoading:true` loading-state bug fixed
+- organizer/events/[id]/edit/page.tsx: created (was 404); full edit form with pre-population + PUT /api/events/{id} + success panel + auto-redirect
+
+**First task for 16B:** Backend Test Coverage Push (80%+)
+
+- Run `./mvnw verify -P coverage` to get baseline JaCoCo report
+- Add `BookingQueryServiceTest` (9 tests)
+- Add `BookingControllerTest` (9 tests)
+- Write `reserveSeat()` Lua script concurrency test (Fix 16B.1 — CRITICAL)
+- Verify 80%+ line coverage in JaCoCo report
