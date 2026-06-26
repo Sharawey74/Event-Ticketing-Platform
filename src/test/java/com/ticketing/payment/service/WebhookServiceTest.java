@@ -24,9 +24,11 @@ import com.stripe.model.checkout.Session;
 import com.ticketing.booking.model.Booking;
 import com.ticketing.booking.model.BookingState;
 import com.ticketing.booking.repository.BookingRepository;
+import com.ticketing.notification.publisher.BookingEventPublisher;
 import com.ticketing.payment.model.ProcessedStripeEvent;
 import com.ticketing.payment.repository.PaymentRepository;
 import com.ticketing.payment.repository.ProcessedStripeEventRepository;
+import com.ticketing.user.model.User;
 
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -49,6 +51,9 @@ class WebhookServiceTest {
     @Mock
     private PaymentRepository paymentRepository;
 
+    @Mock
+    private BookingEventPublisher bookingEventPublisher;
+
     @InjectMocks
     private WebhookService webhookService;
 
@@ -56,10 +61,25 @@ class WebhookServiceTest {
 
     @BeforeEach
     void setUp() {
+        User owner = User.builder()
+                .id(1L)
+                .email("attendee@eventora.com")
+                .build();
+
+        com.ticketing.event.model.Event event = com.ticketing.event.model.Event.builder()
+                .id(10L)
+                .title("Test Event")
+                .startDate(Instant.now().plus(30, java.time.temporal.ChronoUnit.DAYS))
+                .build();
+
         paymentPendingBooking = Booking.builder()
                 .id(42L)
                 .state(BookingState.PAYMENT_PENDING)
                 .stripeSessionId("cs_test_session_abc123")
+                .user(owner)
+                .event(event)
+                .totalAmount(java.math.BigDecimal.valueOf(500))
+                .tickets(new java.util.ArrayList<>())
                 .createdAt(Instant.now())
                 .build();
     }

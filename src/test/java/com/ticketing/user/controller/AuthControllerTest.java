@@ -44,7 +44,7 @@ class AuthControllerTest {
     private UserDetailsService userDetailsService;
 
     @Test
-    @DisplayName("POST /api/auth/register should return success response")
+    @DisplayName("POST /api/v1/auth/register should return success response")
     void register_shouldReturnSuccessResponse() throws Exception {
         RegisterRequest request = new RegisterRequest();
         request.setEmail("user@example.com");
@@ -62,7 +62,7 @@ class AuthControllerTest {
 
         when(authService.register(any(RegisterRequest.class))).thenReturn(authResponse);
 
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post("/api/v1/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isOk())
@@ -72,7 +72,7 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("POST /api/auth/login should return success response")
+    @DisplayName("POST /api/v1/auth/login should return success response")
     void login_shouldReturnSuccessResponse() throws Exception {
         LoginRequest request = new LoginRequest();
         request.setEmail("user@example.com");
@@ -87,7 +87,7 @@ class AuthControllerTest {
 
         when(authService.login(any(LoginRequest.class))).thenReturn(authResponse);
 
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isOk())
@@ -96,7 +96,7 @@ class AuthControllerTest {
             .andExpect(jsonPath("$.data.userId").value(21));
     }
     @Test
-    @DisplayName("POST /api/auth/login with bad credentials should return 401")
+    @DisplayName("POST /api/v1/auth/login with bad credentials should return 401")
     void login_withBadCredentials_shouldReturn401() throws Exception {
         LoginRequest request = new LoginRequest();
         request.setEmail("user@example.com");
@@ -105,7 +105,7 @@ class AuthControllerTest {
         when(authService.login(any(LoginRequest.class)))
             .thenThrow(new org.springframework.security.authentication.BadCredentialsException("Bad credentials"));
 
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isUnauthorized())

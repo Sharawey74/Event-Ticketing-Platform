@@ -93,39 +93,50 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("register with ADMIN role in request should force USER role")
-    void register_withAdminRole_shouldForceUserRole() {
+    @DisplayName("register with ADMIN role should throw ValidationException — self-registration as ADMIN is forbidden")
+    void register_whenRoleIsAdmin_shouldThrowValidationException() {
         RegisterRequest request = createRegisterRequest();
         request.setRole(Role.ADMIN); // Attempt privilege escalation
-        
+
+        assertThrows(jakarta.validation.ValidationException.class,
+                () -> authService.register(request),
+                "Self-registration as ADMIN must be rejected");
+    }
+
+    @Test
+    @DisplayName("register with ORGANIZER role should create user with ORGANIZER role")
+    void register_whenRoleIsOrganizer_shouldCreateOrganizerUser() {
+        RegisterRequest request = createRegisterRequest();
+        request.setRole(Role.ORGANIZER);
+
         when(passwordEncoder.encode("Password@123")).thenReturn("encoded-password");
 
         com.ticketing.user.model.User savedUser = com.ticketing.user.model.User.builder()
-            .id(8L)
+            .id(9L)
             .email(request.getEmail())
             .passwordHash("encoded-password")
             .firstName(request.getFirstName())
             .lastName(request.getLastName())
-            .role(Role.USER) // Forced
+            .role(Role.ORGANIZER)
             .build();
-            
+
         when(userRepository.save(any(com.ticketing.user.model.User.class))).thenReturn(savedUser);
 
         UserDetails userDetails = User.withUsername(savedUser.getEmail())
             .password("encoded-password")
-            .authorities("ROLE_USER")
+            .authorities("ROLE_ORGANIZER")
             .build();
         when(userDetailsService.loadUserByUsername(savedUser.getEmail())).thenReturn(userDetails);
-        when(jwtService.generateToken(userDetails)).thenReturn("jwt-token");
+        when(jwtService.generateToken(userDetails)).thenReturn("jwt-organizer-token");
 
         AuthResponse response = authService.register(request);
 
-        assertEquals(Role.USER, response.getRole());
-        
-        // Verify that the user builder was called with Role.USER
-        org.mockito.ArgumentCaptor<com.ticketing.user.model.User> userCaptor = org.mockito.ArgumentCaptor.forClass(com.ticketing.user.model.User.class);
+        assertEquals(Role.ORGANIZER, response.getRole());
+
+        org.mockito.ArgumentCaptor<com.ticketing.user.model.User> userCaptor =
+                org.mockito.ArgumentCaptor.forClass(com.ticketing.user.model.User.class);
         verify(userRepository).save(userCaptor.capture());
-        assertEquals(Role.USER, userCaptor.getValue().getRole());
+        assertEquals(Role.ORGANIZER, userCaptor.getValue().getRole());
     }
 
 
