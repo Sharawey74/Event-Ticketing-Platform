@@ -27,6 +27,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Formula;
 
 @Data
 @Builder
@@ -96,6 +97,9 @@ public class Event {
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<TicketTier> ticketTiers = new ArrayList<>();
+
+    @Formula("(SELECT MIN(tt.base_price) FROM ticket_tiers tt WHERE tt.event_id = id)")
+    private java.math.BigDecimal minPrice;
 
     @PrePersist
     void onCreate() {

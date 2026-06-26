@@ -4,6 +4,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { TrendingUp } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { api } from "@/lib/api";
 
@@ -56,10 +57,20 @@ export default function DashboardBookingsPage() {
   const bookings = (bookingsData as Booking[]) || [];
 
   const totalBookings = bookings.length;
-  
-  const upcomingEvents = bookings.filter(b => 
+
+  const upcomingEvents = bookings.filter(b =>
     b.state === "CONFIRMED" && new Date(b.eventDate).getTime() > new Date().getTime()
   );
+
+  const upcomingNext30 = bookings.filter(b =>
+    b.state === "CONFIRMED" &&
+    new Date(b.eventDate).getTime() > Date.now() &&
+    new Date(b.eventDate).getTime() < Date.now() + 30 * 24 * 60 * 60 * 1000
+  ).length;
+
+  const userName = userEmail
+    ? userEmail.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    : "there";
 
   // Expired reservations and other non-confirmed future events are still in history, 
   // but upcoming events specifically look for CONFIRMED future events.
@@ -84,14 +95,8 @@ export default function DashboardBookingsPage() {
              {/* Initials fallback */}
              <span className="font-hero-headline-mobile text-primary">{userEmail ? userEmail.charAt(0).toUpperCase() : "U"}</span>
           </div>
-          <h2 className="font-section-heading text-on-surface mb-1">Welcome Back</h2>
+          <h2 className="font-section-heading text-on-surface mb-1">Welcome back, {userName}!</h2>
           <p className="font-body text-on-surface-variant mb-6">{userEmail || "user@example.com"}</p>
-          <button 
-            className="rounded-full border border-primary text-primary px-6 py-2 hover:bg-primary-container transition-colors font-label-sm"
-            onClick={() => alert("Profile editing is coming in Phase 1B")}
-          >
-            Edit Profile
-          </button>
         </div>
 
         {/* Stats Grid */}
@@ -100,21 +105,25 @@ export default function DashboardBookingsPage() {
             <div className="w-12 h-12 rounded-full bg-primary-container/20 text-primary flex items-center justify-center mb-4">
               <span className="material-symbols-outlined">confirmation_number</span>
             </div>
-            <p className="font-hero-headline-mobile text-on-surface leading-tight">{totalBookings}</p>
+            <div className="flex items-end gap-2">
+              <p className="text-4xl font-black text-on-surface leading-tight">{totalBookings}</p>
+              <TrendingUp className="h-4 w-4 text-emerald-500 mb-1" />
+            </div>
             <p className="font-body text-on-surface-variant">Total Bookings</p>
           </div>
           <div className="bg-surface-container-lowest rounded-xl p-stack-lg shadow-md border border-surface-container-high hover:shadow-xl transition-shadow duration-300 flex flex-col items-start">
             <div className="w-12 h-12 rounded-full bg-secondary-container/20 text-secondary flex items-center justify-center mb-4">
               <span className="material-symbols-outlined">event_upcoming</span>
             </div>
-            <p className="font-hero-headline-mobile text-on-surface leading-tight">{upcomingEvents.length}</p>
+            <p className="text-4xl font-black text-on-surface leading-tight">{upcomingEvents.length}</p>
             <p className="font-body text-on-surface-variant">Upcoming Events</p>
+            <p className="text-xs text-on-surface-variant mt-0.5">Next 30 days: {upcomingNext30}</p>
           </div>
           <div className="bg-surface-container-lowest rounded-xl p-stack-lg shadow-md border border-surface-container-high hover:shadow-xl transition-shadow duration-300 flex flex-col items-start">
             <div className="w-12 h-12 rounded-full bg-tertiary-container/20 text-tertiary flex items-center justify-center mb-4">
               <span className="material-symbols-outlined">account_balance_wallet</span>
             </div>
-            <p className="font-hero-headline-mobile text-on-surface leading-tight">${totalSpent.toFixed(2)}</p>
+            <p className="text-4xl font-black text-on-surface leading-tight">EGP {totalSpent.toFixed(0)}</p>
             <p className="font-body text-on-surface-variant">Total Spent</p>
           </div>
         </div>
@@ -165,10 +174,10 @@ export default function DashboardBookingsPage() {
         ) : (
           <div className="bg-surface-container-lowest rounded-xl p-8 border border-surface-container-high text-center flex flex-col items-center">
             <span className="material-symbols-outlined text-[64px] text-surface-container-highest mb-4">event_busy</span>
-            <h3 className="font-body-lg font-bold text-on-surface mb-2">No upcoming events</h3>
-            <p className="font-body text-on-surface-variant mb-6">You don&apos;t have any upcoming confirmed bookings right now.</p>
+            <h3 className="font-body-lg font-bold text-on-surface mb-2">No upcoming events yet</h3>
+            <p className="font-body text-on-surface-variant mb-6">Your schedule is clear. Start exploring events and book your next adventure!</p>
             <Link href="/search" className="btn-gradient text-on-primary font-label-sm px-6 py-3 rounded-full hover:shadow-lg transition-all">
-              Discover Events
+              Explore Events
             </Link>
           </div>
         )}
@@ -210,7 +219,7 @@ export default function DashboardBookingsPage() {
                         {booking.tickets?.length || (booking as unknown as Record<string, number>).quantity || 0}
                       </td>
                       <td className="p-4 font-body text-on-surface font-semibold">
-                        ${(booking.totalAmount || 0).toFixed(2)}
+                        EGP {(booking.totalAmount || 0).toFixed(2)}
                       </td>
                       <td className="p-4">
                         <BookingStatusBadge state={booking.state} />
@@ -221,12 +230,6 @@ export default function DashboardBookingsPage() {
               </table>
             </div>
             
-            <div className="mt-6 flex justify-center">
-              <button className="text-primary font-label-sm flex items-center gap-1 hover:text-on-primary-container-variant group transition-colors">
-                Load More History
-                <span className="material-symbols-outlined text-[18px] group-hover:translate-y-0.5 transition-transform">keyboard_arrow_down</span>
-              </button>
-            </div>
           </>
         ) : (
           <div className="bg-surface-container-lowest rounded-xl p-8 border border-surface-container-high text-center">

@@ -1,5 +1,6 @@
 package com.ticketing.event.dto;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 import com.ticketing.event.model.EventStatus;
@@ -25,6 +26,8 @@ public class EventResponse {
 
     private Long categoryId;
 
+    private String categoryName;
+
     private Long venueId;
 
     private Instant startDate;
@@ -42,4 +45,6 @@ public class EventResponse {
     private Boolean dynamicPricingEnabled;
 
     private Boolean waitlistEnabled;
+
+    private BigDecimal minPrice;
 }

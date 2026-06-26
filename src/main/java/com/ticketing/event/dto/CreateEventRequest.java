@@ -1,6 +1,7 @@
 package com.ticketing.event.dto;
 
 import java.time.Instant;
+import java.util.List;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Future;
@@ -39,4 +40,6 @@ public class CreateEventRequest {
     private Instant salesCloseDate;
 
     private String coverImageUrl;
+
+    private List<CreateTicketTierRequest> ticketTiers;
 }

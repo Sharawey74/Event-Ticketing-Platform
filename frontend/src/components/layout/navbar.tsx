@@ -2,129 +2,290 @@
 
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { FormEvent, useState, useEffect } from "react";
+import { FormEvent, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 
-import { Search, ShoppingCart, LogOut, User } from "lucide-react";
+import { Search, ShoppingCart, LogOut, User, ChevronDown, LayoutDashboard } from "lucide-react";
 
 import { buildSearchHref } from "@/lib/search";
 import { useAuthStore } from "@/store/authStore";
+import { useReservationStore } from "@/store/reservationStore";
+import { api } from "@/lib/api";
+import { SearchDropdown } from "./SearchDropdown";
+import { CartDrawer } from "./CartDrawer";
+import type { EventResponse, VenueResponse } from "@/types/event";
 
 export function Navbar() {
   const router = useRouter();
+  const pathname = usePathname() || "";
+
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [isClient, setIsClient] = useState(false);
-  const cartCount = 0;
-  
-  const { token, userEmail, clearAuth } = useAuthStore();
+  const [inputFocused, setInputFocused] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const cartCount = useReservationStore((s) => (s.bookingId ? 1 : 0));
+  const { token, userEmail, userRole, clearAuth } = useAuthStore();
 
   useEffect(() => {
     const timer = setTimeout(() => setIsClient(true), 0);
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  // Close profile dropdown on outside click
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [dropdownOpen]);
+
+  const { data: venuesData } = useQuery({
+    queryKey: ["venues-for-search"],
+    queryFn: async () => {
+      const res = await api.get("/api/venues?size=100");
+      return (res.data?.data?.content ?? []) as VenueResponse[];
+    },
+    staleTime: 5 * 60 * 1000,
+    enabled: isClient,
+  });
+
+  const { data: eventSuggestions } = useQuery({
+    queryKey: ["event-suggestions", debouncedQuery],
+    queryFn: async () => {
+      const res = await api.get(
+        `/api/search/events?query=${encodeURIComponent(debouncedQuery)}&size=4`
+      );
+      return (res.data?.data?.content ?? []) as EventResponse[];
+    },
+    enabled: debouncedQuery.length >= 2,
+    staleTime: 30_000,
+  });
+
+  const filteredCities = useMemo(() => {
+    if (!venuesData || !query) return [];
+    const allCities = venuesData.map((v) => v.city);
+    const unique = [...new Set(allCities)].sort();
+    return unique
+      .filter((city) => city.toLowerCase().includes(query.toLowerCase()))
+      .slice(0, 5);
+  }, [venuesData, query]);
+
+  const showDropdown =
+    inputFocused &&
+    query.length >= 1 &&
+    (filteredCities.length > 0 || (eventSuggestions?.length ?? 0) > 0);
+
   function submitSearch(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
-
     const searchTerm = query.trim();
+    setInputFocused(false);
     if (!searchTerm) {
       router.push("/search");
       return;
     }
-
-    router.push(
-      buildSearchHref({
-        query: searchTerm,
-        city: "",
-        date: "",
-        categoryId: "",
-      }),
-    );
+    router.push(buildSearchHref({ query: searchTerm, city: "", date: "", categoryId: "" }));
   }
+
+  const handleSelectCity = useCallback(
+    (city: string) => {
+      setQuery(city);
+      router.push(buildSearchHref({ query: "", city, date: "", categoryId: "" }));
+    },
+    [router]
+  );
+
+  const handleCloseDropdown = useCallback(() => setInputFocused(false), []);
 
   const handleLogout = () => {
     clearAuth();
-    // Also clear the middleware cookie
     document.cookie = "token=; path=/; max-age=0;";
+    setDropdownOpen(false);
     router.push("/auth/login");
   };
 
-  const pathname = usePathname() || "";
   if (pathname.includes("/confirmation") || pathname.includes("/checkout")) {
     return null;
   }
 
+  const isAuthPage = pathname.startsWith("/auth");
+
+  const navLinkBase =
+    "font-label-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded px-1";
+
   return (
-    <header className="sticky top-0 z-30 h-20 bg-surface/80 backdrop-blur-md shadow-md border-b border-outline-variant flex items-center">
-      <div className="mx-auto flex w-full max-w-container-max items-center justify-between gap-4 px-edge-padding">
-        <Link href="/" className="inline-flex items-center gap-2">
-          <span className="text-section-heading font-bold text-primary tracking-tighter">
-            Eventora
-          </span>
-        </Link>
-
-        <form
-          className="hidden w-full max-w-md items-center gap-2 rounded-full border border-outline-variant bg-surface-bright px-3 py-2 md:flex"
-          onSubmit={submitSearch}
-        >
-          <Search className="h-4 w-4 text-outline" />
-          <input
-            className="w-full bg-transparent font-body text-sm text-on-surface outline-none"
-            type="text"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search events"
-            aria-label="Search events"
-          />
-        </form>
-
-        <div className="flex items-center gap-6">
-          <Link
-            className={`font-label-sm ${pathname === "/" ? "font-bold text-primary border-b-2 border-primary" : "text-on-surface-variant hover:text-primary"}`}
-            href="/"
-          >
-            Discover
-          </Link>
-          <Link
-            className={`font-label-sm ${pathname.startsWith("/dashboard") ? "font-bold text-primary border-b-2 border-primary" : "text-on-surface-variant hover:text-primary"}`}
-            href="/dashboard/bookings"
-          >
-            Dashboard
-          </Link>
-          <button
-            className="relative inline-flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors"
-            type="button"
-            aria-label="Open cart"
-          >
-            <ShoppingCart className="h-6 w-6" />
-            <span className="absolute -right-2 -top-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-error text-on-error font-caption font-bold">
-              {cartCount}
+    <>
+      <header className="sticky top-0 z-30 h-20 bg-surface/80 backdrop-blur-md shadow-md border-b border-outline-variant flex items-center">
+        <div className="mx-auto flex w-full max-w-container-max items-center justify-between gap-4 px-edge-padding">
+          <Link href="/" className="inline-flex items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded">
+            <span className="text-section-heading font-bold text-primary tracking-tighter">
+              Eventora
             </span>
-          </button>
-          
-          {isClient && token ? (
-            <div className="flex items-center gap-4 border-l border-outline-variant pl-4">
-              <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0">
-                {userEmail ? userEmail.charAt(0).toUpperCase() : <User className="h-4 w-4" />}
-              </div>
-              <button 
-                onClick={handleLogout}
-                className="text-on-surface-variant hover:text-error transition-colors p-1"
-                title="Log out"
-                aria-label="Log out"
-              >
-                <LogOut className="h-5 w-5" />
-              </button>
-            </div>
-          ) : (
-            <Link 
-              className="bg-linear-to-r from-primary to-secondary text-on-primary rounded-full px-6 py-2 font-label-sm hover:shadow-lg hover:scale-105 transition-all" 
-              href="/auth/login"
+          </Link>
+
+          <div ref={searchContainerRef} className="hidden md:flex relative w-full max-w-md">
+            <form
+              className="w-full flex items-center gap-2 rounded-full border border-outline-variant bg-surface-bright px-3 py-2"
+              onSubmit={submitSearch}
             >
-              Sign in
+              <Search className="h-4 w-4 text-outline shrink-0" />
+              <input
+                className="w-full bg-transparent font-body text-sm text-on-surface outline-none"
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onFocus={() => setInputFocused(true)}
+                placeholder="Search events or cities"
+                aria-label="Search events"
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => { setQuery(""); setInputFocused(false); }}
+                  className="text-on-surface-variant hover:text-on-surface"
+                  aria-label="Clear search"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              )}
+            </form>
+
+            {showDropdown && (
+              <SearchDropdown
+                query={query}
+                cities={filteredCities}
+                events={eventSuggestions ?? []}
+                onClose={handleCloseDropdown}
+                onSelectCity={handleSelectCity}
+              />
+            )}
+          </div>
+
+          <div className="flex items-center gap-6">
+            <Link
+              className={`${navLinkBase} ${pathname === "/" ? "font-bold text-primary border-b-2 border-primary" : "text-on-surface-variant hover:text-primary"}`}
+              href="/"
+            >
+              Discover
             </Link>
-          )}
+            <Link
+              className={`${navLinkBase} ${pathname.startsWith("/dashboard") ? "font-bold text-primary border-b-2 border-primary" : "text-on-surface-variant hover:text-primary"}`}
+              href="/dashboard/bookings"
+            >
+              Dashboard
+            </Link>
+            {isClient && userRole === "ORGANIZER" && (
+              <Link
+                className={`${navLinkBase} ${pathname.startsWith("/organizer") ? "font-bold text-primary border-b-2 border-primary" : "text-on-surface-variant hover:text-primary"}`}
+                href="/organizer/events"
+              >
+                Organizer
+              </Link>
+            )}
+
+            {/* Cart button — hidden on auth pages */}
+            {!isAuthPage && (
+              <button
+                type="button"
+                onClick={() => setCartOpen(true)}
+                className="relative inline-flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded"
+                aria-label="Open cart"
+              >
+                <ShoppingCart className="h-6 w-6" />
+                {cartCount > 0 && (
+                  <span className="absolute -right-2 -top-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-error text-on-error font-caption font-bold text-[10px]">
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+            )}
+
+            {!isAuthPage && isClient && token ? (
+              <div ref={dropdownRef} className="relative border-l border-outline-variant pl-4">
+                <button
+                  type="button"
+                  onClick={() => setDropdownOpen((o) => !o)}
+                  className="flex items-center gap-1.5 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded"
+                  aria-haspopup="true"
+                  aria-expanded={dropdownOpen}
+                >
+                  <span className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0">
+                    {userEmail ? userEmail.charAt(0).toUpperCase() : <User className="h-4 w-4" />}
+                  </span>
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 text-on-surface-variant transition-transform duration-150 ${dropdownOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+
+                {dropdownOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-outline-variant bg-surface shadow-xl z-50 py-1 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-outline-variant">
+                      <p className="text-xs text-on-surface-variant truncate">{userEmail}</p>
+                      <span className="mt-1 inline-block rounded-full bg-primary/10 text-primary text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5">
+                        {userRole === "ORGANIZER" ? "Organizer" : "Attendee"}
+                      </span>
+                    </div>
+
+                    <Link
+                      href="/dashboard/bookings"
+                      onClick={() => setDropdownOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-on-surface hover:bg-surface-container-low transition-colors"
+                    >
+                      <LayoutDashboard className="h-4 w-4 text-outline" />
+                      My Bookings
+                    </Link>
+
+                    {userRole === "ORGANIZER" && (
+                      <Link
+                        href="/organizer/events"
+                        onClick={() => setDropdownOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2.5 text-sm text-on-surface hover:bg-surface-container-low transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[16px] text-outline">event</span>
+                        Organizer Panel
+                      </Link>
+                    )}
+
+                    <div className="h-px bg-outline-variant mx-4 my-1" />
+
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-error hover:bg-error/5 transition-colors"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Sign out
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : !isAuthPage ? (
+              <Link
+                className="bg-linear-to-r from-primary to-secondary text-on-primary rounded-full px-6 py-2 font-label-sm hover:shadow-lg hover:scale-105 transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                href="/auth/login"
+              >
+                Sign in
+              </Link>
+            ) : null}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+
+      <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} />
+    </>
   );
 }

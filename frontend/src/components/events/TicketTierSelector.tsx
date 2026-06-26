@@ -1,19 +1,23 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { TicketTierResponse } from "@/types/event";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
+import { useReservationStore } from "@/store/reservationStore";
 
 interface TicketTierSelectorProps {
   eventId: number;
+  eventTitle: string;
   tiers: TicketTierResponse[];
 }
 
-export function TicketTierSelector({ eventId, tiers }: TicketTierSelectorProps) {
+export function TicketTierSelector({ eventId, eventTitle, tiers }: TicketTierSelectorProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { token } = useAuthStore();
+  const { set: reservationSet, clear: reservationClear } = useReservationStore();
   
   const [selectedTierId, setSelectedTierId] = useState<number | null>(
     tiers.length > 0 ? tiers[0].id : null
@@ -34,7 +38,7 @@ export function TicketTierSelector({ eventId, tiers }: TicketTierSelectorProps) 
 
   useEffect(() => {
     if (!expiresAt) return;
-    
+
     const calculateTimeLeft = () => {
       const now = new Date().getTime();
       const expiry = new Date(expiresAt).getTime();
@@ -44,6 +48,8 @@ export function TicketTierSelector({ eventId, tiers }: TicketTierSelectorProps) 
     const interval = setInterval(() => setTimeLeft(calculateTimeLeft()), 1000);
     return () => clearInterval(interval);
   }, [expiresAt]);
+
+  // beforeunload dialog and cancellation are handled globally by ReservationGuard
 
   const handleDecrease = () => {
     if (quantity > 1) setQuantity(quantity - 1);
@@ -87,6 +93,15 @@ export function TicketTierSelector({ eventId, tiers }: TicketTierSelectorProps) 
         const now = new Date().getTime();
         const expiry = new Date(booking.expiresAt).getTime();
         setTimeLeft(Math.max(0, Math.floor((expiry - now) / 1000)));
+        reservationSet(
+          booking.bookingId,
+          booking.expiresAt,
+          pathname ?? "/",
+          eventTitle,
+          selectedTier?.tierName ?? "",
+          quantity,
+          selectedTier?.basePrice ?? 0,
+        );
       } else {
         throw new Error("Invalid response from server");
       }
@@ -113,6 +128,7 @@ export function TicketTierSelector({ eventId, tiers }: TicketTierSelectorProps) 
       const checkoutUrl = res.data?.data?.checkoutUrl;
       
       if (checkoutUrl) {
+        reservationClear();
         window.location.href = checkoutUrl;
       } else {
         throw new Error("Checkout URL missing");
@@ -147,15 +163,19 @@ export function TicketTierSelector({ eventId, tiers }: TicketTierSelectorProps) 
           </div>
         )}
 
-        <div className="bg-surface-container-low rounded-xl p-4 border border-outline-variant/30 mb-4">
-          <div className="flex justify-between items-start mb-2">
-            <div>
-              <h3 className="font-label-sm text-label-sm text-on-surface">{selectedTier?.tierName}</h3>
-              <p className="font-caption text-caption text-on-surface-variant">Quantity: {quantity}</p>
-            </div>
-            <span className="font-section-heading text-section-heading text-primary">
-              ${total.toFixed(2)}
-            </span>
+        <div className="bg-surface-container-low rounded-xl p-4 border border-outline-variant/30 mb-4 space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-on-surface-variant">{selectedTier?.tierName} × {quantity}</span>
+            <span className="text-on-surface">EGP {(price * quantity).toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-on-surface-variant">Service fee</span>
+            <span className="text-on-surface">EGP {fee.toFixed(2)}</span>
+          </div>
+          <div className="h-px bg-outline-variant" />
+          <div className="flex justify-between font-semibold">
+            <span className="text-on-surface">Total</span>
+            <span className="text-primary text-lg">EGP {total.toFixed(2)}</span>
           </div>
         </div>
 
@@ -177,6 +197,7 @@ export function TicketTierSelector({ eventId, tiers }: TicketTierSelectorProps) 
         )}
 
         <button
+          type="button"
           onClick={handleCheckout}
           disabled={isSubmitting || timeLeft <= 0}
           className="w-full btn-gradient text-on-primary font-label-sm text-label-sm h-14 rounded-full flex items-center justify-center gap-2 hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
@@ -223,10 +244,10 @@ export function TicketTierSelector({ eventId, tiers }: TicketTierSelectorProps) 
                 </div>
                 <div className="text-right">
                   <span className="font-section-heading text-section-heading text-primary">
-                    ${tier.basePrice.toFixed(2)}
+                    EGP {tier.basePrice.toFixed(2)}
                   </span>
                   <p className="font-caption text-caption text-on-surface-variant">
-                    + ${fee.toFixed(2)} fee
+                    + EGP {fee.toFixed(2)} fee
                   </p>
                 </div>
               </div>
@@ -236,6 +257,7 @@ export function TicketTierSelector({ eventId, tiers }: TicketTierSelectorProps) 
                   <span className="font-body text-body text-on-surface-variant">Quantity</span>
                   <div className="flex items-center gap-4 bg-surface rounded-full px-3 py-1 border border-outline-variant">
                     <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDecrease();
@@ -249,6 +271,7 @@ export function TicketTierSelector({ eventId, tiers }: TicketTierSelectorProps) 
                       {quantity}
                     </span>
                     <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleIncrease();
@@ -267,14 +290,24 @@ export function TicketTierSelector({ eventId, tiers }: TicketTierSelectorProps) 
       </div>
 
       <div className="pt-4 border-t border-outline-variant/30">
-        <div className="flex justify-between items-center mb-4">
-          <span className="font-body text-body text-on-surface-variant">Total</span>
-          <span className="font-section-heading text-section-heading text-on-surface">
-            ${total.toFixed(2)}
-          </span>
+        <div className="space-y-1.5 mb-4">
+          <div className="flex justify-between text-sm">
+            <span className="text-on-surface-variant">Ticket × {quantity}</span>
+            <span className="text-on-surface">EGP {(price * quantity).toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-on-surface-variant">Service fee</span>
+            <span className="text-on-surface">EGP {fee.toFixed(2)}</span>
+          </div>
+          <div className="h-px bg-outline-variant my-1" />
+          <div className="flex justify-between font-semibold">
+            <span className="text-on-surface">Total</span>
+            <span className="text-primary font-section-heading">EGP {total.toFixed(2)}</span>
+          </div>
         </div>
 
         <button
+          type="button"
           onClick={handleReserve}
           disabled={isSubmitting || !selectedTierId}
           className="w-full btn-gradient text-on-primary font-label-sm text-label-sm h-14 rounded-full flex items-center justify-center gap-2 hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"

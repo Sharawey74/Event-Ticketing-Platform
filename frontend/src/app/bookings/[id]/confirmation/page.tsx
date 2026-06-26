@@ -147,7 +147,7 @@ export default function ConfirmationPage() {
             <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
             <div>
               <p className="font-caption text-caption text-primary-fixed mb-1 opacity-90">Total Paid</p>
-              <p className="font-hero-headline-mobile text-hero-headline-mobile">${booking.totalPrice?.toFixed(2) || "0.00"}</p>
+              <p className="font-hero-headline-mobile text-hero-headline-mobile">EGP {booking.totalPrice?.toFixed(2) || "0.00"}</p>
             </div>
             <div className="mt-4 pt-4 border-t border-white/20">
               <p className="font-caption text-caption flex items-center gap-1">

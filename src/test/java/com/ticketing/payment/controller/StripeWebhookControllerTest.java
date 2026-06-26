@@ -67,7 +67,7 @@ class StripeWebhookControllerTest {
                 .when(webhookService).verifyAndProcess(anyString(), anyString());
 
         // Act + Assert — 400: Stripe will NOT retry bad signature events
-        mockMvc.perform(post("/api/webhooks/stripe")
+        mockMvc.perform(post("/api/v1/payments/webhook")
                         .contentType(MediaType.TEXT_PLAIN)
                         .header("Stripe-Signature", INVALID_SIG)
                         .content(WEBHOOK_PAYLOAD))
@@ -81,7 +81,7 @@ class StripeWebhookControllerTest {
         // This simulates a successful transaction commit.
 
         // Act + Assert — 200: returned ONLY after verifyAndProcess() returns (Fix 9.1)
-        mockMvc.perform(post("/api/webhooks/stripe")
+        mockMvc.perform(post("/api/v1/payments/webhook")
                         .contentType(MediaType.TEXT_PLAIN)
                         .header("Stripe-Signature", VALID_SIG)
                         .content(WEBHOOK_PAYLOAD))

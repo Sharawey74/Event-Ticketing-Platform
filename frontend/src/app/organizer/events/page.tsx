@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -22,29 +22,41 @@ interface OrganizerEvent {
 export default function OrganizerDashboardPage() {
   const router = useRouter();
   const { token, userRole } = useAuthStore();
+  const [isClient, setIsClient] = useState(false);
+
   const { data: eventsData, isLoading } = useQuery({
     queryKey: ["organizerEvents"],
     queryFn: async () => {
       const res = await api.get("/api/v1/organizer/events");
       return res.data?.data || [];
     },
-    enabled: !!token && userRole === "ORGANIZER",
+    enabled: isClient && !!token && userRole === "ORGANIZER",
   });
 
   const events = (eventsData as OrganizerEvent[]) || [];
 
+  // Mark client ready after first render so Zustand can finish rehydrating from localStorage
+  useEffect(() => { setIsClient(true); }, []);
+
   useEffect(() => {
+    if (!isClient) return;
     if (!token) {
       router.push("/auth/login");
       return;
     }
-    
-    if (userRole && userRole !== "ORGANIZER") {
+    if (userRole !== "ORGANIZER") {
       router.push("/dashboard/bookings");
       return;
     }
-  }, [token, userRole, router]);
+  }, [isClient, token, userRole, router]);
 
+  if (!isClient) {
+    return <main className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen flex items-center justify-center"><p>Loading dashboard...</p></main>;
+  }
+  // Redirect in flight — render nothing to avoid a flash of empty content
+  if (!token || userRole !== "ORGANIZER") {
+    return null;
+  }
   if (isLoading) {
     return <main className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen flex items-center justify-center"><p>Loading dashboard...</p></main>;
   }
@@ -94,10 +106,10 @@ export default function OrganizerDashboardPage() {
             <path d="M 50 275 L 800 275" stroke="#e0e3e5" strokeWidth="1" />
             
             {/* Y-Axis Labels */}
-            <text x="40" y="55" fontSize="12" fill="#7b7487" textAnchor="end" className="font-caption">$10k</text>
-            <text x="40" y="130" fontSize="12" fill="#7b7487" textAnchor="end" className="font-caption">$5k</text>
-            <text x="40" y="205" fontSize="12" fill="#7b7487" textAnchor="end" className="font-caption">$2.5k</text>
-            <text x="40" y="280" fontSize="12" fill="#7b7487" textAnchor="end" className="font-caption">$0</text>
+            <text x="40" y="55" fontSize="12" fill="#7b7487" textAnchor="end" className="font-caption">EGP 10k</text>
+            <text x="40" y="130" fontSize="12" fill="#7b7487" textAnchor="end" className="font-caption">EGP 5k</text>
+            <text x="40" y="205" fontSize="12" fill="#7b7487" textAnchor="end" className="font-caption">EGP 2.5k</text>
+            <text x="40" y="280" fontSize="12" fill="#7b7487" textAnchor="end" className="font-caption">EGP 0</text>
             
             {/* X-Axis Labels */}
             <text x="100" y="295" fontSize="12" fill="#7b7487" textAnchor="middle" className="font-caption">Oct 1</text>
@@ -180,7 +192,7 @@ export default function OrganizerDashboardPage() {
                 <div className="flex-1 lg:border-l border-outline-variant/30 lg:pl-stack-md flex items-center justify-between py-2 lg:py-0">
                   <div>
                     <p className="font-caption text-on-surface-variant mb-1">Gross Revenue</p>
-                    <p className="font-label-sm text-body-lg font-bold text-on-surface">${(event.grossRevenue || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                    <p className="font-label-sm text-body-lg font-bold text-on-surface">EGP {(event.grossRevenue || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button 

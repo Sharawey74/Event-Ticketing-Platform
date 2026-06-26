@@ -140,11 +140,6 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
                     <br />
                     {event.venue?.city || ""} {event.venue?.country || ""}
                   </p>
-                  {event.venue && (
-                    <a className="text-primary font-label-sm text-label-sm hover:underline mt-1 inline-block" href="#">
-                      View Map
-                    </a>
-                  )}
                 </div>
               </div>
             </div>
@@ -167,7 +162,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
 
           {/* Right Column: Sticky Ticketing */}
           <div className="lg:col-span-5 xl:col-span-4 relative">
-            <TicketTierSelector eventId={event.id} tiers={event.ticketTiers || []} />
+            <TicketTierSelector eventId={event.id} eventTitle={event.title} tiers={event.ticketTiers || []} />
           </div>
         </div>
       </div>

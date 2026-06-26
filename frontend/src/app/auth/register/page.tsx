@@ -2,22 +2,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useAuthStore } from "@/store/authStore";
+import { Eye, EyeOff } from "lucide-react";
 import { api } from "@/lib/api";
 
 export default function RegisterPage() {
-  const setAuth = useAuthStore((state) => state.setAuth);
-
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [uiRole, setUiRole] = useState<"ATTENDEE" | "ORGANIZER">("ATTENDEE"); // Decorational UI only
-  
+  const [showPassword, setShowPassword] = useState(false);
+  const [role, setRole] = useState<"USER" | "ORGANIZER">("USER");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // Simple password strength calculation
   const getPasswordStrength = (pass: string) => {
     let score = 0;
     if (pass.length > 0) score += 1;
@@ -29,188 +26,241 @@ export default function RegisterPage() {
 
   const strength = getPasswordStrength(password);
   const strengthLabels = ["Weak", "Weak", "Medium", "Strong", "Very Strong"];
+  const strengthColors = ["bg-error", "bg-error", "bg-yellow-500", "bg-emerald-500", "bg-emerald-600"];
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
-
     try {
-      // E-001 ENFORCED: role field NOT sent to backend endpoint
-      const registerPayload = { firstName, lastName, email, password };
-      
-      const res = await api.post("/api/v1/auth/register", registerPayload);
-      const { token, email: userEmail, role } = res.data?.data || {};
-
-      if (token && userEmail) {
-        setAuth(token, userEmail, role);
-        // Write token to a cookie so the Next.js middleware can verify auth on navigation
-        document.cookie = `token=${token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
-        
-        // Redirect based on actual backend-assigned role
-        if (role === "ORGANIZER") {
-          window.location.href = "/organizer/events";
-        } else {
-          window.location.href = "/dashboard/bookings";
-        }
-      } else {
-        // Fallback: if backend doesn't auto-login, redirect to login
-        window.location.href = "/auth/login?registered=true";
-      }
+      await api.post("/api/v1/auth/register", { firstName, lastName, email, password, role });
+      window.location.href = "/auth/login?registered=true";
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string } } };
-      setError(error.response?.data?.message || "Failed to register account");
+      const apiError = err as { response?: { data?: { message?: string } } };
+      setError(apiError.response?.data?.message || "Failed to register account");
     } finally {
       setIsLoading(false);
     }
   };
 
+  const inputClass =
+    "w-full rounded-xl border border-outline-variant bg-surface py-3 px-4 text-sm text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all [&:-webkit-autofill]:shadow-[inset_0_0_0_1000px_#f8f9ff]";
+
   return (
-    <main className="min-h-screen relative flex items-center justify-center bg-surface px-4 py-20">
-      
-      {/* Absolute Logo Header */}
-      <header className="w-full py-6 px-edge-padding absolute top-0 left-0 flex justify-center sm:justify-start items-center z-50">
-        <Link href="/" className="text-section-heading font-section-heading text-primary tracking-tighter">
-          Eventora
-        </Link>
-      </header>
+    <main className="min-h-[calc(100vh-80px)] flex items-center justify-center bg-surface px-4 py-8">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 h-96 w-96 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-secondary/10 blur-3xl" />
+      </div>
 
-      {/* Decorative Background Blob */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary-fixed-dim/30 rounded-full blur-[100px] pointer-events-none -z-10" />
+      <div className="relative w-full max-w-lg">
+        <div className="mb-8 text-center">
+          <h1 className="text-2xl font-bold text-on-surface">Create your account</h1>
+          <p className="mt-1 text-sm text-on-surface-variant">Join Eventora to unlock premium experiences.</p>
+        </div>
 
-      {/* Register Card */}
-      <div className="w-full max-w-[420px] bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant/30 p-stack-lg z-10">
-        
-        <h1 className="font-section-heading text-section-heading text-on-surface mb-2">Create your account</h1>
-        <p className="font-body text-body text-on-surface-variant mb-6">Join Eventora to unlock premium experiences.</p>
-        
-        {error ? (
-          <div className="mb-4 p-3 bg-error-container text-on-error-container rounded-lg font-label-sm">
-            {error}
-          </div>
-        ) : null}
+        <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-8 shadow-lg">
+          {error && (
+            <div className="mb-4 rounded-lg bg-error-container px-4 py-3 text-sm text-on-error-container text-center">
+              {error}
+            </div>
+          )}
 
-        <form className="flex flex-col gap-5" onSubmit={handleRegister}>
-          
-          {/* Name Grid */}
-          <div className="grid grid-cols-2 gap-4">
+          <form className="flex flex-col gap-5" onSubmit={handleRegister}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="firstName" className="block text-sm font-medium text-on-surface mb-1.5">
+                  First Name
+                </label>
+                <input
+                  id="firstName"
+                  type="text"
+                  required
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  autoComplete="given-name"
+                  placeholder="First name"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label htmlFor="lastName" className="block text-sm font-medium text-on-surface mb-1.5">
+                  Last Name
+                </label>
+                <input
+                  id="lastName"
+                  type="text"
+                  required
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  autoComplete="family-name"
+                  placeholder="Last name"
+                  className={inputClass}
+                />
+              </div>
+            </div>
+
             <div>
-              <label htmlFor="firstName" className="block font-label-sm text-on-surface mb-1">First Name</label>
-              <input 
-                id="firstName"
-                type="text" 
+              <label htmlFor="email" className="block text-sm font-medium text-on-surface mb-1.5">
+                Email Address
+              </label>
+              <input
+                id="email"
+                type="email"
                 required
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className="w-full rounded-lg border border-outline-variant py-2.5 px-3 bg-surface-bright focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-body text-sm"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                placeholder="you@example.com"
+                className={inputClass}
               />
             </div>
+
             <div>
-              <label htmlFor="lastName" className="block font-label-sm text-on-surface mb-1">Last Name</label>
-              <input 
-                id="lastName"
-                type="text" 
-                required
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className="w-full rounded-lg border border-outline-variant py-2.5 px-3 bg-surface-bright focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-body text-sm"
-              />
-            </div>
-          </div>
-
-          {/* Email */}
-          <div>
-            <label htmlFor="email" className="block font-label-sm text-on-surface mb-1">Email Address</label>
-            <input 
-              id="email"
-              type="email" 
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-outline-variant py-2.5 px-3 bg-surface-bright focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-body text-sm"
-            />
-          </div>
-
-          {/* Password */}
-          <div>
-            <label htmlFor="password" className="block font-label-sm text-on-surface mb-1">Password</label>
-            <input 
-              id="password"
-              type="password" 
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-outline-variant py-2.5 px-3 bg-surface-bright focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-body text-sm mb-2"
-            />
-            {/* Password Strength Indicator */}
-            <div className="flex gap-1 h-1.5 w-full mb-1">
-              {[1, 2, 3, 4].map(idx => (
-                <div 
-                  key={idx} 
-                  className={`flex-1 rounded-full ${idx <= strength ? "bg-primary" : "bg-surface-variant"}`} 
-                />
-              ))}
-            </div>
-            <p className="font-caption text-on-surface-variant text-right">{strengthLabels[strength]}</p>
-          </div>
-
-          {/* Role Selection (UI ONLY) */}
-          <div>
-            <label className="block font-label-sm text-on-surface mb-3">I want to...</label>
-            <div className="grid grid-cols-2 gap-4">
-              
-              {/* Attendee Toggle */}
-              <label className="cursor-pointer">
-                <input 
-                  type="radio" 
-                  name="role" 
-                  value="ATTENDEE" 
-                  className="peer sr-only" 
-                  checked={uiRole === "ATTENDEE"}
-                  onChange={() => setUiRole("ATTENDEE")}
-                />
-                <div className="border-2 border-outline-variant peer-checked:border-primary peer-checked:bg-primary-fixed/20 rounded-xl p-4 flex flex-col items-center gap-2 transition-all">
-                  <span className={`material-symbols-outlined text-[28px] ${uiRole === "ATTENDEE" ? "text-primary" : "text-on-surface-variant"}`}>confirmation_number</span>
-                  <span className={`font-label-sm ${uiRole === "ATTENDEE" ? "text-primary" : "text-on-surface"}`}>Attend Events</span>
-                </div>
+              <label htmlFor="password" className="block text-sm font-medium text-on-surface mb-1.5">
+                Password
               </label>
-
-              {/* Organizer Toggle */}
-              <label className="cursor-pointer">
-                <input 
-                  type="radio" 
-                  name="role" 
-                  value="ORGANIZER" 
-                  className="peer sr-only" 
-                  checked={uiRole === "ORGANIZER"}
-                  onChange={() => setUiRole("ORGANIZER")}
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="new-password"
+                  placeholder="At least 8 characters"
+                  className={`${inputClass} pr-11`}
                 />
-                <div className="border-2 border-outline-variant peer-checked:border-primary peer-checked:bg-primary-fixed/20 rounded-xl p-4 flex flex-col items-center gap-2 transition-all">
-                  <span className={`material-symbols-outlined text-[28px] ${uiRole === "ORGANIZER" ? "text-primary" : "text-on-surface-variant"}`}>storefront</span>
-                  <span className={`font-label-sm ${uiRole === "ORGANIZER" ? "text-primary" : "text-on-surface"}`}>Host Events</span>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors focus:outline-none"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+
+              {password.length > 0 && (
+                <div className="mt-2.5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="flex gap-1 h-1.5 flex-1">
+                      {[1, 2, 3, 4].map((idx) => (
+                        <div
+                          key={idx}
+                          className={`flex-1 rounded-full transition-colors ${
+                            idx <= strength ? strengthColors[strength] : "bg-surface-variant"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-xs text-on-surface-variant shrink-0">{strengthLabels[strength]}</span>
+                  </div>
+                  <ul className="space-y-1">
+                    <li
+                      className={`flex items-center gap-1.5 text-sm ${
+                        password.length >= 8 ? "text-emerald-600" : "text-on-surface-variant"
+                      }`}
+                    >
+                      <span className="w-3 text-center">{password.length >= 8 ? "✓" : "•"}</span>
+                      At least 8 characters
+                    </li>
+                    <li
+                      className={`flex items-center gap-1.5 text-sm ${
+                        /[A-Z]/.test(password) ? "text-emerald-600" : "text-on-surface-variant"
+                      }`}
+                    >
+                      <span className="w-3 text-center">{/[A-Z]/.test(password) ? "✓" : "•"}</span>
+                      One uppercase letter
+                    </li>
+                    <li
+                      className={`flex items-center gap-1.5 text-sm ${
+                        /[0-9]/.test(password) ? "text-emerald-600" : "text-on-surface-variant"
+                      }`}
+                    >
+                      <span className="w-3 text-center">{/[0-9]/.test(password) ? "✓" : "•"}</span>
+                      One number
+                    </li>
+                  </ul>
                 </div>
-              </label>
-              
+              )}
             </div>
-          </div>
 
-          {/* Submit */}
-          <button 
-            type="submit" 
-            disabled={isLoading}
-            className="btn-gradient w-full py-3 px-4 rounded-full text-on-primary font-label-md mt-6 shadow-md hover:shadow-lg hover:-translate-y-px transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-md flex justify-center items-center gap-2"
-          >
-            {isLoading ? "Creating Account..." : "Create Account"}
-          </button>
-        </form>
+            <div>
+              <label className="block text-sm font-medium text-on-surface mb-3">I want to...</label>
+              <div className="grid grid-cols-2 gap-4">
+                <label className="cursor-pointer">
+                  <input
+                    type="radio"
+                    name="role"
+                    value="USER"
+                    className="peer sr-only"
+                    checked={role === "USER"}
+                    onChange={() => setRole("USER")}
+                  />
+                  <div className="border-2 border-outline-variant peer-checked:border-primary peer-checked:ring-2 peer-checked:ring-primary/20 peer-checked:bg-primary-fixed/20 rounded-xl p-5 flex flex-col items-center gap-2 transition-all">
+                    <span
+                      className={`material-symbols-outlined text-[36px] ${
+                        role === "USER" ? "text-primary" : "text-on-surface-variant"
+                      }`}
+                    >
+                      confirmation_number
+                    </span>
+                    <span className={`text-sm font-medium ${role === "USER" ? "text-primary" : "text-on-surface"}`}>
+                      Attend Events
+                    </span>
+                  </div>
+                </label>
 
-        <div className="text-center mt-6">
-          <p className="font-body text-on-surface-variant">
-            Already have an account? <Link href="/auth/login" className="text-primary font-bold hover:underline">Sign in</Link>
+                <label className="cursor-pointer">
+                  <input
+                    type="radio"
+                    name="role"
+                    value="ORGANIZER"
+                    className="peer sr-only"
+                    checked={role === "ORGANIZER"}
+                    onChange={() => setRole("ORGANIZER")}
+                  />
+                  <div className="border-2 border-outline-variant peer-checked:border-primary peer-checked:ring-2 peer-checked:ring-primary/20 peer-checked:bg-primary-fixed/20 rounded-xl p-5 flex flex-col items-center gap-2 transition-all">
+                    <span
+                      className={`material-symbols-outlined text-[36px] ${
+                        role === "ORGANIZER" ? "text-primary" : "text-on-surface-variant"
+                      }`}
+                    >
+                      storefront
+                    </span>
+                    <span
+                      className={`text-sm font-medium ${role === "ORGANIZER" ? "text-primary" : "text-on-surface"}`}
+                    >
+                      Host Events
+                    </span>
+                  </div>
+                </label>
+              </div>
+              {role === "ORGANIZER" && (
+                <p className="mt-2 text-sm text-on-surface-variant text-center">
+                  You&apos;ll be able to create and manage events after signing in.
+                </p>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="btn-gradient mt-2 w-full rounded-full py-3 text-sm font-semibold text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed disabled:translate-y-0 flex justify-center items-center gap-2"
+            >
+              {isLoading ? "Creating Account…" : "Create Account"}
+            </button>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-on-surface-variant">
+            Already have an account?{" "}
+            <Link href="/auth/login" className="font-semibold text-primary hover:underline">
+              Sign in
+            </Link>
           </p>
         </div>
       </div>
-
     </main>
   );
 }

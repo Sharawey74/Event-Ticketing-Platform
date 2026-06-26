@@ -23,10 +23,11 @@
 | 10 | RabbitMQ Consumers + Notifications | ✅ Complete | 3 | 83/83 passing | Implemented BookingNotificationListener for async emails and QR code generation |
 | 11 | Pricing Engine + Waitlist | ✅ Complete | 5 | 88/88 passing | Pricing engine logic, waitlist implementation, cancel booking action |
 | 12 | Refund Logic + Concurrency Polish | ✅ Complete | 11 | 99/99 passing | 3-tier refund logic, Pricing Engine wired |
-| 13 | Frontend Event Detail + Booking Flow | ✅ Complete | — | — | |
-| 14 | Frontend User Dashboard + QR Display | ✅ Complete | — | — | |
-| 15 | Frontend Organizer Dashboard | ✅ Complete | — | — | |
-| 16 | Backend Test Coverage Push (80%+) | ⬜ Not Started | — | — | |
+| 13 | Frontend Event Detail + Booking Flow | ✅ Complete | — | — | TicketTierSelector, Book Now routing, and confirmation UI built |
+| 14 | Frontend User Dashboard + QR Display | ✅ Complete | — | — | Dashboard bookings table, booking details with base64 QR display |
+| 15 | Frontend Organizer Dashboard + Core Fixes | ✅ Complete | — | — | Organizer dashboard scaffolded. Core bugs fixed: Stripe webhook 403, Session GSON fallback, QR pub/sub event missing, DTO nesting mismatches |
+| 16A | Platform Stabilization (Day 16A) | 🔄 In Progress | 116 | 104/104 unit passing ✅ | BookingQueryService (QR gate), AuthService organizer role, register flow, DataSeeder profile fix, env alignment. 12 Docker-only errors (pre-existing). UI sub-session: edit event page created, loading-state bug fixed, hero Sign In hidden when authenticated, GlobalExceptionHandler 405/404/415 handlers added |
+| 16B | Backend Test Coverage Push (80%+) | ⬜ Not Started | — | — | |
 | 17 | Docker Multi-stage + Compose Polish | ⬜ Not Started | — | — | |
 | 18 | CI/CD Pipeline (GitHub Actions) | ⬜ Not Started | — | — | |
 | 19 | Performance + k6 Load Tests + Swagger/OpenAPI | ⬜ Not Started | — | — | E-002 Swagger annotations, k6 Railway baseline + booking scenarios |
@@ -64,7 +65,26 @@
 | Fix 11.1 | IMPORTANT | Audit | ✅ | CANCELLED state added to BookingState (pre-applied for Day 8) |
 | Fix 11.2 | IMPORTANT | 11 | ✅ | RELEASE event / AVAILABLE state removal (documented in BookingState Javadoc) |
 | Fix 12.1 | GOOD | 12 | ✅ | refund_denial_reason via V11 migration |
-| Fix 16.1 | CRITICAL | 16 | ⬜ | Concurrency test for reserveSeat() Lua script |
+| Fix 15.1 | CRITICAL | 15 | ✅ | Stripe Webhook 403 Forbidden fixed in SecurityConfig |
+| Fix 15.2 | CRITICAL | 15 | ✅ | Stripe Session Deserialization Version Mismatch fixed via ApiResource.GSON fallback |
+| Fix 15.3 | CRITICAL | 15 | ✅ | Missing BookingConfirmedEvent publish call added in WebhookService |
+| Fix 15.4 | HIGH | 15 | ✅ | Next.js middleware token missing issue fixed (localStorage vs cookie sync) |
+| Fix 15.5 | HIGH | 15 | ✅ | Dashboard nested BookingDetailsResponse DTO alignment (totalPrice, event.title) |
+| Fix 16A.1 | CRITICAL | 16A | ✅ | BookingQueryService: QR/ticket data gated behind CONFIRMED/ATTENDED state |
+| Fix 16A.2 | CRITICAL | 16A | ✅ | AuthService: ADMIN self-registration blocked; ORGANIZER role correctly assignable |
+| Fix 16A.3 | HIGH | 16A | ✅ | register/page.tsx: sends role to backend; redirects to /auth/login?registered=true |
+| Fix 16A.4 | HIGH | 16A | ✅ | DataSeeder: removed "default" profile (prod safety) |
+| Fix 16A.5 | MEDIUM | 16A | ✅ | application-local.yml: fixed STRIPE_WEBHOOK_SECRET env var name |
+| Fix 16A.6 | MEDIUM | 16A | ✅ | .env.example: corrected backend port to 8088 |
+| Fix 16A.7 | HIGH | 16A | ✅ | BookingRepository: added findByIdWithDetails with full EntityGraph |
+| Fix 16A.8 | HIGH | 16A | ✅ | BookingController: removed direct repo injection; now delegates to BookingQueryService |
+| Fix 16A.9 | MEDIUM | 16A | ✅ | Pre-existing test URL mismatches fixed (AuthControllerTest, StripeWebhookControllerTest) |
+| Fix 16A.10 | MEDIUM | 16A | ✅ | WebhookServiceTest: added missing BookingEventPublisher mock + populated booking test data |
+| Fix 16A.11 | HIGH | 16A | ✅ | GlobalExceptionHandler: added 405/404/415 handlers (was falling into 500 catch-all) |
+| Fix 16A.12 | HIGH | 16A | ✅ | page.tsx hero: "Sign In" button hidden when user is already authenticated |
+| Fix 16A.13 | HIGH | 16A | ✅ | organizer/events/page.tsx: split loading guard — disabled TanStack Query kept isLoading:true forever when !token |
+| Fix 16A.14 | HIGH | 16A | ✅ | organizer/events/[id]/edit/page.tsx: created missing edit event page (was 404) |
+| Fix 16.1 | CRITICAL | 16B | ⬜ | Concurrency test for reserveSeat() Lua script |
 | Fix PW3-1 | CRITICAL | 1/2 | ✅ | Stripe account + CLI installed |
 
 ---
@@ -73,8 +93,8 @@
 
 | Metric | Current | Target |
 | :--- | :--- | :--- |
-| `./mvnw test` passing | 99 / 99 Tests Passing | 100% |
-| Test coverage | N/A | 80%+ |
+| `./mvnw test` passing | 104 / 104 unit passing (12 Docker-only errors, pre-existing) | 100% |
+| Test coverage | N/A (JaCoCo not yet run) | 80%+ |
 | Active @Autowired usages | 0 | 0 |
 | Active LocalDateTime usages | 0 | 0 |
 | Magic numbers in code | 0 | 0 |
