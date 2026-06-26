@@ -6,6 +6,7 @@ Artifacts/
 Docs/
 docs/
 R/
+
 Images/
 Plans/
 Tools/
@@ -50,6 +51,8 @@ build/
 *.resolved
 .agent
 .env
+.claude
+CLAUDE.md
 *.txt
 
 ### Logs ###
