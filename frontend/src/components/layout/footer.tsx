@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export function Footer() {
   return (
     <footer className="bg-surface-container-lowest border-t border-surface-container-high py-stack-lg mt-auto">
@@ -10,8 +12,8 @@ export function Footer() {
         </div>
         <div className="flex flex-col items-center md:items-end gap-2">
           <div className="flex gap-4">
-             <a href="#" className="text-on-surface-variant font-caption hover:text-primary transition-colors">Terms</a>
-             <a href="#" className="text-on-surface-variant font-caption hover:text-primary transition-colors">Privacy</a>
+             <Link href="/terms" className="text-on-surface-variant font-caption hover:text-primary transition-colors">Terms</Link>
+             <Link href="/privacy" className="text-on-surface-variant font-caption hover:text-primary transition-colors">Privacy</Link>
           </div>
           <p className="text-on-surface-variant font-caption">
             © {new Date().getFullYear()} Eventora. All rights reserved.

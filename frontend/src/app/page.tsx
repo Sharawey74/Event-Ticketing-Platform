@@ -1,10 +1,14 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useMemo, useState } from "react";
 
 import { useQuery } from "@tanstack/react-query";
 import { Calendar, MapPin, Search } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+
+import { useAuthStore } from "@/store/authStore";
 
 import { EventCard } from "@/components/events/event-card";
 import { fetchCategories, fetchVenues } from "@/lib/catalog";
@@ -36,6 +40,8 @@ const initialFilters: AppliedFilters = {
 
 export default function Home() {
   const router = useRouter();
+  const token = useAuthStore((s) => s.token);
+  const isLoggedIn = token !== null;
   const [draftQuery, setDraftQuery] = useState("");
   const [draftCity, setDraftCity] = useState("");
   const [draftDate, setDraftDate] = useState("");
@@ -104,8 +110,17 @@ export default function Home() {
     <div className="bg-surface">
       {/* ── Hero ── */}
       <section className="relative overflow-hidden bg-zinc-950 text-white">
-        {/* Purple gradient — no green */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(99,14,212,0.75),transparent_55%),radial-gradient(ellipse_at_bottom_right,rgba(75,65,225,0.55),transparent_50%)] opacity-90" />
+        {/* Concert background with purple overlay */}
+        <div className="absolute inset-0">
+          <img
+            src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=1600&q=80"
+            alt=""
+            aria-hidden="true"
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-zinc-950/70" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(99,14,212,0.65),transparent_55%),radial-gradient(ellipse_at_bottom_right,rgba(75,65,225,0.45),transparent_50%)]" />
+        </div>
 
         <div className="relative mx-auto w-full max-w-6xl px-4 py-16 md:px-6 md:py-24">
           <div className="max-w-3xl space-y-4">
@@ -119,6 +134,25 @@ export default function Home() {
               Search published events, filter by city and category, and reserve
               your seat in seconds.
             </p>
+
+            {/* Secondary CTA glass buttons */}
+            <div className="flex flex-wrap gap-3 pt-2">
+              <Link
+                href="/search"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/15 border border-white/30 backdrop-blur-sm text-white text-sm font-medium hover:bg-white/25 transition-all"
+              >
+                <Search className="h-4 w-4" />
+                Browse Events
+              </Link>
+              {!isLoggedIn && (
+                <Link
+                  href="/auth/login"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm text-white/80 text-sm font-medium hover:bg-white/20 transition-all"
+                >
+                  Sign In
+                </Link>
+              )}
+            </div>
           </div>
 
           {/* Search Bar */}

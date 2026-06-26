@@ -149,7 +149,7 @@ export default function BookingDetailPage() {
       if (refund.status === "DENIED") {
         setRefundStatus({ message: `Refund denied: ${refund.denialReason}`, isError: true });
       } else {
-        setRefundStatus({ message: `Refund processed successfully. Amount: $${refund.amount?.toFixed(2) || "0.00"}`, isError: false });
+        setRefundStatus({ message: `Refund processed successfully. Amount: EGP ${refund.amount?.toFixed(2) || "0.00"}`, isError: false });
       }
     } catch (err: unknown) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -214,7 +214,7 @@ export default function BookingDetailPage() {
         <div className="flex flex-col items-end gap-2 text-right">
           <BookingStatusBadge state={booking.state} />
           <p className="font-caption text-on-surface-variant mt-1">Booking Ref: <span className="font-mono text-on-surface">{booking.reference || `VVD-${booking.id}`}</span></p>
-          <p className="font-section-heading text-primary mt-2">${(booking.totalPrice || 0).toFixed(2)}</p>
+          <p className="font-section-heading text-primary mt-2">EGP {(booking.totalPrice || 0).toFixed(2)}</p>
         </div>
       </div>
 

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
+import { ReservationGuard } from "@/components/layout/ReservationGuard";
 import { AppProviders } from "@/components/providers/app-providers";
 import "./globals.css";
 
@@ -39,6 +40,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <AppProviders>
+          <ReservationGuard />
           <div className="flex min-h-full flex-col">
             <Navbar />
             <main className="flex-1">{children}</main>

@@ -44,6 +44,7 @@ export type EventResponse = {
   description: string | null;
   organizerId: number | null;
   categoryId: number | null;
+  categoryName: string | null;
   venueId: number | null;
   startDate: string;
   endDate: string;
@@ -53,6 +54,7 @@ export type EventResponse = {
   status: EventStatus;
   dynamicPricingEnabled: boolean;
   waitlistEnabled: boolean;
+  minPrice: number | null;
 };
 
 export type EventDetailResponse = Omit<EventResponse, "organizerId" | "categoryId" | "venueId"> & {
