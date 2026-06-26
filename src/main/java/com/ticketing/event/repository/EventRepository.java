@@ -1,6 +1,7 @@
 package com.ticketing.event.repository;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -30,6 +31,14 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     Optional<Event> findByIdWithDetails(@Param("id") Long id);
 
     Page<Event> findByStatusAndStartDateAfter(EventStatus status, Instant date, Pageable pageable);
+
+    @Query("""
+            SELECT e FROM Event e
+            LEFT JOIN FETCH e.ticketTiers
+            WHERE e.organizer.id = :organizerId
+            ORDER BY e.startDate DESC
+            """)
+    List<Event> findByOrganizerIdWithTiers(@Param("organizerId") Long organizerId);
 
     @EntityGraph(attributePaths = { "organizer", "category", "venue" })
     @Query("""

@@ -25,9 +25,11 @@ import com.ticketing.user.model.User;
 import com.ticketing.user.repository.UserRepository;
 import org.springframework.statemachine.config.StateMachineFactory;
 
+import com.ticketing.common.exception.ConflictException;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 
 @Service
 @RequiredArgsConstructor
@@ -128,6 +130,37 @@ public class BookingService {
         } finally {
             lockService.releaseLock(lockKey, lockValue);
         }
+    }
+
+    @Transactional
+    public void cancelBooking(Long bookingId, Long userId) {
+        Booking booking = bookingRepository.findByIdWithDetails(bookingId)
+                .orElseThrow(() -> new EntityNotFoundException("Booking not found: " + bookingId));
+
+        if (!booking.getUser().getId().equals(userId)) {
+            throw new AccessDeniedException("You do not own this booking");
+        }
+
+        if (booking.getState() != BookingState.RESERVED) {
+            throw new ConflictException(
+                    "Only RESERVED bookings can be self-cancelled. Current state: " + booking.getState());
+        }
+
+        int quantity = booking.getTickets().size();
+        Long tierId = booking.getTickets().get(0).getTier().getId();
+
+        inventoryService.releaseSeat(tierId, quantity);
+
+        TicketTier tier = ticketTierRepository.findById(tierId)
+                .orElseThrow(() -> new EntityNotFoundException("Ticket tier not found: " + tierId));
+        tier.setAvailableCount(tier.getAvailableCount() + quantity);
+        ticketTierRepository.save(tier);
+
+        booking.setState(BookingState.CANCELLED);
+        bookingRepository.save(booking);
+
+        log.info("[booking] Booking {} self-cancelled by user {}. Released {} seats for tier {}",
+                bookingId, userId, quantity, tierId);
     }
 
     @Transactional

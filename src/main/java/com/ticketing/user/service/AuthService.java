@@ -36,12 +36,17 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
+        if (request.getRole() == Role.ADMIN) {
+            throw new ValidationException("Self-registration as ADMIN is not permitted");
+        }
+        Role assignedRole = (request.getRole() == Role.ORGANIZER) ? Role.ORGANIZER : Role.USER;
+
         User user = User.builder()
             .email(request.getEmail())
             .passwordHash(passwordEncoder.encode(request.getPassword()))
             .firstName(request.getFirstName())
             .lastName(request.getLastName())
-            .role(Role.USER) // Force role to USER to prevent privilege escalation
+            .role(assignedRole)
             .build();
 
         User saved;

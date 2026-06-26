@@ -1,6 +1,7 @@
 package com.ticketing.event.service;
 
 import java.time.Instant;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,9 +13,13 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.ticketing.booking.model.TicketTier;
+import com.ticketing.booking.repository.TicketTierRepository;
 import com.ticketing.common.config.RedisConfig;
+import com.ticketing.inventory.service.InventoryService;
 
 import com.ticketing.event.dto.CreateEventRequest;
+import com.ticketing.event.dto.CreateTicketTierRequest;
 import com.ticketing.event.dto.EventFilterRequest;
 import com.ticketing.event.dto.EventResponse;
 import com.ticketing.event.dto.UpdateEventRequest;
@@ -37,6 +42,8 @@ public class EventService {
     private static final Logger logger = LoggerFactory.getLogger(EventService.class);
 
     private final EventRepository eventRepository;
+    private final TicketTierRepository ticketTierRepository;
+    private final InventoryService inventoryService;
 
     @Transactional
     public EventResponse createEvent(CreateEventRequest request, Long organizerId) {
@@ -59,6 +66,25 @@ public class EventService {
             .build();
 
         Event saved = eventRepository.save(event);
+
+        if (request.getTicketTiers() != null) {
+            for (CreateTicketTierRequest tierReq : request.getTicketTiers()) {
+                TicketTier tier = TicketTier.builder()
+                    .event(saved)
+                    .tierName(tierReq.getTierName())
+                    .description(tierReq.getDescription())
+                    .basePrice(tierReq.getBasePrice())
+                    .totalCapacity(tierReq.getTotalCapacity())
+                    .availableCount(tierReq.getTotalCapacity())
+                    .maxPerBooking(tierReq.getMaxPerBooking() != null
+                        ? tierReq.getMaxPerBooking()
+                        : com.ticketing.common.util.BusinessConstants.MAX_TICKETS_PER_BOOKING)
+                    .build();
+                TicketTier savedTier = ticketTierRepository.save(tier);
+                inventoryService.setAvailableCount(savedTier.getId(), savedTier.getTotalCapacity());
+            }
+        }
+
         logger.info("Event {} created by organizer {}", saved.getId(), organizerId);
         return toResponse(saved);
     }
@@ -199,6 +225,7 @@ public class EventService {
             .description(event.getDescription())
             .organizerId(event.getOrganizer() == null ? null : event.getOrganizer().getId())
             .categoryId(event.getCategory() == null ? null : event.getCategory().getId())
+            .categoryName(event.getCategory() == null ? null : event.getCategory().getName())
             .venueId(event.getVenue() == null ? null : event.getVenue().getId())
             .startDate(event.getStartDate())
             .endDate(event.getEndDate())
@@ -207,6 +234,7 @@ public class EventService {
             .coverImageUrl(event.getCoverImageUrl())
             .status(event.getStatus())
             .waitlistEnabled(event.getWaitlistEnabled())
+            .minPrice(event.getMinPrice())
             .build();
     }
 
