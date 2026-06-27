@@ -26,8 +26,9 @@
 | 13 | Frontend Event Detail + Booking Flow | ✅ Complete | — | — | TicketTierSelector, Book Now routing, and confirmation UI built |
 | 14 | Frontend User Dashboard + QR Display | ✅ Complete | — | — | Dashboard bookings table, booking details with base64 QR display |
 | 15 | Frontend Organizer Dashboard + Core Fixes | ✅ Complete | — | — | Organizer dashboard scaffolded. Core bugs fixed: Stripe webhook 403, Session GSON fallback, QR pub/sub event missing, DTO nesting mismatches |
-| 16A | Platform Stabilization (Day 16A) | 🔄 In Progress | 116 | 104/104 unit passing ✅ | BookingQueryService (QR gate), AuthService organizer role, register flow, DataSeeder profile fix, env alignment. 12 Docker-only errors (pre-existing). UI sub-session: edit event page created, loading-state bug fixed, hero Sign In hidden when authenticated, GlobalExceptionHandler 405/404/415 handlers added |
-| 16B | Backend Test Coverage Push (80%+) | ⬜ Not Started | — | — | |
+| 16A | Platform Stabilization (Day 16A) | ✅ Complete | 116 | 104/104 unit passing ✅ | BookingQueryService (QR gate), AuthService organizer role, register flow, DataSeeder profile fix, env alignment. 12 Docker-only errors (pre-existing). UI sub-session: edit event page created, loading-state bug fixed, hero Sign In hidden when authenticated, GlobalExceptionHandler 405/404/415 handlers added |
+| 16B-CF | Checkout Flow Stabilization (sub-session) | ✅ Complete | 141 | 129/129 unit passing ✅ | 6 root-cause bugs fixed: price sync, resume checkout (Payment upsert fixes UNIQUE violation), PAYMENT_PENDING cancel+auto-expire, stale-closure dialog, explicit replace prompt, Booking History actions. +25 new tests. |
+| 16B | Backend Test Coverage Push (80%+) | 🔄 In Progress | — | — | BookingControllerTest missing; Fix 16B.1 (Lua concurrency) still CRITICAL pending |
 | 17 | Docker Multi-stage + Compose Polish | ⬜ Not Started | — | — | |
 | 18 | CI/CD Pipeline (GitHub Actions) | ⬜ Not Started | — | — | |
 | 19 | Performance + k6 Load Tests + Swagger/OpenAPI | ⬜ Not Started | — | — | E-002 Swagger annotations, k6 Railway baseline + booking scenarios |
@@ -84,6 +85,16 @@
 | Fix 16A.12 | HIGH | 16A | ✅ | page.tsx hero: "Sign In" button hidden when user is already authenticated |
 | Fix 16A.13 | HIGH | 16A | ✅ | organizer/events/page.tsx: split loading guard — disabled TanStack Query kept isLoading:true forever when !token |
 | Fix 16A.14 | HIGH | 16A | ✅ | organizer/events/[id]/edit/page.tsx: created missing edit event page (was 404) |
+| Fix 16B.2 | CRITICAL | 16B-CF | ✅ | PaymentService: resume from PAYMENT_PENDING; Payment upsert (fixes payments_booking_id_key UNIQUE violation) |
+| Fix 16B.3 | HIGH | 16B-CF | ✅ | GlobalExceptionHandler: IllegalStateException → 409 Conflict |
+| Fix 16B.4 | HIGH | 16B-CF | ✅ | BookingService: self-cancel of PAYMENT_PENDING (releases seats, transitions to CANCELLED) |
+| Fix 16B.5 | HIGH | 16B-CF | ✅ | ReservationExpirationJob: auto-expire stale PAYMENT_PENDING → PAYMENT_FAILED, release inventory |
+| Fix 16B.6 | IMPORTANT | 16B-CF | ✅ | BusinessConstants: STRIPE_SESSION_TTL_SECONDS = 1860L |
+| Fix 16B.7 | HIGH | 16B-CF | ✅ | TicketTierSelector/CartDrawer: price row + Total from store.totalAmount; savings line on discount |
+| Fix 16B.8 | HIGH | 16B-CF | ✅ | ReservationGuard: live getState() reads eliminate stale-closure "Leave site?" dialog |
+| Fix 16B.9 | HIGH | 16B-CF | ✅ | TicketTierSelector: explicit replace-confirmation before overwriting a reservation for a different event |
+| Fix 16B.10 | HIGH | 16B-CF | ✅ | Booking History: Resume+Cancel actions; useEffect countdown fix; muted terminal rows; clear store on mount |
+| Fix 16B.11 | MEDIUM | 16B-CF | ✅ | reservationStore: unitPrice + eventId fields added |
 | Fix 16.1 | CRITICAL | 16B | ⬜ | Concurrency test for reserveSeat() Lua script |
 | Fix PW3-1 | CRITICAL | 1/2 | ✅ | Stripe account + CLI installed |
 
@@ -93,8 +104,8 @@
 
 | Metric | Current | Target |
 | :--- | :--- | :--- |
-| `./mvnw test` passing | 104 / 104 unit passing (12 Docker-only errors, pre-existing) | 100% |
-| Test coverage | N/A (JaCoCo not yet run) | 80%+ |
+| `./mvnw test` passing | 129 / 129 unit passing (12 Docker-only errors, pre-existing) | 100% |
+| Test coverage | N/A (JaCoCo not yet run — run `./mvnw verify -P coverage` for Day 16B) | 80%+ |
 | Active @Autowired usages | 0 | 0 |
 | Active LocalDateTime usages | 0 | 0 |
 | Magic numbers in code | 0 | 0 |
