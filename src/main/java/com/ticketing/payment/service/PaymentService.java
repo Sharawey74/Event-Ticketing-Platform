@@ -77,40 +77,49 @@ public class PaymentService {
             throw new AccessDeniedException("Booking does not belong to the requesting user");
         }
 
-        // Step 2: Validate booking is in RESERVED state
-        if (booking.getState() != BookingState.RESERVED) {
-            log.warn("[{}] [payment] Cannot create checkout — booking {} is in state {}, expected RESERVED",
+        // Step 2: Validate booking is checkout-eligible.
+        // RESERVED  = first checkout attempt.
+        // PAYMENT_PENDING = resume an abandoned checkout (a fresh Stripe session is created).
+        if (booking.getState() != BookingState.RESERVED
+                && booking.getState() != BookingState.PAYMENT_PENDING) {
+            log.warn("[{}] [payment] Cannot create checkout — booking {} is in state {}, expected RESERVED or PAYMENT_PENDING",
                     correlationId, bookingId, booking.getState());
             throw new IllegalStateException(
-                    "Checkout requires booking in RESERVED state, but was: " + booking.getState());
+                    "Checkout requires booking in RESERVED or PAYMENT_PENDING state, but was: " + booking.getState());
         }
 
-        // Step 3: Build Stripe line items from booking tickets (group by tier)
-        List<SessionCreateParams.LineItem> lineItems = booking.getTickets().stream()
-                .collect(java.util.stream.Collectors.groupingBy(
-                        ticket -> ticket.getTier().getId(),
-                        java.util.stream.Collectors.counting()))
-                .entrySet().stream()
-                .map(entry -> {
-                    var tier = booking.getTickets().stream()
-                            .filter(t -> t.getTier().getId().equals(entry.getKey()))
-                            .findFirst()
-                            .orElseThrow()
-                            .getTier();
-                    return SessionCreateParams.LineItem.builder()
-                            .setQuantity(entry.getValue())
-                            .setPriceData(SessionCreateParams.LineItem.PriceData.builder()
-                                    .setCurrency("usd")
-                                    .setUnitAmount(tier.getBasePrice()
-                                            .multiply(java.math.BigDecimal.valueOf(100))
-                                            .longValue()) // Stripe uses cents
-                                    .setProductData(SessionCreateParams.LineItem.PriceData.ProductData.builder()
-                                            .setName(tier.getTierName() + " — " + booking.getEvent().getTitle())
-                                            .build())
-                                    .build())
-                            .build();
-                })
-                .toList();
+        // The reservation hold must still be valid — an expired hold means the seats may have
+        // been released by the expiration job, so we refuse to charge for them.
+        if (booking.getExpiresAt() == null || booking.getExpiresAt().isBefore(Instant.now())) {
+            log.warn("[{}] [payment] Cannot create checkout — booking {} reservation hold has expired",
+                    correlationId, bookingId);
+            throw new IllegalStateException(
+                    "Reservation has expired. Please reserve the tickets again.");
+        }
+
+        // Step 3: Build Stripe line item using booking.totalAmount as the source of truth.
+        // This ensures the Stripe charge matches exactly what the pricing engine calculated
+        // (which may include early-bird discounts, group discounts, or surge pricing).
+        int ticketCount = booking.getTickets().size();
+        long perTicketCents = ticketCount > 0
+                ? booking.getTotalAmount()
+                        .divide(java.math.BigDecimal.valueOf(ticketCount), 2, java.math.RoundingMode.HALF_UP)
+                        .multiply(java.math.BigDecimal.valueOf(100))
+                        .longValue()
+                : 0L;
+
+        List<SessionCreateParams.LineItem> lineItems = List.of(
+                SessionCreateParams.LineItem.builder()
+                        .setQuantity((long) ticketCount)
+                        .setPriceData(SessionCreateParams.LineItem.PriceData.builder()
+                                .setCurrency("usd")
+                                .setUnitAmount(perTicketCents)
+                                .setProductData(SessionCreateParams.LineItem.PriceData.ProductData.builder()
+                                        .setName(booking.getEvent().getTitle())
+                                        .build())
+                                .build())
+                        .build()
+        );
 
         // Step 4: Build and create the Stripe Session
         SessionCreateParams params = SessionCreateParams.builder()
@@ -118,8 +127,7 @@ public class PaymentService {
                 .setSuccessUrl(successUrl.replace("{bookingId}", String.valueOf(bookingId)))
                 .setCancelUrl(cancelUrl)
                 // Stripe requires expires_at to be at least 30 minutes from creation.
-                // We use 31 minutes (1860 seconds) to safely avoid any clock drift errors.
-                .setExpiresAt(Instant.now().plusSeconds(Math.max(1860, BusinessConstants.RESERVATION_TTL_SECONDS)).getEpochSecond())
+                .setExpiresAt(Instant.now().plusSeconds(BusinessConstants.STRIPE_SESSION_TTL_SECONDS).getEpochSecond())
                 .putMetadata("bookingId", String.valueOf(bookingId))
                 .putMetadata("userId", String.valueOf(userId))
                 .addAllLineItem(lineItems)
@@ -145,25 +153,37 @@ public class PaymentService {
 
         String sessionId = stripeSession != null ? stripeSession.getId() : mockSessionId;
 
-        // Step 5: Persist a Payment record with PENDING status
-        Payment payment = Payment.builder()
-                .booking(booking)
-                .stripeSessionId(sessionId)
-                .amount(booking.getTotalAmount())
-                .currency("USD")
-                .status(PaymentStatus.PENDING)
-                .build();
+        // Step 5: Persist (or update) a Payment record with PENDING status.
+        // On resume (PAYMENT_PENDING), a Payment row already exists — UPDATE it with the new
+        // session ID rather than inserting, which would violate payments_booking_id_key (UNIQUE).
+        Payment payment = paymentRepository.findByBookingId(bookingId)
+                .map(existing -> {
+                    existing.setStripeSessionId(sessionId);
+                    existing.setStatus(PaymentStatus.PENDING);
+                    return existing;
+                })
+                .orElseGet(() -> Payment.builder()
+                        .booking(booking)
+                        .stripeSessionId(sessionId)
+                        .amount(booking.getTotalAmount())
+                        .currency("USD")
+                        .status(PaymentStatus.PENDING)
+                        .build());
         paymentRepository.save(payment);
 
-        // Step 6: Store session ID on the booking and transition state RESERVED → PAYMENT_PENDING.
+        // Step 6: Store session ID on the booking and ensure state is PAYMENT_PENDING.
         // This is critical: the webhook handler checks for PAYMENT_PENDING state before confirming.
         // Without this transition, the webhook would silently skip confirmation (see WebhookService).
+        // The hold is extended to match the Stripe session lifetime so the expiration job does not
+        // race with an in-progress payment, and a resumed checkout keeps the seats held.
+        BookingState previousState = booking.getState();
         booking.setStripeSessionId(sessionId);
         booking.setState(BookingState.PAYMENT_PENDING);
+        booking.setExpiresAt(Instant.now().plusSeconds(BusinessConstants.STRIPE_SESSION_TTL_SECONDS));
         bookingRepository.save(booking);
 
-        log.info("[{}] [payment] Checkout session created for booking {}. State transitioned RESERVED → PAYMENT_PENDING. Session: {}",
-                correlationId, bookingId, sessionId);
+        log.info("[{}] [payment] Checkout session created for booking {}. State {} → PAYMENT_PENDING. Session: {}",
+                correlationId, bookingId, previousState, sessionId);
 
         String finalCheckoutUrl = stripeSession != null ? stripeSession.getUrl() : mockCheckoutUrl;
 

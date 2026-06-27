@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/store/authStore";
+import { useReservationStore } from "@/store/reservationStore";
 import { api } from "@/lib/api";
 
 function BookingStatusBadge({ state }: { state: string }) {
@@ -44,6 +45,7 @@ interface Booking {
   id: number;
   state: string;
   reference?: string;
+  expiresAt?: string | null;
   event: {
     title: string;
     startDate: string;
@@ -114,12 +116,20 @@ export default function BookingDetailPage() {
   const queryClient = useQueryClient();
   const [refundStatus, setRefundStatus] = useState<{message: string, isError: boolean} | null>(null);
   const [isRefunding, setIsRefunding] = useState(false);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) {
       router.push("/auth/login");
     }
   }, [token, router]);
+
+  // Returning from a cancelled Stripe checkout: drop the in-memory hold.
+  useEffect(() => {
+    useReservationStore.getState().clear();
+  }, []);
 
   const { data: booking, isLoading, error: queryError } = useQuery({
     queryKey: ["booking", id],
@@ -181,12 +191,44 @@ export default function BookingDetailPage() {
     );
   }
 
+  const handleContinueCheckout = async () => {
+    setIsCheckingOut(true);
+    setCheckoutError(null);
+    try {
+      const res = await api.post(`/api/bookings/${id}/checkout`);
+      const checkoutUrl = res.data?.data?.checkoutUrl;
+      if (checkoutUrl) window.location.href = checkoutUrl;
+    } catch (err: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setCheckoutError((err as any)?.response?.data?.message || "Could not resume checkout.");
+      setIsCheckingOut(false);
+    }
+  };
+
+  const handleCancelBooking = async () => {
+    setIsCancelling(true);
+    setCheckoutError(null);
+    try {
+      await api.delete(`/api/v1/bookings/${id}`);
+      await queryClient.invalidateQueries({ queryKey: ["myBookings"] });
+      router.push("/dashboard/bookings");
+    } catch (err: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setCheckoutError((err as any)?.response?.data?.message || "Could not cancel booking.");
+      setIsCancelling(false);
+    }
+  };
+
   // Calculate days until event
   const eventDate = new Date(booking.event?.startDate || new Date());
   const now = new Date();
   const diffTime = eventDate.getTime() - now.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   const canRefund = booking.state === "CONFIRMED" && diffDays > 3;
+  const isRecoverable = booking.state === "RESERVED" || booking.state === "PAYMENT_PENDING";
+  const holdStillValid =
+    !!booking.expiresAt && new Date(booking.expiresAt).getTime() > Date.now();
+  const canContinueCheckout = isRecoverable && holdStillValid;
 
   return (
     <main className="pt-32 pb-section-gap px-edge-padding max-w-4xl mx-auto min-h-screen flex flex-col gap-stack-lg">
@@ -218,6 +260,51 @@ export default function BookingDetailPage() {
         </div>
       </div>
 
+      {/* Continue/Resume to Checkout — shown for RESERVED or PAYMENT_PENDING bookings with a valid hold */}
+      {isRecoverable && (
+        <div className="bg-primary/5 border border-primary/20 rounded-xl p-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+              <h3 className="font-label-sm text-on-surface mb-1">Complete Your Purchase</h3>
+              <p className="font-caption text-on-surface-variant max-w-lg">
+                {holdStillValid
+                  ? "Your seat is still held. Continue to secure checkout to confirm this booking."
+                  : "This reservation hold has expired. Cancel it to release the seats, then reserve again."}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              {canContinueCheckout && (
+                <button
+                  type="button"
+                  onClick={handleContinueCheckout}
+                  disabled={isCheckingOut || isCancelling}
+                  className="bg-primary text-on-primary px-6 py-2.5 rounded-full font-label-sm hover:shadow-lg transition-shadow disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  {isCheckingOut
+                    ? "Redirecting…"
+                    : booking.state === "PAYMENT_PENDING"
+                      ? "Resume Checkout"
+                      : "Continue to Checkout"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleCancelBooking}
+                disabled={isCheckingOut || isCancelling}
+                className="px-6 py-2.5 rounded-full font-label-sm border border-outline-variant text-error hover:bg-error-container/40 transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+              >
+                {isCancelling ? "Cancelling…" : "Cancel"}
+              </button>
+            </div>
+          </div>
+          {checkoutError && (
+            <div className="mt-3 bg-error-container text-on-error-container text-sm rounded-lg px-4 py-2">
+              {checkoutError}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Refund Section */}
       {canRefund || refundStatus ? (
         <div className="bg-surface-container-low rounded-xl p-6 border border-outline-variant">
@@ -231,6 +318,7 @@ export default function BookingDetailPage() {
             
             {canRefund ? (
               <button
+                type="button"
                 onClick={handleRefund}
                 disabled={isRefunding}
                 className="bg-error text-on-error px-6 py-2 rounded-full font-label-sm hover:bg-error-container hover:text-on-error-container transition-colors disabled:opacity-50"

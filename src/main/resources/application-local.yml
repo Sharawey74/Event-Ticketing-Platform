@@ -57,4 +57,4 @@ stripe:
   secret-key: ${STRIPE_SECRET_KEY:sk_test_placeholder}
   webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_placeholder}
   success-url: http://localhost:3000/bookings/{bookingId}/confirmation?session_id={CHECKOUT_SESSION_ID}
-  cancel-url: http://localhost:3000/cart
+  cancel-url: http://localhost:3000/dashboard/bookings

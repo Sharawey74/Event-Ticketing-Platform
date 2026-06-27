@@ -32,6 +32,11 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     // BUG-03 Fix: Required by ReservationExpirationJob on Day 8
     List<Booking> findByStateAndExpiresAtBefore(BookingState state, Instant time);
 
+    // Recovery: ReservationExpirationJob expires stale RESERVED and PAYMENT_PENDING holds.
+    // Tickets + tier are fetched so inventory can be released without a lazy-load round trip.
+    @EntityGraph(attributePaths = { "tickets", "tickets.tier" })
+    List<Booking> findByStateInAndExpiresAtBefore(java.util.Collection<BookingState> states, Instant time);
+
     @Query("""
             SELECT b.event.id AS eventId, COUNT(tk) AS ticketsSold, SUM(b.totalAmount) AS grossRevenue
             FROM Booking b JOIN b.tickets tk

@@ -68,6 +68,8 @@ public class BookingQueryService {
         return BookingDetailsResponse.builder()
                 .id(booking.getId())
                 .reference("EVT-" + booking.getId())
+                .state(booking.getState().name())
+                .expiresAt(booking.getExpiresAt())
                 .totalPrice(booking.getTotalAmount())
                 .event(BookingDetailsResponse.EventDto.builder()
                         .title(booking.getEvent().getTitle())

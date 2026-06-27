@@ -141,9 +141,13 @@ public class BookingService {
             throw new AccessDeniedException("You do not own this booking");
         }
 
-        if (booking.getState() != BookingState.RESERVED) {
+        // RESERVED = abandon an unpaid hold. PAYMENT_PENDING = abandon a checkout the user
+        // started but never completed (recovery from a stuck Stripe session). Both release seats.
+        if (booking.getState() != BookingState.RESERVED
+                && booking.getState() != BookingState.PAYMENT_PENDING) {
             throw new ConflictException(
-                    "Only RESERVED bookings can be self-cancelled. Current state: " + booking.getState());
+                    "Only RESERVED or PAYMENT_PENDING bookings can be self-cancelled. Current state: "
+                            + booking.getState());
         }
 
         int quantity = booking.getTickets().size();
