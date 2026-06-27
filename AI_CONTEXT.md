@@ -1,10 +1,10 @@
 # AI CONTEXT SNAPSHOT — Event Ticketing Platform
 
-## Last Updated: Day 16A (2026-06-26) — UI Stabilization sub-session: edit event page, loading-state fix, hero auth guard, GlobalExceptionHandler HTTP codes
+## Last Updated: Day 16B-CF (2026-06-27) — Checkout Flow Stabilization: price sync, resume checkout, explicit replace, booking history actions, duplicate-insert fix (payments_booking_id_key)
 
 ## Branch: feat/platform-enhancements
 
-## Test Status: 104/104 unit passing (12 Docker-only errors pre-existing — require Docker Desktop + Testcontainers)
+## Test Status: 129/129 unit passing (12 Docker-only errors pre-existing — require Docker Desktop + Testcontainers)
 
 ## 1. NON-NEGOTIABLE RULES (From instructions.txt + Overlay)
 
@@ -161,6 +161,16 @@ class YourControllerTest {
 | **16A.12** | page.tsx hero: "Sign In" glass button hidden when user is authenticated | Frontend | ✅ Applied | frontend/src/app/page.tsx |
 | **16A.13** | organizer/events/page.tsx: split loading guard to prevent infinite loading when query disabled | Frontend | ✅ Applied | frontend/src/app/organizer/events/page.tsx |
 | **16A.14** | organizer/events/[id]/edit/page.tsx: created missing edit event page (was 404) | Frontend | ✅ Applied | frontend/src/app/organizer/events/[id]/edit/page.tsx |
+| **16B.2** | PaymentService: resume checkout from PAYMENT_PENDING; Payment upsert (fixes `payments_booking_id_key` UNIQUE violation) | Payment | ✅ Applied | PaymentService.java |
+| **16B.3** | GlobalExceptionHandler: `IllegalStateException` → 409 Conflict (was falling into 500 catch-all) | Common | ✅ Applied | GlobalExceptionHandler.java |
+| **16B.4** | BookingService: self-cancel of PAYMENT_PENDING bookings (releases seats + transitions CANCELLED) | Booking | ✅ Applied | BookingService.java |
+| **16B.5** | ReservationExpirationJob: auto-expire stale PAYMENT_PENDING → PAYMENT_FAILED, release inventory | Booking | ✅ Applied | ReservationExpirationJob.java |
+| **16B.6** | BusinessConstants: `STRIPE_SESSION_TTL_SECONDS = 1860L` (replaces inline magic number) | Util | ✅ Applied | BusinessConstants.java |
+| **16B.7** | TicketTierSelector/CartDrawer: price row + Total from `store.totalAmount`; savings line when discount applied | Frontend | ✅ Applied | TicketTierSelector.tsx, CartDrawer.tsx |
+| **16B.8** | ReservationGuard: `beforeunload`/`pagehide` read `skipBeforeUnload` live via `getState()` — eliminates stale-closure "Leave site?" dialog | Frontend | ✅ Applied | ReservationGuard.tsx |
+| **16B.9** | TicketTierSelector: explicit replace-confirmation prompt before overwriting a held reservation for another event | Frontend | ✅ Applied | TicketTierSelector.tsx |
+| **16B.10** | Booking History: Resume+Cancel actions for RESERVED/PAYMENT_PENDING; fixed `useEffect` countdown; muted terminal rows; clear store on mount | Frontend | ✅ Applied | dashboard/bookings/page.tsx, [id]/page.tsx |
+| **16B.11** | reservationStore: added `unitPrice` + `eventId` fields to support savings line and replace-prompt guard | Frontend | ✅ Applied | reservationStore.ts |
 | **16B.1** | Test `reserveSeat()` Lua Script explicitly (concurrency test) | Tests | ⏳ Pending | - |
 
 ---
@@ -178,7 +188,8 @@ class YourControllerTest {
 | 13 | Frontend Booking Flow | ✅ | N/A |
 | 14 | Frontend User Dashboard | ✅ | N/A |
 | 15 | Frontend Organizer Dashboard | ✅ | N/A |
-| 16A | Platform Stabilization | 🔄 In Progress | 104/104 unit |
+| 16A | Platform Stabilization | ✅ Complete | 104/104 unit |
+| 16B-CF | Checkout Flow Stabilization (sub-session) | ✅ Complete | 129/129 unit |
 
 ---
 
@@ -195,6 +206,10 @@ All exceptions must flow through `GlobalExceptionHandler`. Current mapping:
 | `ConstraintViolationException` | 400 | `handleConstraintViolation` |
 | `AuthenticationException` | 401 | `handleAuthentication` |
 | `ConflictException` | 409 | `handleConflict` |
+| `IllegalStateException` | 409 | `handleIllegalState` |
+| `HttpRequestMethodNotSupportedException` | 405 | `handleMethodNotAllowed` |
+| `NoResourceFoundException` / `NoHandlerFoundException` | 404 | `handleNoHandlerFound` |
+| `HttpMediaTypeNotSupportedException` | 415 | `handleUnsupportedMediaType` |
 | `Exception` (catch-all) | 500 | `handleGeneralException` |
 
 *Note: All responses now include `errorId` and `correlationId`. Structured MDC logging is active for all exceptions.*
@@ -330,7 +345,7 @@ This repository has two deployable parts:
 
 ---
 
-## 10. NEXT SESSION START — DAY 16B
+## 10. NEXT SESSION START — DAY 16B (REMAINING)
 
 **Current Branch:** `feat/platform-enhancements`
 
@@ -351,10 +366,24 @@ This repository has two deployable parts:
 - organizer/events/page.tsx: TanStack Query disabled-query `isLoading:true` loading-state bug fixed
 - organizer/events/[id]/edit/page.tsx: created (was 404); full edit form with pre-population + PUT /api/events/{id} + success panel + auto-redirect
 
-**First task for 16B:** Backend Test Coverage Push (80%+)
+**Completed in Day 16B-CF (Checkout Flow Stabilization sub-session, 2026-06-27):**
+
+- PaymentService: resume checkout from PAYMENT_PENDING; Payment upsert via `findByBookingId` (fixes `payments_booking_id_key` UNIQUE constraint violation on second checkout attempt)
+- PaymentService: hold extended to `STRIPE_SESSION_TTL_SECONDS` on checkout — prevents expiry job racing an in-progress Stripe session
+- BookingService: self-cancel now accepts PAYMENT_PENDING (releases Redis seats + DB `availableCount`, transitions to CANCELLED)
+- ReservationExpirationJob: rewritten to expire both RESERVED (→ EXPIRED) and stale PAYMENT_PENDING (→ PAYMENT_FAILED, seats released); uses `findByStateInAndExpiresAtBefore` with `@EntityGraph`
+- GlobalExceptionHandler: `IllegalStateException` → 409 Conflict (+ `GlobalExceptionHandlerTest` for all handler mappings)
+- BusinessConstants: `STRIPE_SESSION_TTL_SECONDS = 1860L`
+- TicketTierSelector/CartDrawer: price row + Total both derived from `store.totalAmount`; savings line when PricingEngine discount applied
+- ReservationGuard: `beforeunload`/`pagehide` handlers read `skipBeforeUnload` live via `getState()` — eliminates stale-closure "Leave site?" dialog
+- TicketTierSelector: explicit replace-confirmation prompt before overwriting a held reservation for another event
+- Booking History (list + detail pages): Resume+Cancel actions for RESERVED/PAYMENT_PENDING; fixed `useEffect` countdown (was using `useState` as side-effect); muted terminal rows; clear store on mount
+- reservationStore: added `unitPrice` + `eventId` fields
+- Tests: 129/129 unit passing (+25 new tests: BookingServiceTest, ReservationExpirationJobTest, GlobalExceptionHandlerTest, PaymentServiceTest updates)
+
+**First task for next session — Day 16B (remaining):** Backend Test Coverage Push (80%+)
 
 - Run `./mvnw verify -P coverage` to get baseline JaCoCo report
-- Add `BookingQueryServiceTest` (9 tests)
-- Add `BookingControllerTest` (9 tests)
-- Write `reserveSeat()` Lua script concurrency test (Fix 16B.1 — CRITICAL)
-- Verify 80%+ line coverage in JaCoCo report
+- Add `BookingControllerTest` (9 tests — controller-layer security not yet covered)
+- Write `reserveSeat()` Lua script concurrency test (Fix 16B.1 — CRITICAL, still pending)
+- Verify 80%+ line coverage in JaCoCo HTML report (`target/site/jacoco/index.html`)

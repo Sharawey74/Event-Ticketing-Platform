@@ -16,6 +16,8 @@ import lombok.NoArgsConstructor;
 public class BookingDetailsResponse {
     private Long id;
     private String reference;
+    private String state;
+    private Instant expiresAt;
     private BigDecimal totalPrice;
     private EventDto event;
     private List<TicketDto> tickets;

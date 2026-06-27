@@ -8,6 +8,11 @@ public final class BusinessConstants {
     public static final long RESERVATION_TTL_SECONDS = 300L;
     public static final long LOCK_TTL_SECONDS = 300L;
 
+    // Stripe Checkout Session lifetime (Stripe requires >= 30 min). Once a booking enters
+    // PAYMENT_PENDING the reservation hold is extended to this value so it matches the
+    // Stripe session expiry and can be safely auto-expired afterwards.
+    public static final long STRIPE_SESSION_TTL_SECONDS = 1860L; // 31 minutes
+
     public static final int EARLY_BIRD_DAYS_THRESHOLD = 30;
     public static final double EARLY_BIRD_DISCOUNT = 0.50;
 

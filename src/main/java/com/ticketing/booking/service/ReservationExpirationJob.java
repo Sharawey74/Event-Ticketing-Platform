@@ -13,10 +13,14 @@ import org.springframework.transaction.annotation.Transactional;
 import com.ticketing.booking.model.Booking;
 import com.ticketing.booking.model.BookingEvent;
 import com.ticketing.booking.model.BookingState;
+import com.ticketing.booking.model.TicketTier;
 import com.ticketing.booking.repository.BookingRepository;
+import com.ticketing.booking.repository.TicketTierRepository;
 import com.ticketing.common.service.DistributedLockService;
 import com.ticketing.common.util.BusinessConstants;
+import com.ticketing.inventory.service.InventoryService;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
@@ -27,6 +31,8 @@ import reactor.core.publisher.Mono;
 public class ReservationExpirationJob {
 
     private final BookingRepository bookingRepository;
+    private final TicketTierRepository ticketTierRepository;
+    private final InventoryService inventoryService;
     private final DistributedLockService lockService;
     private final StateMachineFactory<BookingState, BookingEvent> stateMachineFactory;
 
@@ -43,7 +49,11 @@ public class ReservationExpirationJob {
         }
 
         try {
-            List<Booking> expiredBookings = bookingRepository.findByStateAndExpiresAtBefore(BookingState.RESERVED, Instant.now());
+            // Recovery: expire both unpaid holds (RESERVED) and abandoned checkouts (PAYMENT_PENDING).
+            // PAYMENT_PENDING bookings have their hold extended to the Stripe session lifetime, so by
+            // the time they appear here the Stripe session has also expired — no race with live payments.
+            List<Booking> expiredBookings = bookingRepository.findByStateInAndExpiresAtBefore(
+                    List.of(BookingState.RESERVED, BookingState.PAYMENT_PENDING), Instant.now());
             if (expiredBookings.isEmpty()) {
                 return;
             }
@@ -52,18 +62,10 @@ public class ReservationExpirationJob {
 
             for (Booking booking : expiredBookings) {
                 try {
-                    var stateMachine = stateMachineFactory.getStateMachine(Long.toString(booking.getId()));
-                    stateMachine.startReactively().block();
-                    
-                    var result = stateMachine.sendEvent(Mono.just(MessageBuilder.withPayload(BookingEvent.EXPIRE_RESERVATION).build())).blockLast();
-                    
-                    if (result != null && result.getResultType().name().equals("ACCEPTED")) {
-                        // Normally the action would handle DB update, but just in case we sync it
-                        booking.setState(BookingState.EXPIRED);
-                        bookingRepository.save(booking);
-                        log.info("Successfully expired booking {}", booking.getId());
+                    if (booking.getState() == BookingState.PAYMENT_PENDING) {
+                        expireStalePaymentPending(booking);
                     } else {
-                        log.warn("Failed to expire booking {}", booking.getId());
+                        expireReservedHold(booking);
                     }
                 } catch (Exception e) {
                     log.error("Error expiring booking {}", booking.getId(), e);
@@ -72,5 +74,50 @@ public class ReservationExpirationJob {
         } finally {
             lockService.releaseLock(LOCK_KEY, lockValue);
         }
+    }
+
+    /**
+     * RESERVED hold timed out before checkout — drive it through the state machine to EXPIRED.
+     */
+    private void expireReservedHold(Booking booking) {
+        var stateMachine = stateMachineFactory.getStateMachine(Long.toString(booking.getId()));
+        stateMachine.startReactively().block();
+
+        var result = stateMachine.sendEvent(Mono.just(
+                MessageBuilder.withPayload(BookingEvent.EXPIRE_RESERVATION).build())).blockLast();
+
+        if (result != null && result.getResultType().name().equals("ACCEPTED")) {
+            booking.setState(BookingState.EXPIRED);
+            bookingRepository.save(booking);
+            log.info("Successfully expired booking {}", booking.getId());
+        } else {
+            log.warn("Failed to expire booking {}", booking.getId());
+        }
+    }
+
+    /**
+     * Checkout was started but never completed within the Stripe session window. Release the held
+     * seats back to inventory and mark the booking PAYMENT_FAILED so it is no longer a dead-end.
+     * Mirrors {@code BookingService.cancelBooking} so self-cancel and auto-expire free seats identically.
+     */
+    private void expireStalePaymentPending(Booking booking) {
+        if (!booking.getTickets().isEmpty()) {
+            int quantity = booking.getTickets().size();
+            Long tierId = booking.getTickets().get(0).getTier().getId();
+
+            inventoryService.releaseSeat(tierId, quantity);
+
+            TicketTier tier = ticketTierRepository.findById(tierId)
+                    .orElseThrow(() -> new EntityNotFoundException("Ticket tier not found: " + tierId));
+            tier.setAvailableCount(tier.getAvailableCount() + quantity);
+            ticketTierRepository.save(tier);
+
+            log.info("Released {} seats for tier {} from stale PAYMENT_PENDING booking {}",
+                    quantity, tierId, booking.getId());
+        }
+
+        booking.setState(BookingState.PAYMENT_FAILED);
+        bookingRepository.save(booking);
+        log.info("Stale PAYMENT_PENDING booking {} marked PAYMENT_FAILED", booking.getId());
     }
 }

@@ -116,6 +116,7 @@ class PaymentServiceTest {
         // Arrange
         when(bookingRepository.findById(42L)).thenReturn(Optional.of(reservedBooking));
         when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByBookingId(42L)).thenReturn(Optional.empty()); // first checkout — no existing payment
         when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // Mock the static Session.create() — Stripe SDK uses static factory methods
@@ -173,6 +174,63 @@ class PaymentServiceTest {
         // Act + Assert
         assertThatThrownBy(() -> paymentService.createCheckoutSession(42L, 99L))
                 .isInstanceOf(AccessDeniedException.class);
+
+        verify(paymentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("createCheckoutSession: resuming a PAYMENT_PENDING booking updates existing payment row (no duplicate insert)")
+    void createCheckoutSession_whenPaymentPendingAndNotExpired_shouldUpdateExistingPaymentAndReturnSession() throws Exception {
+        // Arrange — booking already in PAYMENT_PENDING (abandoned checkout), hold still valid
+        reservedBooking.setState(BookingState.PAYMENT_PENDING);
+        reservedBooking.setExpiresAt(Instant.now().plusSeconds(600));
+
+        // Existing payment row that was created on the first checkout attempt
+        Payment existingPayment = Payment.builder()
+                .id(99L)
+                .booking(reservedBooking)
+                .stripeSessionId("cs_test_old_session")
+                .amount(new BigDecimal("99.00"))
+                .currency("USD")
+                .status(com.ticketing.payment.model.PaymentStatus.PENDING)
+                .build();
+
+        when(bookingRepository.findById(42L)).thenReturn(Optional.of(reservedBooking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
+        // Return the existing row — service must UPDATE it, not INSERT a new one
+        when(paymentRepository.findByBookingId(42L)).thenReturn(Optional.of(existingPayment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Session mockSession = mock(Session.class);
+        when(mockSession.getId()).thenReturn("cs_test_resume_xyz");
+        when(mockSession.getUrl()).thenReturn("https://checkout.stripe.com/pay/cs_test_resume_xyz");
+
+        try (MockedStatic<Session> sessionMock = Mockito.mockStatic(Session.class)) {
+            sessionMock.when(() -> Session.create(any(SessionCreateParams.class))).thenReturn(mockSession);
+
+            // Act
+            CheckoutSessionResponse response = paymentService.createCheckoutSession(42L, 1L);
+
+            // Assert — existing payment row has new session ID; no duplicate row inserted
+            assertThat(response).isNotNull();
+            assertThat(response.getCheckoutUrl()).isEqualTo("https://checkout.stripe.com/pay/cs_test_resume_xyz");
+            assertThat(existingPayment.getStripeSessionId()).isEqualTo("cs_test_resume_xyz");
+            assertThat(reservedBooking.getState()).isEqualTo(BookingState.PAYMENT_PENDING);
+            verify(paymentRepository).save(existingPayment); // same object, not a new one
+        }
+    }
+
+    @Test
+    @DisplayName("createCheckoutSession: when the reservation hold has expired should throw IllegalStateException")
+    void createCheckoutSession_whenExpired_shouldThrowIllegalState() {
+        // Arrange — RESERVED but the 5-minute hold has already lapsed
+        reservedBooking.setExpiresAt(Instant.now().minusSeconds(10));
+        when(bookingRepository.findById(42L)).thenReturn(Optional.of(reservedBooking));
+
+        // Act + Assert
+        assertThatThrownBy(() -> paymentService.createCheckoutSession(42L, 1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("expired");
 
         verify(paymentRepository, never()).save(any());
     }

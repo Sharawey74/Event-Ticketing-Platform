@@ -2,13 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { X, ShoppingCart, Timer, ArrowRight } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 import { useReservationStore } from "@/store/reservationStore";
 import { useAuthStore } from "@/store/authStore";
 import { api } from "@/lib/api";
-
-const SERVICE_FEE = 25;
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -16,11 +13,12 @@ interface CartDrawerProps {
 }
 
 export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
-  const router = useRouter();
   const store = useReservationStore();
   const { token } = useAuthStore();
   const [timeLeft, setTimeLeft] = useState(0);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!store.expiresAt) {
@@ -34,10 +32,30 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     return () => clearInterval(interval);
   }, [store.expiresAt]);
 
-  const handleCheckout = () => {
-    if (!store.returnPath) return;
-    onClose();
-    router.push(store.returnPath);
+  const handleCheckout = async () => {
+    if (!store.bookingId || !token) return;
+    setIsCheckingOut(true);
+    setCheckoutError(null);
+
+    try {
+      const res = await api.post(`/api/bookings/${store.bookingId}/checkout`);
+      const checkoutUrl = res.data?.data?.checkoutUrl;
+
+      if (checkoutUrl) {
+        // Flag the redirect as intentional, then leave. Do NOT clear the store first — clearing
+        // resets the flag and the booking before the browser navigates. The store is reset when
+        // the user lands on the confirmation page or the bookings dashboard.
+        store.setSkipBeforeUnload(true);
+        window.location.href = checkoutUrl;
+      } else {
+        throw new Error("Checkout URL missing from response");
+      }
+    } catch (err: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const msg = (err as any)?.response?.data?.message || "Checkout failed. Please try again.";
+      setCheckoutError(msg);
+      setIsCheckingOut(false);
+    }
   };
 
   const handleCancel = async () => {
@@ -49,13 +67,12 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
       // booking may already be expired — clear store anyway
     } finally {
       store.clear();
+      setCheckoutError(null);
       setIsCancelling(false);
       onClose();
     }
   };
 
-  const subtotal = store.unitPrice * store.quantity;
-  const total = subtotal + SERVICE_FEE;
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
 
@@ -83,6 +100,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
             <h2 className="font-section-heading text-on-surface">Your Reservation</h2>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="text-on-surface-variant hover:text-on-surface transition-colors"
             aria-label="Close cart"
@@ -124,18 +142,24 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               <div className="bg-surface-container-low rounded-xl p-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-on-surface-variant">
-                    Ticket × {store.quantity}
+                    {store.tierName} × {store.quantity}
                   </span>
-                  <span className="text-on-surface">EGP {subtotal.toFixed(2)}</span>
+                  <span className="text-on-surface">EGP {store.totalAmount.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-on-surface-variant">Service fee</span>
-                  <span className="text-on-surface">EGP {SERVICE_FEE.toFixed(2)}</span>
-                </div>
+                {store.unitPrice * store.quantity > store.totalAmount && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-on-surface-variant line-through">
+                      EGP {(store.unitPrice * store.quantity).toFixed(2)}
+                    </span>
+                    <span className="text-primary">
+                      You saved EGP {(store.unitPrice * store.quantity - store.totalAmount).toFixed(2)}
+                    </span>
+                  </div>
+                )}
                 <div className="h-px bg-outline-variant" />
                 <div className="flex justify-between font-semibold">
                   <span className="text-on-surface">Total</span>
-                  <span className="text-primary text-lg">EGP {total.toFixed(2)}</span>
+                  <span className="text-primary text-lg">EGP {store.totalAmount.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -146,31 +170,30 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               <p className="text-sm text-on-surface-variant">
                 Browse events and reserve your spot.
               </p>
-              <button
-                onClick={() => { onClose(); router.push("/"); }}
-                className="text-sm text-primary hover:underline"
-              >
-                Discover Events
-              </button>
             </div>
           )}
         </div>
 
         {store.bookingId && (
           <div className="border-t border-outline-variant px-6 py-4 flex flex-col gap-3">
+            {checkoutError && (
+              <div className="bg-error-container text-on-error-container text-xs rounded-lg px-3 py-2">
+                {checkoutError}
+              </div>
+            )}
             <button
               type="button"
               onClick={handleCheckout}
-              disabled={timeLeft <= 0}
+              disabled={timeLeft <= 0 || isCheckingOut}
               className="w-full btn-gradient text-on-primary font-semibold h-12 rounded-full flex items-center justify-center gap-2 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Proceed to Checkout
-              <ArrowRight className="h-4 w-4" />
+              {isCheckingOut ? "Redirecting to Stripe…" : "Proceed to Checkout"}
+              {!isCheckingOut && <ArrowRight className="h-4 w-4" />}
             </button>
             <button
               type="button"
               onClick={handleCancel}
-              disabled={isCancelling}
+              disabled={isCancelling || isCheckingOut}
               className="w-full text-sm text-error hover:underline transition-colors py-1"
             >
               {isCancelling ? "Cancelling…" : "Cancel Reservation"}
