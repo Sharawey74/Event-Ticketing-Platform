@@ -917,4 +917,376 @@ Before tagging `v1.0.0`, verify all critical fixes were applied:
 
 ---
 
+## MISSING FIXES — Not in Original Overlay (Discovered via Full Audit)
+
+The following fixes were referenced in session prompts or verification checklists but never documented in this overlay file. They must be applied during their respective days.
+
+---
+
+### Fix E-001 — Register Form Must NOT Send `role` Field
+**Severity:** 🔴 CRITICAL (Role escalation vulnerability)
+**Day:** Day 15 (frontend register form) / verified Day 21
+**File:** `frontend/src/app/auth/register/page.tsx`, `AuthController.java`
+
+**Why:** If the register form includes a `role` field in its payload, any user can self-assign `ORGANIZER` or attempt `ADMIN`. The backend `RegisterRequest` DTO must not include a `role` field, or if it does, the backend must forcibly set `role = USER` regardless of what is sent.
+
+**Exact Fix:**
+Frontend register payload must be exactly `{ firstName, lastName, email, password }` — NO `role` field. Verify with DevTools Network tab during Day 21 smoke test:
+```json
+// CORRECT — no role field:
+{ "firstName": "Ali", "lastName": "Ahmed", "email": "...", "password": "..." }
+
+// WRONG — role escalation vector:
+{ "firstName": "Ali", ..., "role": "ORGANIZER" }
+```
+Backend: if `RegisterRequest` has a `role` field at all, annotate it `@JsonIgnore` or remove it entirely. Role defaults to `USER` in the service layer.
+
+---
+
+### Fix E-008 — GlobalExceptionHandler Must Have `Exception.class` Catch-All
+**Severity:** 🟠 HIGH
+**Day:** Day 2 or any day where GlobalExceptionHandler is created
+**File:** `src/main/java/com/ticketing/common/exception/GlobalExceptionHandler.java`
+
+**Why:** Without a `Exception.class` catch-all handler, any unhandled `RuntimeException` propagates as a raw Spring Whitelabel Error Page or 500 with a stack trace in the response body — exposing internal implementation details. The catch-all must return a generic `ApiResponse.failure()` with no stack trace, and MUST log the exception with `log.error("Unexpected exception", ex)` so the stack trace appears in server logs only.
+
+**Exact Fix:**
+```java
+@ExceptionHandler(Exception.class)
+public ResponseEntity<ApiResponse<Void>> handleUnexpected(Exception ex, HttpServletRequest request) {
+    log.error("Unhandled exception — correlationId={}", 
+        MDC.get("correlationId"), ex);  // ex is 3rd arg when msg has params
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .body(ApiResponse.failure("An unexpected error occurred. Please try again."));
+    // NEVER return ex.getMessage() or ex.getClass().getName() — information exposure
+}
+```
+
+---
+
+### Fix 7.1 — Add `@Version` Optimistic Locking to Booking Entity
+**Severity:** 🟡 IMPORTANT
+**Day:** Day 8 (Booking entity creation)
+**File:** `Booking.java`
+
+**Why:** The Day 21 verification table checks `SELECT version FROM bookings WHERE id=1 → increments on each update` — but this column is never explicitly documented as a fix to implement. Without `@Version`, concurrent updates to the same booking (e.g., two webhook deliveries arriving simultaneously) are not protected by optimistic locking, and the `@Retryable` on `checkIn()` (Fix M-001) has nothing to retry against.
+
+**Exact Fix:**
+```java
+// In Booking.java entity:
+@Version
+@Column(nullable = false)
+private Long version = 0L;
+```
+In `V5__create_bookings_and_tickets.sql`:
+```sql
+version BIGINT NOT NULL DEFAULT 0,
+```
+The `@Version` field is automatically incremented by Hibernate on every `save()` and checked on concurrent updates — `ObjectOptimisticLockingFailureException` is thrown if another transaction committed a newer version first.
+
+---
+
+### Fix 16B.2 — `payments_booking_id_key` UNIQUE Violation on Payment Upsert
+**Severity:** 🔴 CRITICAL
+**Day:** Day 9 (PaymentService implementation)
+**File:** `PaymentService.java`, `Payment.java`, Flyway migration
+
+**Why:** The `payments` table has a UNIQUE constraint on `booking_id` (one payment per booking). When Stripe fires a retry webhook (e.g., `checkout.session.completed` delivered twice for the same session), the idempotency guard in Fix 9.2 handles the `ProcessedStripeEvent` duplicate. However, if the first webhook partially succeeded (saved the payment record) and then failed before returning 200 to Stripe, Stripe retries. The retry passes the stripe event idempotency check (because the first record was never saved to `processed_stripe_events` due to the partial failure), then tries to insert a new `Payment` record — which fails with `payments_booking_id_key` UNIQUE violation. This is distinct from Fix 9.2.
+
+**Exact Fix:** In `PaymentService`, use upsert semantics (find-or-create) for the Payment record:
+```java
+Payment payment = paymentRepository.findByBookingId(booking.getId())
+    .orElseGet(() -> Payment.builder().booking(booking).build());
+
+payment.setStripeSessionId(sessionId);
+payment.setAmount(amount);
+payment.setStatus(PaymentStatus.COMPLETED);
+payment.setPaidAt(Instant.now());
+paymentRepository.save(payment);  // INSERT on first save, UPDATE on retry
+```
+This is idempotent — retrying the same sessionId updates the same record rather than inserting a duplicate.
+
+---
+
+### Fix 16B-missing — BookingControllerTest (9 Tests Required by Day 16B)
+**Severity:** 🔴 CRITICAL (required for 80% coverage gate)
+**Day:** Day 16
+**File:** `src/test/java/com/ticketing/booking/BookingControllerTest.java`
+
+**Why:** CLAUDE.md explicitly calls out `Fix 16B-missing` as a pending critical fix. Without this test class, `BookingController` has zero coverage, failing the 80% JaCoCo gate.
+
+**Required test names (TDD naming convention):**
+```
+bookingController_whenReserveValid_shouldReturn201
+bookingController_whenReserveUnauthenticated_shouldReturn401
+bookingController_whenReserveInvalidBody_shouldReturn400
+bookingController_whenGetBookingOwner_shouldReturn200
+bookingController_whenGetBookingOtherUser_shouldReturn403
+bookingController_whenCheckInAsOrganizer_shouldReturn200
+bookingController_whenCheckInAsUser_shouldReturn403
+bookingController_whenCancelAsOwner_shouldReturn200
+bookingController_whenCancelAsNonOwner_shouldReturn403
+```
+
+**Mandatory test setup:**
+```java
+@WebMvcTest(controllers = BookingController.class)
+@Import(TestSecurityConfig.class)        // MANDATORY
+class BookingControllerTest {
+    @MockitoBean BookingService bookingService;  // @MockitoBean not @MockBean (Spring Boot 3.4+)
+    @MockitoBean JwtService jwtService;          // MANDATORY — JwtFilter requires this
+    // DO NOT use addFilters = false
+}
+```
+
+---
+
+### Fix M-008 — Clarify Token Storage Strategy (sessionStorage vs cookie vs Zustand)
+**Severity:** 🟡 IMPORTANT
+**Day:** Day 15 / verified Day 21
+**Files:** `authStore.ts`, `login/page.tsx`, `middleware.ts`
+
+**Why:** There is a three-way contradiction across documents about where the JWT lives:
+1. `14_frontend.md` shows Zustand in-memory (no persistence)
+2. `18_debugging_report.md` (Bug 2 fix) shows token written to `document.cookie` for Next.js middleware
+3. Day 21 smoke test says "JWT in sessionStorage (NOT localStorage)"
+
+The intended architecture for Phase 1A must be explicitly chosen:
+
+**Chosen architecture (M-008 interim):**
+- Zustand `authStore` with `persist` middleware using `sessionStorage` as the storage adapter
+- Cookie also written on login (for Next.js server-side middleware route protection)
+- Rationale: sessionStorage is cleared on tab close (safer than localStorage), cookie enables SSR auth guards
+
+**Exact Fix:**
+```typescript
+import { persist, createJSONStorage } from 'zustand/middleware'
+
+export const useAuthStore = create(
+    persist(
+        (set) => ({
+            token: null,
+            user: null,
+            setAuth: (token, user) => set({ token, user }),
+            clearAuth: () => set({ token: null, user: null }),
+        }),
+        {
+            name: 'auth-storage',
+            storage: createJSONStorage(() => sessionStorage),  // NOT localStorage
+        }
+    )
+)
+```
+
+---
+
+### Fix M-001 (Addendum) — `@Retryable` Must NOT Apply to `reserveTickets()`
+**Severity:** 🔴 CRITICAL
+**Day:** Day 16 / any time BookingService is modified
+**File:** `BookingService.java`
+
+**Why:** Already documented in Day 16 prompt, but NOT in this overlay file. Adding `@Retryable` to `reserveTickets()` causes Redis inventory to be decremented multiple times while only one booking is created — a permanent invisible inventory undercount. The Lua floor guard prevents the count going negative but the second attempt still decrements it.
+
+**Exact rule:** `@Retryable` is allowed on `checkIn()` ONLY. It is FORBIDDEN on any method that touches Redis inventory counters.
+
+---
+
+## FINAL CHECKLIST — Day 21 (Phase 1A Close) [UPDATED]
+
+Before tagging `v1.0.0`, verify all critical fixes were applied:
+
+**Original overlay fixes:**
+- [ ] `Instant` used for all time-sensitive fields (Fix 1.1)
+- [ ] PostgreSQL ENUM for roles (Fix 1.2)
+- [ ] Lua floor guard in `reserveSeat()` (Fix 5.1)
+- [ ] TOCTOU double-check inside lock in `reserveTickets()` (Fix 8.1)
+- [ ] CHECK_IN guard implemented (Fix 8.2)
+- [ ] Expiry job distributed lock (Fix 8.3)
+- [ ] Webhook 200 only after DB commit (Fix 9.1)
+- [ ] Webhook idempotency with concurrent guard (Fix 9.2)
+- [ ] DENY_REFUND notification action (Fix 10.1)
+- [ ] QR generation offloaded to async queue (Fix 10.2)
+- [ ] CANCELLED state added to state machine (Fix 11.1)
+- [ ] RELEASE event caller documented or removed (Fix 11.2)
+- [ ] `refund_denial_reason` field added (Fix 12.1)
+- [ ] Lua floor guard tested with concurrency test (Fix 16.1)
+- [ ] Correlation ID propagation across HTTP + RabbitMQ (Fix CC-1)
+- [ ] `BusinessConstants.java` used throughout — no magic numbers (Fix CC-2)
+- [ ] Stripe + Railway accounts created before Day 9 (Fix PW3-1)
+
+**Newly documented missing fixes:**
+- [ ] Register form sends no `role` field (Fix E-001)
+- [ ] GlobalExceptionHandler has `Exception.class` catch-all with `log.error(..., ex)` (Fix E-008)
+- [ ] `@Version` optimistic locking on `Booking` entity (Fix 7.1)
+- [ ] Payment upsert instead of insert on webhook retry (Fix 16B.2)
+- [ ] BookingControllerTest — 9 tests passing (Fix 16B-missing)
+- [ ] Token storage strategy resolved: sessionStorage via Zustand persist (Fix M-008)
+- [ ] `@Retryable` NOT on `reserveTickets()` — only on `checkIn()` (Fix M-001 addendum)
+
+**Session prompt bugs (from 20_session_prompt_review.md):**
+- [ ] `@Transactional` removed from `ConcurrentBookingTest` (BUG-D16-1)
+- [ ] `actions/checkout@v4` corrected in ALL GitHub Actions YAML files (BUG-D18-1)
+- [ ] `RateLimitFilter` uses constructor injection, not `@Autowired` (BUG-D20-1)
+- [ ] Rate limit counter is atomic Lua script, not two-step INCR+EXPIRE (BUG-D20-2)
+- [ ] `status().isNot(429)` replaced with valid MockMvc assertion (BUG-D20-3)
+- [ ] Actuator `permitAll()` replaced with health-only public access (BUG-D20-6)
+
+---
+
+## PHASE 1B — Deferred Items and New Issues
+
+The following items were explicitly deferred to Phase 1B or are newly identified from full project audit. They are NOT to be implemented in Phase 1A.
+
+---
+
+### Phase 1B Roadmap
+
+#### H-001 — State Machine API Migration (Spring State Machine 4.x)
+**Why deferred:** `StateMachineConfigurerAdapter` is deprecated in Spring State Machine 4.x. The functional API (`StateMachineModelFactory`) is the replacement. Migration requires rewriting `BookingStateMachineConfig` and all guards/actions. Functional — deferred because the deprecated API works correctly.
+
+**Phase 1B target:** Migrate to the builder/functional API, add state machine metrics via Micrometer, add state transition event logging.
+
+---
+
+#### H-002 — Outbox Pattern for Reliable RabbitMQ Publishing
+**Why deferred:** Currently, RabbitMQ messages are published inside `@Transactional` service methods — but they are not part of the DB transaction. If the DB commits and then RabbitMQ publish fails (broker down, network partition), the notification email is silently dropped, and the QR code is never generated. The booking is CONFIRMED but the user gets nothing.
+
+**Phase 1B target:** Implement the Transactional Outbox pattern:
+1. Save a `OutboxEvent` record to the DB inside the same transaction as the business operation
+2. A scheduled `OutboxPoller` reads unprocessed outbox events and publishes them to RabbitMQ
+3. Mark the outbox event as `SENT` after successful publish
+4. This guarantees at-least-once delivery even across broker restarts
+
+---
+
+#### H-003 — HttpOnly Cookie Authentication (M-008 Full Implementation)
+**Why deferred:** Full HttpOnly cookie auth requires the frontend (Vercel) and backend (Railway) to share a domain (e.g., `app.example.com` → Vercel, `api.example.com` → Railway). In Phase 1A, they are on separate Railway/Vercel subdomains — cross-domain cookies with SameSite=Strict are blocked by browsers.
+
+**Phase 1B target:** Set up a custom domain (e.g., `ticketing.example.com`) with a shared apex domain. Backend sets `Set-Cookie: token=...; HttpOnly; Secure; SameSite=Strict; Domain=.example.com`. Frontend reads nothing from storage — the browser attaches the cookie automatically.
+
+---
+
+#### H-004 — Elasticsearch Event Search with CQRS
+**Why deferred:** Current search is PostgreSQL full-text (`ILIKE` or `tsvector`). It has no relevance ranking, no fuzzy matching, and scales poorly with large event catalogs.
+
+**Phase 1B target:** Add Elasticsearch 8.x via Spring Data Elasticsearch. Publish `EventCreatedEvent`/`EventUpdatedEvent` to a separate Elasticsearch projection index. `EventSearchController` queries ES, not PostgreSQL. Use CQRS: PostgreSQL is the write model, ES is the read model.
+
+---
+
+#### H-005 — WebSocket Real-Time Seat Availability
+**Why deferred:** Current availability is polled via `GET /api/events/{id}` which caches for 5 minutes. This means a user can see "50 seats available" while the last seat is being purchased.
+
+**Phase 1B target:** Implement `@MessageMapping` with STOMP over WebSocket. When `inventoryService.reserveSeat()` decrements, broadcast the new count to all subscribers of the event's topic (`/topic/events/{id}/availability`). Frontend subscribes using `@stomp/stompjs`.
+
+---
+
+#### H-006 — Organizer Multi-Step Event Creation Form (Days 14–15 Incomplete)
+**Current state:** The Create Event form only implements Step 1 (Basic Info). Steps 2–4 (Ticket Tiers, Media, Review) are mocked/empty placeholders in the organizer dashboard.
+
+**Phase 1B target:** Implement the full multi-step form with:
+- Step 2: Ticket tier builder (add multiple tiers with capacity + price)
+- Step 3: Cover image upload to S3/Cloudinary
+- Step 4: Review and publish form
+
+---
+
+#### H-007 — Event Image Upload (S3 / Cloudinary)
+**Current state:** `Event` entity has `coverImageUrl` field but the upload mechanism does not exist. Events are created without cover images; the frontend falls back to a placeholder.
+
+**Phase 1B target:** Add `POST /api/v1/events/{id}/cover` endpoint accepting `multipart/form-data`. Backend uploads to S3 (AWS SDK) or Cloudinary, stores the resulting public URL in `Event.coverImageUrl`. Frontend renders the actual cover on event cards and detail pages.
+
+---
+
+#### H-008 — Full OWASP/ASVS Compliance Mapping
+**Why deferred:** Phase 1A addresses OWASP Top 10 defensively (parameterized queries, JWT auth, rate limiting, CORS, security headers). A formal ASVS L2 compliance audit requires a dedicated security review session mapping every control.
+
+**Phase 1B target:** Run OWASP ZAP passive scan against the Railway deployment, generate a report, address any findings. Map all ASVS L2 controls to implemented mitigations.
+
+---
+
+#### H-009 — Kubernetes + Helm Deployment
+**Why deferred:** Phase 1A uses Railway single-instance deployment. Kubernetes adds significant operational complexity with no benefit at the current scale.
+
+**Phase 1B target:** Write `k8s/` manifests: `Deployment`, `Service`, `ConfigMap`, `Secret`, `HorizontalPodAutoscaler`. Write Helm chart. Set up GKE or EKS cluster. Add readiness/liveness probes to the Spring Boot app (using `/actuator/health/readiness` and `/actuator/health/liveness`).
+
+---
+
+#### H-010 — Full Observability Stack (Prometheus + Grafana + Jaeger)
+**Why deferred:** Phase 1A uses Actuator + structured JSON logs. Production-grade observability requires distributed tracing (Jaeger), metrics aggregation (Prometheus), and dashboards (Grafana).
+
+**Phase 1B target:** 
+- Add Micrometer + Prometheus metrics export at `/actuator/prometheus`
+- Wire Spring Boot Actuator to Prometheus scrape config
+- Add Grafana dashboards for: booking creation rate, inventory levels, state machine transition latency, RabbitMQ queue depth
+- Add Zipkin/Jaeger tracing via `spring-cloud-sleuth` (or Micrometer Tracing)
+
+---
+
+#### H-011 — Waitlist Notification Email Templates
+**Current state:** `WaitlistService` notifies the next-in-queue user when a cancellation occurs by publishing to RabbitMQ. But `NotificationService` likely sends a plain-text email or no email at all for waitlist events.
+
+**Phase 1B target:** Create proper HTML email templates using Thymeleaf. Templates for: booking confirmation, refund approved/denied, waitlist notification ("A seat opened up for event X — complete your booking within 15 minutes"), payment failure.
+
+---
+
+#### H-012 — Refund Flow End-to-End Verification
+**Current state:** The `RefundService` submits refund requests via Stripe API. The refund webhook (`charge.refunded`) handling is not confirmed to be implemented.
+
+**Phase 1B target:** Verify `charge.refunded` webhook is handled in `WebhookService`, booking state is transitioned to `REFUND_APPROVED`, and the user receives a notification. Add integration test using Stripe CLI: `stripe trigger charge.refunded`.
+
+---
+
+#### H-013 — Payment Retry on Stripe Failure
+**Current state:** If Stripe payment fails (`checkout.session.expired`), booking moves to `PAYMENT_FAILED` with no retry path. The user must start over from event discovery.
+
+**Phase 1B target:** Add `POST /api/v1/bookings/{id}/retry-payment` endpoint that: validates booking is in `PAYMENT_FAILED` state, creates a new Stripe Checkout session, transitions back to `PAYMENT_PENDING`. Re-use the distributed lock to prevent concurrent retries.
+
+---
+
+#### H-014 — Admin Dashboard and User Management
+**Current state:** ADMIN role exists and is blocked from self-registration (Fix E-001) but there is no admin UI or API beyond what comes from existing controller `@PreAuthorize("hasRole('ADMIN')")` guards.
+
+**Phase 1B target:** Implement `/admin` pages:
+- User management (list users, change roles, deactivate)
+- Event moderation (force-publish, force-cancel any event)
+- System metrics summary (total bookings, revenue, active events)
+
+---
+
+#### NEW-001 — Booking Idempotency-Key Enforcement on Backend
+**Discovered via:** Scope analysis HIGH-9 + Day 20 M-002 description
+
+**Why:** The frontend sends `Idempotency-Key: crypto.randomUUID()` on `POST /api/v1/bookings/reserve`. But the backend does not validate or honor this header — it's purely advisory. If the frontend double-submits (network timeout + retry), two bookings are created for the same user/tier/quantity.
+
+**Phase 1B target:** Add Redis-based idempotency key store on the booking endpoint:
+1. On receipt of `Idempotency-Key`, check Redis for an existing response stored at `idempotency:{key}`
+2. If found, return the cached response immediately (no double booking)
+3. If not found, process normally, then cache the response with a 5-minute TTL
+
+---
+
+#### NEW-002 — Organizer Sales Analytics (Real Charts)
+**Current state:** Day 15 organizer dashboard has mocked chart data or placeholder charts.
+
+**Phase 1B target:** Wire the organizer analytics to real data:
+- `GET /api/v1/organizer/events/{id}/analytics` → return time-series booking data
+- Frontend: real Recharts line chart from actual booking timestamps
+- Add: revenue breakdown by tier, conversion rate (reserved → confirmed), refund rate
+
+---
+
+#### NEW-003 — Database Connection Pool Tuning
+**Current state:** Spring Boot defaults (HikariCP `maximumPoolSize=10`). Under the k6 load tests, connection pool exhaustion may occur under sustained booking load.
+
+**Phase 1B target:** Profile HikariCP metrics via `/actuator/metrics/hikaricp.connections.active`. Tune: `maximum-pool-size` based on Railway instance vCPU count, `connection-timeout`, `idle-timeout`. Add HikariCP health indicator to readiness probe.
+
+---
+
+#### NEW-004 — Booking State Machine Persistence Store
+**Current state:** State machine state is rehydrated from the DB `booking.state` field on each request. This works but doesn't take advantage of Spring State Machine's built-in `StateMachineRuntimePersister`.
+
+**Phase 1B target:** Implement `JpaPersistingStateMachineInterceptor` to store the full state machine context (including extended state variables) to a `state_machine_context` table. Benefit: extended state (variables like `bookingId`, `currentUserId`) survives across JVM restarts without manual rehydration logic.
+
+---
+
 *Companion to Phase 1A Sections 2–16 | April 4–24, 2026 | All fixes apply on top of the original plan without replacing it*
