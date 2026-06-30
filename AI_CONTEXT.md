@@ -1,10 +1,10 @@
 # AI CONTEXT SNAPSHOT — Event Ticketing Platform
 
-## Last Updated: Day 16B-CF (2026-06-27) — Checkout Flow Stabilization: price sync, resume checkout, explicit replace, booking history actions, duplicate-insert fix (payments_booking_id_key)
+## Last Updated: Day 16B (2026-06-30) — Backend Test Coverage Push: 81.4% INSTRUCTION coverage (JaCoCo gate ✅ PASSED), 183/183 tests passing
 
 ## Branch: feat/platform-enhancements
 
-## Test Status: 129/129 unit passing (12 Docker-only errors pre-existing — require Docker Desktop + Testcontainers)
+## Test Status: 183/183 ALL passing (includes Docker-based Testcontainers integration tests — requires Docker Desktop running)
 
 ## 1. NON-NEGOTIABLE RULES (From instructions.txt + Overlay)
 
@@ -171,7 +171,9 @@ class YourControllerTest {
 | **16B.9** | TicketTierSelector: explicit replace-confirmation prompt before overwriting a held reservation for another event | Frontend | ✅ Applied | TicketTierSelector.tsx |
 | **16B.10** | Booking History: Resume+Cancel actions for RESERVED/PAYMENT_PENDING; fixed `useEffect` countdown; muted terminal rows; clear store on mount | Frontend | ✅ Applied | dashboard/bookings/page.tsx, [id]/page.tsx |
 | **16B.11** | reservationStore: added `unitPrice` + `eventId` fields to support savings line and replace-prompt guard | Frontend | ✅ Applied | reservationStore.ts |
-| **16B.1** | Test `reserveSeat()` Lua Script explicitly (concurrency test) | Tests | ⏳ Pending | - |
+| **16B.1** | Test `reserveSeat()` Lua Script explicitly (concurrency test) | Tests | ✅ Applied | InventoryServiceConcurrencyTest.java — 100-thread/50-seat startLatch test |
+| **16B-missing** | BookingControllerTest — 13 tests covering all booking endpoints + @PreAuthorize guards | Tests | ✅ Applied | BookingControllerTest.java |
+| **16B-coverage** | Backend Test Coverage Push: +54 new unit tests across 13 new test classes | Tests | ✅ Applied | 81.4% INSTRUCTION coverage, JaCoCo gate PASSED |
 
 ---
 
@@ -190,6 +192,7 @@ class YourControllerTest {
 | 15 | Frontend Organizer Dashboard | ✅ | N/A |
 | 16A | Platform Stabilization | ✅ Complete | 104/104 unit |
 | 16B-CF | Checkout Flow Stabilization (sub-session) | ✅ Complete | 129/129 unit |
+| 16B | Backend Test Coverage Push (80%+) | ✅ Complete | 183/183 all passing — 81.4% INSTRUCTION (JaCoCo gate ✅) |
 
 ---
 
