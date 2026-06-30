@@ -2,18 +2,21 @@
 
 **Date:** Saturday, April 19, 2026 | **Planned Hours:** 6 hrs
 
+> **Rev:** Updated per `docs/Core/20_session_prompt_review.md` — BUG-D16-1 through D16-5 fixed, Fix 16B-missing added.
+
 ---
 
 ## YOUR FIRST MESSAGE
 >
-> After pasting `instructions.txt` content, send this as your next message:
+> After pasting `instructions.md` content, send this as your next message:
 
 ```
-We are on Day 16 — Backend Test Coverage Push (80%+) + M-001 Retry Fix.
+We are on Day 16 — Backend Test Coverage Push (80%+) + M-001 Retry Fix + BookingControllerTest.
 Feature: test-coverage
 
 Active fixes today:
-- Fix 16.1 — CRITICAL: 80% test coverage gate before deploy. Lua floor guard must be tested for concurrency.
+- Fix 16.1 — CRITICAL: 80% INSTRUCTION coverage gate (JaCoCo). Lua floor guard concurrency test.
+- Fix 16B-missing — CRITICAL: BookingControllerTest — @WebMvcTest + @Import(TestSecurityConfig.class), 9 tests.
 - Fix M-001 — IMPORTANT: Add @Retryable to BookingService.checkIn() ONLY (NOT to reserveTickets).
 - Cross-cutting: Fix CC-1 (X-Correlation-ID), Fix CC-2 (BusinessConstants only, no magic numbers)
 
@@ -24,20 +27,24 @@ Pre-conditions confirmed:
 - Frontend Days 13–15 complete ✅
 
 TDD MANDATORY — This day is all about tests:
-Write ConcurrentBookingTest BEFORE any other coverage:
-  testLuaFloorGuard_underHighConcurrency_shouldNeverOversell()
+Write InventoryServiceConcurrencyTest BEFORE any other coverage:
+  reserveSeat_whenConcurrentRequests_shouldNeverGoBelowZero()
 
-Run ./mvnw test -Dtest=ConcurrentBookingTest — confirm behavior.
+CRITICAL test rules (BUG-D16-1 fix):
+- ConcurrentBookingTest MUST NOT have @Transactional on the class — concurrent threads do NOT
+  share the test's transaction context, causing wrong assertions. Use @BeforeEach/@AfterEach instead.
+- Use @MockitoBean (NOT deprecated @MockBean) for all @WebMvcTest controller tests.
+- JaCoCo counter is INSTRUCTION (not LINE) — these are different metrics. Be precise.
 
 Non-negotiable rules:
-- Configure JaCoCo maven plugin to enforce an 80% minimum instruction coverage rule.
+- Configure JaCoCo maven plugin to enforce 80% minimum INSTRUCTION coverage (not LINE coverage).
 - PricingEngine must reach 100% branch coverage.
-- ConcurrentBookingTest must spawn at least 100 threads attempting to book the same limited tier.
+- ConcurrentBookingTest must spawn 100 threads against 50-seat tier (50 succeed, 50 fail).
 - @Retryable must be applied ONLY to checkIn() — applying it to reserveTickets() causes permanent Redis inventory undercount.
 - Every log.error() call must pass the exception as the second arg (not just the message).
 - No hardcoded URLs, ports, or magic numbers — all via BusinessConstants.
 
-Start with: Configure JaCoCo in pom.xml and write ConcurrentBookingTest.
+Start with: Configure JaCoCo in pom.xml (INSTRUCTION counter, 80%) and write InventoryServiceConcurrencyTest.
 ```
 
 ---
@@ -56,18 +63,13 @@ Start with: Configure JaCoCo in pom.xml and write ConcurrentBookingTest.
 ## Context Briefing
 
 **What we're building today:**
-Day 16 enforces the quality standard before production. We configure JaCoCo to fail the build if instruction coverage drops below 80%. We write the most important test: a multithreaded concurrency test proving the Redis Lua floor guard (Fix 5.1) prevents overselling. We also apply M-001 (`@Retryable` on `checkIn()`) correctly.
+Day 16 enforces the quality standard before production. We configure JaCoCo to fail the build if INSTRUCTION coverage drops below 80%. We write the concurrency test proving the Lua floor guard prevents overselling. We write the full BookingControllerTest (Fix 16B-missing). We apply M-001 (`@Retryable` on `checkIn()`).
 
 **Why the Lua test (Fix 16.1) matters:**
-The core value proposition of a ticketing system is "no double bookings". The Lua script in `InventoryService` ensures the atomic decrement doesn't drop below zero. We must prove this by firing 100 threads at a ticket tier with a capacity of 10. Exactly 10 should succeed, 90 should fail with `InsufficientInventoryException`.
+The core guarantee of a ticketing platform is "no oversell." 100 threads, 50 seats — exactly 50 must succeed. The Lua script's floor guard is the only correctness guarantee.
 
 **Why M-001 must be scoped to `checkIn()` ONLY:**
-`reserveTickets()` decrements Redis inventory BEFORE the DB save. If `@Retryable` fires on an `ObjectOptimisticLockingFailureException` from the DB save, Redis would be decremented twice while only one booking is created — a permanent invisible inventory undercount. `checkIn()` only updates a DB row state (`CONFIRMED → ATTENDED`) with no Redis side effect — retrying it is safe.
-
-**Pre-conditions from Day 15:**
-
-- Frontend UI for all 10 pages complete ✅
-- Stripe checkout + confirmation flow working ✅
+`reserveTickets()` decrements Redis inventory BEFORE the DB save. If `@Retryable` fires on `ObjectOptimisticLockingFailureException`, Redis is decremented twice for one booking — a permanent invisible inventory undercount. `checkIn()` only updates a DB row state — no Redis side effects — so retrying is safe.
 
 ---
 
@@ -82,8 +84,9 @@ The core value proposition of a ticketing system is "no double bookings". The Lu
 
 | Fix ID | Severity | Action Required |
 | :--- | :--- | :--- |
-| **Fix 16.1** | 🔴 CRITICAL | 80% test coverage gate. Configure JaCoCo to fail the build `< 80%`. Write a high-concurrency test (`ConcurrentBookingTest`) using an `ExecutorService` and `CountDownLatch` to blast `InventoryService.reserveSeat()` and prove the Lua floor guard works. |
-| **Fix M-001** | 🟡 IMPORTANT | Add `@Retryable` for `ObjectOptimisticLockingFailureException` to `BookingService.checkIn()` ONLY. Enable `@EnableRetry` on main class. Do NOT add to `reserveTickets()`. |
+| **Fix 16.1** | 🔴 CRITICAL | 80% INSTRUCTION coverage gate. JaCoCo `<counter>INSTRUCTION</counter>`. Write `InventoryServiceConcurrencyTest`: 100 threads / 50 seats / `CountDownLatch`. |
+| **Fix 16B-missing** | 🔴 CRITICAL | `BookingControllerTest` — `@WebMvcTest` + `@Import(TestSecurityConfig.class)` + `@MockitoBean`. 9 tests covering all booking endpoints and `@PreAuthorize` guards. |
+| **Fix M-001** | 🟡 IMPORTANT | `@Retryable` on `BookingService.checkIn()` ONLY. Enable `@EnableRetry`. Do NOT add to `reserveTickets()`. |
 
 ---
 
@@ -120,7 +123,7 @@ Add the `jacoco-maven-plugin` to `<build><plugins>`:
             <element>BUNDLE</element>
             <limits>
               <limit>
-                <counter>INSTRUCTION</counter>
+                <counter>INSTRUCTION</counter>  <!-- INSTRUCTION not LINE — more precise -->
                 <value>COVEREDRATIO</value>
                 <minimum>0.80</minimum>
               </limit>
@@ -128,7 +131,7 @@ Add the `jacoco-maven-plugin` to `<build><plugins>`:
           </rule>
         </rules>
         <excludes>
-          <!-- Exclude DTOs, entities, config, exceptions — test coverage not meaningful -->
+          <!-- Only exclude non-logic classes — NEVER exclude services or controllers -->
           <exclude>**/dto/**</exclude>
           <exclude>**/model/**</exclude>
           <exclude>**/config/**</exclude>
@@ -142,61 +145,230 @@ Add the `jacoco-maven-plugin` to `<build><plugins>`:
 </plugin>
 ```
 
-#### 2. ConcurrentBookingTest
+#### 2. InventoryServiceConcurrencyTest (Fix 16.1)
+
+**⚠️ BUG-D16-1 fix: NO `@Transactional` on this class.** Concurrent threads spawned by `ExecutorService` do NOT inherit the test's Spring transaction context. Each thread runs in its own transaction. Using `@Transactional` on the class causes incorrect assertion results. Use `@BeforeEach` / `@AfterEach` for setup and cleanup instead.
 
 ```java
 @SpringBootTest
-@Transactional  // each test method gets a fresh DB state
-public class ConcurrentBookingTest {
+@Testcontainers
+class InventoryServiceConcurrencyTest {
 
-    @Autowired private InventoryService inventoryService;
-    @Autowired private TicketTierRepository tierRepository;
+    // ⚠️ @SpringBootTest loads the FULL Spring context — all three infrastructure containers are required.
+    // Omitting postgres or rabbitmq causes context startup failure even though this test only tests Redis.
+    @Container
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17");
+
+    @Container
+    static GenericContainer<?> redis = new GenericContainer<>("redis:7")
+        .withExposedPorts(6379);
+
+    @Container
+    static RabbitMQContainer rabbitmq = new RabbitMQContainer("rabbitmq:4");
+
+    @DynamicPropertySource
+    static void configureContainers(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url",      postgres::getJdbcUrl);
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+        registry.add("spring.data.redis.host",     redis::getHost);
+        registry.add("spring.data.redis.port",     redis::getFirstMappedPort);
+        registry.add("spring.rabbitmq.host",       rabbitmq::getHost);
+        registry.add("spring.rabbitmq.amqp-port",  rabbitmq::getAmqpPort);
+    }
+
+    @Autowired InventoryService inventoryService;
+    @Autowired TicketTierRepository tierRepository;
+
+    private Long tierId;
+
+    @BeforeEach
+    void setUp() {
+        // Commit to DB — each test gets a fresh tier with 50 seats
+        TicketTier tier = tierRepository.save(
+            TicketTier.builder().name("General").capacity(50).availableCount(50).build()
+        );
+        tierId = tier.getId();
+        inventoryService.warmUpTier(tierId, 50);  // seeds Redis key
+    }
+
+    @AfterEach
+    void tearDown() {
+        tierRepository.deleteAll();
+        // Redis cleared by Testcontainers container isolation per test
+    }
 
     @Test
-    @DisplayName("Fix 16.1: Lua floor guard must prevent overselling under 100 concurrent requests")
-    void testLuaFloorGuard_underHighConcurrency_shouldNeverOversell() throws InterruptedException {
-        int CAPACITY = 10;
-        int THREADS = 100;
-        // Set up a TicketTier in Redis with CAPACITY seats
-        Long tierId = seedTierInRedis(CAPACITY);
+    @DisplayName("Fix 16.1: Lua floor guard — 100 threads / 50 seats → exactly 50 succeed, 0 negative")
+    void reserveSeat_whenConcurrentRequests_shouldNeverGoBelowZero() throws InterruptedException {
+        int SEAT_COUNT = 50;
+        int THREAD_COUNT = 100;
 
-        CountDownLatch startLatch = new CountDownLatch(1); // all threads start simultaneously
-        CountDownLatch doneLatch = new CountDownLatch(THREADS);
+        ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
+        CountDownLatch startLatch = new CountDownLatch(1);   // fire all threads simultaneously
+        CountDownLatch doneLatch  = new CountDownLatch(THREAD_COUNT);
         AtomicInteger successCount = new AtomicInteger(0);
-        AtomicInteger failureCount = new AtomicInteger(0);
+        AtomicInteger failCount    = new AtomicInteger(0);
 
-        ExecutorService executor = Executors.newFixedThreadPool(THREADS);
-        for (int i = 0; i < THREADS; i++) {
+        for (int i = 0; i < THREAD_COUNT; i++) {
             executor.submit(() -> {
                 try {
-                    startLatch.await(); // wait for all threads to be ready
-                    inventoryService.reserveSeat(tierId, 1);
-                    successCount.incrementAndGet();
-                } catch (Exception e) {
-                    failureCount.incrementAndGet();
+                    startLatch.await();  // wait for all threads to be ready
+                    Long result = inventoryService.reserveSeat(tierId, 1);
+                    if (result != null && result >= 0) {
+                        successCount.incrementAndGet();
+                    } else {
+                        failCount.incrementAndGet();  // -1 = floor guard, -2 = key missing
+                    }
+                } catch (Exception ignored) {
+                    failCount.incrementAndGet();
                 } finally {
                     doneLatch.countDown();
                 }
             });
         }
-        startLatch.countDown(); // fire all threads at once
+
+        startLatch.countDown();  // release all 100 threads simultaneously
         doneLatch.await(30, TimeUnit.SECONDS);
         executor.shutdown();
 
-        // Assert: exactly CAPACITY threads succeeded, the rest failed
-        assertThat(successCount.get()).isEqualTo(CAPACITY);
-        assertThat(failureCount.get()).isEqualTo(THREADS - CAPACITY);
-        // Assert: Redis inventory is now exactly 0 (not negative)
-        assertThat(inventoryService.getAvailableCount(tierId)).isZero();
+        assertThat(successCount.get()).isEqualTo(SEAT_COUNT);              // exactly 50 succeed
+        assertThat(failCount.get()).isEqualTo(THREAD_COUNT - SEAT_COUNT);  // exactly 50 fail
+        assertThat(inventoryService.getAvailableCount(tierId)).isEqualTo(0L);      // not negative
+        assertThat(inventoryService.getAvailableCount(tierId)).isGreaterThanOrEqualTo(0L); // floor guard held
     }
 }
 ```
 
-### Afternoon (3 hrs) — M-001 Retry Fix + Coverage Backfilling
+---
+
+### Mid-Morning (1 hr) — BookingControllerTest (Fix 16B-missing)
+
+This is a mandatory CRITICAL fix from CLAUDE.md. Without it, `BookingController` has zero test coverage and the JaCoCo gate fails.
+
+**⚠️ BUG-D16-4 fix: use `@MockitoBean` not deprecated `@MockBean`.**
+
+```java
+@WebMvcTest(controllers = BookingController.class)
+@Import(TestSecurityConfig.class)          // MANDATORY — loads security without full context
+class BookingControllerTest {
+
+    @Autowired MockMvc mockMvc;
+    @Autowired ObjectMapper objectMapper;
+
+    @MockitoBean BookingService bookingService;   // @MockitoBean (Spring Boot 3.4+, not @MockBean)
+    @MockitoBean JwtService jwtService;           // MANDATORY — JwtFilter requires this bean
+
+    // ❌ DO NOT add: addFilters = false — disables @PreAuthorize entirely
+    // ❌ DO NOT mock: UserDetailsService — TestSecurityConfig provides it
+
+    // --- RESERVE ---
+    @Test
+    @WithMockUser(roles = "USER")
+    void bookingController_whenReserveValid_shouldReturn201() throws Exception {
+        ReserveTicketsRequest request = new ReserveTicketsRequest(42L, 2);
+        BookingResponse response = BookingResponse.builder()
+            .bookingId(101L).state(BookingState.RESERVED).build();
+        when(bookingService.reserveTickets(any(), anyLong())).thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/bookings/reserve")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.state").value("RESERVED"));
+    }
+
+    @Test
+    void bookingController_whenReserveUnauthenticated_shouldReturn401() throws Exception {
+        mockMvc.perform(post("/api/v1/bookings/reserve")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"tierId\":42,\"quantity\":1}"))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void bookingController_whenReserveInvalidBody_shouldReturn400() throws Exception {
+        mockMvc.perform(post("/api/v1/bookings/reserve")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"tierId\":null,\"quantity\":-1}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.success").value(false));
+    }
+
+    // --- GET BOOKING ---
+    @Test
+    @WithMockUser(roles = "USER", username = "owner@test.com")
+    void bookingController_whenGetBookingOwner_shouldReturn200() throws Exception {
+        when(bookingService.getBookingDetails(eq(101L), anyLong()))
+            .thenReturn(BookingDetailsResponse.builder().bookingId(101L).build());
+
+        mockMvc.perform(get("/api/v1/bookings/101"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER", username = "other@test.com")
+    void bookingController_whenGetBookingOtherUser_shouldReturn403() throws Exception {
+        when(bookingService.getBookingDetails(eq(101L), anyLong()))
+            .thenThrow(new AccessDeniedException("Not your booking"));
+
+        mockMvc.perform(get("/api/v1/bookings/101"))
+            .andExpect(status().isForbidden());
+    }
+
+    // --- CHECK-IN ---
+    @Test
+    @WithMockUser(roles = "ORGANIZER")
+    void bookingController_whenCheckInAsOrganizer_shouldReturn200() throws Exception {
+        when(bookingService.checkIn(eq(101L), anyLong()))
+            .thenReturn(BookingResponse.builder().bookingId(101L).state(BookingState.ATTENDED).build());
+
+        mockMvc.perform(post("/api/v1/bookings/101/check-in"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.state").value("ATTENDED"));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")  // USER role — @PreAuthorize("hasRole('ORGANIZER')") must block this
+    void bookingController_whenCheckInAsUser_shouldReturn403() throws Exception {
+        mockMvc.perform(post("/api/v1/bookings/101/check-in"))
+            .andExpect(status().isForbidden());
+    }
+
+    // --- CANCEL ---
+    @Test
+    @WithMockUser(roles = "USER")
+    void bookingController_whenCancelAsOwner_shouldReturn200() throws Exception {
+        when(bookingService.cancelBooking(eq(101L), anyLong()))
+            .thenReturn(BookingResponse.builder().bookingId(101L).state(BookingState.CANCELLED).build());
+
+        mockMvc.perform(post("/api/v1/bookings/101/cancel"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.state").value("CANCELLED"));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void bookingController_whenCancelAsNonOwner_shouldReturn403() throws Exception {
+        when(bookingService.cancelBooking(eq(101L), anyLong()))
+            .thenThrow(new AccessDeniedException("Not your booking"));
+
+        mockMvc.perform(post("/api/v1/bookings/101/cancel"))
+            .andExpect(status().isForbidden());
+    }
+}
+```
+
+---
+
+### Afternoon (2 hrs) — M-001 Retry + Coverage Backfilling
 
 #### Fix M-001 — @Retryable on checkIn() ONLY
 
-Add `spring-retry` to `pom.xml` if not already present:
+Add `spring-retry` to `pom.xml`:
 
 ```xml
 <dependency>
@@ -220,70 +392,54 @@ Apply `@Retryable` to `BookingService.checkIn()` ONLY:
     backoff = @Backoff(delay = 100, multiplier = 2)
 )
 @Transactional
-public void checkIn(Long bookingId) {
-    // ... existing checkIn logic — only DB state update, no Redis side effects
+public BookingResponse checkIn(Long bookingId, Long organizerId) {
+    // ... DB state update only — no Redis side effects — safe to retry
 }
 ```
 
-**⚠️ DO NOT add `@Retryable` to `reserveTickets()`** — the Redis decrement makes retrying unsafe.
+**⚠️ DO NOT add `@Retryable` to `reserveTickets()`** — Redis decrement makes retrying unsafe (Fix M-001 addendum in `Phase1A_Adjustments_and_Fixes.md`).
 
 #### Coverage Backfilling
 
 Run `./mvnw clean test jacoco:report` and open `target/site/jacoco/index.html`.
 
-Focus areas to backfill to reach 80%:
+Focus areas:
 
-1. **PricingEngine** — 100% branch coverage required:
+1. **PricingEngine — 100% branch coverage:**
+   - Early bird + group discount (both combined)
+   - Early bird only (group < min)
+   - Surge pricing only (inventory > 80% threshold)
+   - Base price (no discount, no surge)
 
-   ```java
-   // Test all combinations:
-   // - Event > 30 days away + group >= 5 → both discounts
-   // - Event > 30 days away + group < 5 → only early bird
-   // - Event <= 30 days + inventory > 80% → surge pricing
-   // - Event <= 30 days + inventory <= 80% → base price
-   ```
+2. **WaitlistService edge cases:**
+   - Join full tier → added to waitlist
+   - Notify next-in-waitlist on cancellation
+   - Join waitlist for unpublished event → error
 
-2. **BookingController / EventController** — `@WebMvcTest` slices:
+3. **GlobalExceptionHandler — all handlers triggered (Fix E-008):**
+   - 400 (`MethodArgumentNotValidException`)
+   - 404 (`EntityNotFoundException`)
+   - 409 conflict
+   - 429 (rate limit — if M-002 already applied)
+   - 500 catch-all (`Exception.class` — every catch-all MUST include `ex` in `log.error()`)
 
-   ```java
-   @WebMvcTest(BookingController.class)
-   class BookingControllerTest {
-       @MockBean BookingService bookingService;
-       @MockBean JwtService jwtService;
-       // test 400, 422, 404, 409 responses
-   }
-   ```
+4. **BookingStateMachineTest — verify M-001 retry:**
+   - Mock `bookingRepository.save()` to throw `ObjectOptimisticLockingFailureException` on first call
+   - Verify `checkIn()` completes after one retry
+   - Verify NO double Redis decrement (mock `inventoryService` and assert single call)
 
-3. **WaitlistService** — edge cases:
-   - Joining a full tier → success (added to waitlist)
-   - Notifying next-in-waitlist when cancellation happens
-   - Attempting to join waitlist for an event that is not PUBLISHED
-
-4. **GlobalExceptionHandler** — trigger all handlers:
-
-   ```java
-   // Trigger 400 (MethodArgumentNotValidException)
-   // Trigger 404 (EntityNotFoundException)
-   // Trigger 409 (ConstraintViolationException or duplicate)
-   // Trigger 422 (IllegalStateException — e.g., event not open for booking)
-   // Trigger 500 (catch-all Exception.class handler — e.g., mock RuntimeException)
-   ```
-
-5. **BookingStateMachineTest** — verify M-001 retry:
-   - Mock `bookingRepository.save()` to throw `ObjectOptimisticLockingFailureException` on first call, succeed on second
-   - Verify `checkIn()` completes successfully after one retry
-   - Verify no double Redis decrement (mock inventoryService and assert single call)
+---
 
 ### Evening (1 hr) — Vitest Frontend Setup + Verification + Git
 
-#### Frontend Vitest Setup (deferred from Day 4 — apply today)
+#### Frontend Vitest Setup
 
 ```bash
 cd frontend
 npm install -D vitest @vitejs/plugin-react @testing-library/react @testing-library/jest-dom
 ```
 
-Add minimal `vitest.config.ts`:
+Add `vitest.config.ts`:
 
 ```typescript
 import { defineConfig } from 'vitest/config';
@@ -300,51 +456,93 @@ export default defineConfig({
 
 Write 2 smoke tests:
 
-- `BookingStatusBadge.test.tsx` — renders correct text and bg class for CONFIRMED, EXPIRED, CANCELLED
-- `authStore.test.ts` — confirms token is stored in sessionStorage, NOT localStorage
+**`BookingStatusBadge.test.tsx`:**
+```typescript
+// Tests rendering for each booking state — simple unit test
+it('renders CONFIRMED with correct class', () => {
+    render(<BookingStatusBadge state="CONFIRMED" />)
+    expect(screen.getByText('Confirmed')).toBeInTheDocument()
+})
+```
 
-**Backend verification:**
+**`authStore.test.ts` (BUG-D16-3 fix — test Zustand state, not browser storage):**
 
-- Run `./mvnw verify` — JaCoCo check must pass (coverage >= 80%)
-- Run `./mvnw test -Dtest=ConcurrentBookingTest` — 10/100 successes confirmed
-- Run `./mvnw test` — all tests passing with no failures
+⚠️ **Resolved contradiction:** authStore uses Zustand with `persist` middleware and `sessionStorage` as the storage adapter (Fix M-008). The test should verify the Zustand state API works correctly, NOT directly assert sessionStorage content (which is an implementation detail).
 
-Git commit: `test: add JaCoCo 80% gate, concurrent booking test, M-001 retry, Vitest setup`
+```typescript
+// authStore.test.ts
+import { useAuthStore } from '../stores/authStore'
+
+beforeEach(() => {
+    useAuthStore.setState({ token: null, user: null })
+    sessionStorage.clear()
+})
+
+it('setAuth stores token and user in Zustand state', () => {
+    const { setAuth } = useAuthStore.getState()
+    setAuth('test-jwt', { id: 1, email: 'a@b.com', role: 'USER' })
+    expect(useAuthStore.getState().token).toBe('test-jwt')
+    expect(useAuthStore.getState().user?.email).toBe('a@b.com')
+})
+
+it('clearAuth resets token and user', () => {
+    useAuthStore.setState({ token: 'old-jwt', user: { id: 1, email: 'a@b.com', role: 'USER' } })
+    useAuthStore.getState().clearAuth()
+    expect(useAuthStore.getState().token).toBeNull()
+    expect(useAuthStore.getState().user).toBeNull()
+})
+```
+
+#### Backend Verification
+
+```bash
+./mvnw verify          # JaCoCo check must pass (INSTRUCTION >= 80%)
+./mvnw test -Dtest=InventoryServiceConcurrencyTest  # 50/100 successes confirmed
+./mvnw test -Dtest=BookingControllerTest  # all 9 tests pass
+./mvnw test            # all tests passing with no failures
+```
+
+Git commit: `test: add JaCoCo 80% instruction gate, Lua concurrency test, BookingControllerTest 9 tests, M-001 retry`
 
 ---
 
 ## Expected Deliverable / Success Criteria
 
 ```
-[ ] JaCoCo plugin configured in pom.xml with 80% minimum instruction coverage rule
-[ ] Exclusions added for DTOs, Entities, Config, Exceptions in JaCoCo config
-[ ] ConcurrentBookingTest: 100 threads, 10 succeed, 90 fail, Redis count = 0 (Fix 16.1)
-[ ] PricingEngine at 100% branch coverage (all 4 pricing scenarios tested)
+[ ] JaCoCo plugin configured — counter: INSTRUCTION, minimum: 0.80 (not LINE)
+[ ] Exclusions: DTOs, Entities, Config, Exceptions only — NOT services or controllers
+[ ] InventoryServiceConcurrencyTest: NO @Transactional on class (BUG-D16-1 fix)
+[ ] InventoryServiceConcurrencyTest: 100 threads / 50 seats / exactly 50 succeed
+[ ] InventoryServiceConcurrencyTest: Redis count = 0 after all threads complete (never negative)
+[ ] BookingControllerTest: @WebMvcTest + @Import(TestSecurityConfig.class) + @MockitoBean (not @MockBean)
+[ ] BookingControllerTest: all 9 test methods present and passing (Fix 16B-missing)
+[ ] PricingEngine: 100% branch coverage (all 4 pricing scenarios)
 [ ] WaitlistService: join-full and notify edge cases covered
-[ ] GlobalExceptionHandler: all handlers triggered in tests (including 422 and catch-all 500)
-[ ] @EnableRetry added to TicketingPlatformApplication.java (M-001)
-[ ] @Retryable on BookingService.checkIn() only — NOT on reserveTickets() (M-001)
-[ ] Retry test confirms checkIn() completes after one retry with single Redis call
-[ ] ./mvnw verify completes successfully (build does not fail on coverage gate)
-[ ] Vitest configured in frontend; BookingStatusBadge + authStore smoke tests passing
-[ ] authStore test confirms sessionStorage used (NOT localStorage)
-[ ] No magic numbers in any new test code — all via BusinessConstants
+[ ] GlobalExceptionHandler: all handlers triggered including 500 catch-all with ex arg
+[ ] @EnableRetry added to TicketingPlatformApplication.java
+[ ] @Retryable on BookingService.checkIn() ONLY — NOT on reserveTickets()
+[ ] Retry test: checkIn() completes after one retry, single Redis call confirmed
+[ ] ./mvnw verify completes — JaCoCo INSTRUCTION gate passes
+[ ] Vitest configured; BookingStatusBadge + authStore smoke tests passing
+[ ] authStore test uses @MockitoBean approach — no direct sessionStorage assertion
+[ ] No magic numbers in any test code — all via BusinessConstants
 ```
 
 ---
 
-## Skills to Attach This Session
+## Skills to Use This Session
 
-- `Plans/skills/java-springboot.SKILL.md`
+- Invoke `/java-springboot` skill — available as a slash command (already in `.claude/skills/`)
 
 ## ⚠️ Critical Reminders
 
-1. **M-001 SCOPE**: `@Retryable` goes on `checkIn()` ONLY. Never on `reserveTickets()` — Redis makes it unsafe.
-2. Concurrent testing requires `CountDownLatch` to ensure all threads fire at exactly the same time — `startLatch.await()` before the inventoryService call.
-3. JaCoCo checks **instruction** coverage, not just line coverage. 80% instruction coverage is the goal.
-4. The `log.error()` in GlobalExceptionHandler catch-all MUST pass `ex` as the second argument — `log.error("...", ex)` — without it, the stack trace never appears in server logs.
-5. `./mvnw verify` (not just `./mvnw test`) runs the JaCoCo check phase. Use verify to confirm the gate.
-6. **NEVER hardcode `localhost:8080`** — all config via environment variables and BusinessConstants only.
+1. **BUG-D16-1 — NO `@Transactional` on concurrency test.** Threads spawned by `ExecutorService` do NOT share the Spring test transaction. Remove it — use `@BeforeEach`/`@AfterEach` instead.
+2. **JaCoCo counter is `INSTRUCTION` — not `LINE`.** These measure different things. `INSTRUCTION` is stricter and more accurate.
+3. **`@MockitoBean` not `@MockBean`** — `@MockBean` is deprecated in Spring Boot 3.4+.
+4. **M-001 SCOPE**: `@Retryable` goes on `checkIn()` ONLY. NEVER on `reserveTickets()` — Redis decrement makes retry unsafe.
+5. **Fix 16B-missing is CRITICAL** — without `BookingControllerTest`, `BookingController` has zero coverage and the JaCoCo gate fails.
+6. `./mvnw verify` (not just `./mvnw test`) runs the JaCoCo check phase.
+7. Every `log.error()` that catches an exception MUST pass `ex` as the last argument.
 
 ---
 
@@ -357,13 +555,13 @@ Git commit: `test: add JaCoCo 80% gate, concurrent booking test, M-001 retry, Vi
 
 | ID | Priority | Item | Status |
 |----|----------|------|--------|
-| BLOCKER-1 | 🔴 P1 | Verify `spring.profiles.active=local` is removed from `application.yaml` — if it is still present, remove it now before Day 18 | 🔲 Verify |
-| HIGH-12 | 🟠 P2 | Run `git ls-files` hygiene check — confirm `Plans/`, `Archive/`, `.env`, `test_output.log`, `.vscode/` are NOT tracked in Git | 🔲 Verify |
+| BLOCKER-1 | 🔴 P1 | Verify `spring.profiles.active=local` removed from `application.yaml` | 🔲 Verify |
+| HIGH-12 | 🟠 P2 | `git ls-files` hygiene check — confirm `Plans/`, `.env`, `target/` NOT tracked | 🔲 Verify |
 
 ### Items Confirmed Out of Scope for Day 16
 
 | Item | Why |
 |------|-----|
-| Vitest test asserting `sessionStorage` usage | `authStore.ts` uses Zustand in-memory — not `sessionStorage`. A test for sessionStorage would be factually wrong |
-| JaCoCo exclusions on service/controller classes | Exclusions are only acceptable for DTOs, entities, and config — not business logic |
-| `@Retryable` on inventory/booking Redis operations | Explicitly forbidden: retrying Redis decrement paths causes invisible inventory undercount |
+| JaCoCo exclusions on service/controller classes | Only DTOs, entities, config — never business logic |
+| `@Retryable` on inventory/booking Redis operations | Explicitly forbidden — causes invisible inventory undercount |
+| sessionStorage direct assertion in Vitest | Test Zustand state API behavior, not browser storage implementation detail |
