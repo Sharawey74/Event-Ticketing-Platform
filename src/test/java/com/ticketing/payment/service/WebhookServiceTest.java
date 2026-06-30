@@ -134,4 +134,95 @@ class WebhookServiceTest {
         verify(bookingRepository, never()).findById(any());
         verify(bookingRepository, never()).save(any());
     }
+
+    @Test
+    @DisplayName("processEvent: checkout.session.expired should transition booking to PAYMENT_FAILED")
+    void processEvent_whenCheckoutExpired_shouldTransitionBookingToPaymentFailed() {
+        Session mockSession = mock(Session.class);
+        when(mockSession.getId()).thenReturn("cs_test_expired_001");
+        when(mockSession.getMetadata()).thenReturn(java.util.Map.of("bookingId", "42"));
+
+        EventDataObjectDeserializer mockDeserializer = mock(EventDataObjectDeserializer.class);
+        when(mockDeserializer.getObject()).thenReturn(Optional.of(mockSession));
+
+        Event stripeEvent = mock(Event.class);
+        when(stripeEvent.getId()).thenReturn("evt_expired_001");
+        when(stripeEvent.getType()).thenReturn("checkout.session.expired");
+        when(stripeEvent.getDataObjectDeserializer()).thenReturn(mockDeserializer);
+
+        when(processedStripeEventRepository.save(any(ProcessedStripeEvent.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(bookingRepository.findById(42L)).thenReturn(Optional.of(paymentPendingBooking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        webhookService.processEvent(stripeEvent);
+
+        verify(bookingRepository).save(any(Booking.class));
+    }
+
+    @Test
+    @DisplayName("processEvent: unhandled event type should log and return without touching booking")
+    void processEvent_whenUnknownEventType_shouldIgnoreWithoutTouchingBooking() {
+        Event stripeEvent = mock(Event.class);
+        when(stripeEvent.getId()).thenReturn("evt_unknown_001");
+        when(stripeEvent.getType()).thenReturn("payment_intent.created");
+
+        when(processedStripeEventRepository.save(any(ProcessedStripeEvent.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        webhookService.processEvent(stripeEvent);
+
+        verify(bookingRepository, never()).findById(any());
+        verify(bookingRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("processEvent: checkout.session.completed when booking already CONFIRMED should skip re-processing")
+    void processEvent_whenBookingAlreadyConfirmed_shouldSkipAndReturn() {
+        paymentPendingBooking.setState(BookingState.CONFIRMED);
+
+        Session mockSession = mock(Session.class);
+        when(mockSession.getId()).thenReturn("cs_test_session_abc123");
+        when(mockSession.getMetadata()).thenReturn(java.util.Map.of("bookingId", "42"));
+        when(mockSession.getPaymentIntent()).thenReturn("pi_test_002");
+
+        EventDataObjectDeserializer mockDeserializer = mock(EventDataObjectDeserializer.class);
+        when(mockDeserializer.getObject()).thenReturn(Optional.of(mockSession));
+
+        Event stripeEvent = mock(Event.class);
+        when(stripeEvent.getId()).thenReturn("evt_confirmed_already");
+        when(stripeEvent.getType()).thenReturn("checkout.session.completed");
+        when(stripeEvent.getDataObjectDeserializer()).thenReturn(mockDeserializer);
+
+        when(processedStripeEventRepository.save(any(ProcessedStripeEvent.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(bookingRepository.findById(42L)).thenReturn(Optional.of(paymentPendingBooking));
+
+        webhookService.processEvent(stripeEvent);
+
+        verify(bookingRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("processEvent: checkout.session.completed missing bookingId in metadata should return early")
+    void processEvent_whenMetadataMissingBookingId_shouldReturnEarly() {
+        Session mockSession = mock(Session.class);
+        when(mockSession.getId()).thenReturn("cs_test_no_meta");
+        when(mockSession.getMetadata()).thenReturn(java.util.Map.of());
+
+        EventDataObjectDeserializer mockDeserializer = mock(EventDataObjectDeserializer.class);
+        when(mockDeserializer.getObject()).thenReturn(Optional.of(mockSession));
+
+        Event stripeEvent = mock(Event.class);
+        when(stripeEvent.getId()).thenReturn("evt_no_bookingid");
+        when(stripeEvent.getType()).thenReturn("checkout.session.completed");
+        when(stripeEvent.getDataObjectDeserializer()).thenReturn(mockDeserializer);
+
+        when(processedStripeEventRepository.save(any(ProcessedStripeEvent.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        webhookService.processEvent(stripeEvent);
+
+        verify(bookingRepository, never()).findById(any());
+    }
 }
