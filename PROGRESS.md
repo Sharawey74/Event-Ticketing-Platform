@@ -28,7 +28,7 @@
 | 15 | Frontend Organizer Dashboard + Core Fixes | ✅ Complete | — | — | Organizer dashboard scaffolded. Core bugs fixed: Stripe webhook 403, Session GSON fallback, QR pub/sub event missing, DTO nesting mismatches |
 | 16A | Platform Stabilization (Day 16A) | ✅ Complete | 116 | 104/104 unit passing ✅ | BookingQueryService (QR gate), AuthService organizer role, register flow, DataSeeder profile fix, env alignment. 12 Docker-only errors (pre-existing). UI sub-session: edit event page created, loading-state bug fixed, hero Sign In hidden when authenticated, GlobalExceptionHandler 405/404/415 handlers added |
 | 16B-CF | Checkout Flow Stabilization (sub-session) | ✅ Complete | 141 | 129/129 unit passing ✅ | 6 root-cause bugs fixed: price sync, resume checkout (Payment upsert fixes UNIQUE violation), PAYMENT_PENDING cancel+auto-expire, stale-closure dialog, explicit replace prompt, Booking History actions. +25 new tests. |
-| 16B | Backend Test Coverage Push (80%+) | 🔄 In Progress | — | — | BookingControllerTest missing; Fix 16B.1 (Lua concurrency) still CRITICAL pending |
+| 16B | Backend Test Coverage Push (80%+) | ✅ Complete | 183 | 183/183 passing ✅ | JaCoCo 81.4% INSTRUCTION coverage — gate passed. Fix 16.1 (Lua concurrency) done. BookingControllerTest (13 tests), +54 new unit tests across 13 new test classes. |
 | 17 | Docker Multi-stage + Compose Polish | ⬜ Not Started | — | — | |
 | 18 | CI/CD Pipeline (GitHub Actions) | ⬜ Not Started | — | — | |
 | 19 | Performance + k6 Load Tests + Swagger/OpenAPI | ⬜ Not Started | — | — | E-002 Swagger annotations, k6 Railway baseline + booking scenarios |
@@ -95,7 +95,7 @@
 | Fix 16B.9 | HIGH | 16B-CF | ✅ | TicketTierSelector: explicit replace-confirmation before overwriting a reservation for a different event |
 | Fix 16B.10 | HIGH | 16B-CF | ✅ | Booking History: Resume+Cancel actions; useEffect countdown fix; muted terminal rows; clear store on mount |
 | Fix 16B.11 | MEDIUM | 16B-CF | ✅ | reservationStore: unitPrice + eventId fields added |
-| Fix 16.1 | CRITICAL | 16B | ⬜ | Concurrency test for reserveSeat() Lua script |
+| Fix 16.1 | CRITICAL | 16B | ✅ | Concurrency test for reserveSeat() Lua script — 100-thread / 50-seat, startLatch, exactly 50 succeed |
 | Fix PW3-1 | CRITICAL | 1/2 | ✅ | Stripe account + CLI installed |
 
 ---
@@ -104,8 +104,8 @@
 
 | Metric | Current | Target |
 | :--- | :--- | :--- |
-| `./mvnw test` passing | 129 / 129 unit passing (12 Docker-only errors, pre-existing) | 100% |
-| Test coverage | N/A (JaCoCo not yet run — run `./mvnw verify -P coverage` for Day 16B) | 80%+ |
+| `./mvnw test` passing | 183 / 183 passing (all tests including Docker-based integration tests) | 100% |
+| Test coverage | 81.4% INSTRUCTION (6731/8268) — JaCoCo gate ✅ PASSED | 80%+ |
 | Active @Autowired usages | 0 | 0 |
 | Active LocalDateTime usages | 0 | 0 |
 | Magic numbers in code | 0 | 0 |

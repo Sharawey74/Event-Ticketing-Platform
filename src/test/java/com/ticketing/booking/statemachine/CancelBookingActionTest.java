@@ -1,0 +1,76 @@
+package com.ticketing.booking.statemachine;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.statemachine.ExtendedState;
+import org.springframework.statemachine.StateContext;
+
+import com.ticketing.booking.model.BookingEvent;
+import com.ticketing.booking.model.BookingState;
+import com.ticketing.notification.event.EmailNotificationEvent;
+import com.ticketing.notification.publisher.BookingEventPublisher;
+
+@ExtendWith(MockitoExtension.class)
+class CancelBookingActionTest {
+
+    @Mock private BookingEventPublisher publisher;
+    @Mock private StateContext<BookingState, BookingEvent> context;
+    @Mock private ExtendedState extendedState;
+
+    @InjectMocks private CancelBookingAction action;
+
+    private Map<Object, Object> variables;
+
+    @BeforeEach
+    void setUp() {
+        variables = new HashMap<>();
+        when(context.getExtendedState()).thenReturn(extendedState);
+        when(extendedState.getVariables()).thenReturn(variables);
+    }
+
+    @Test
+    @DisplayName("execute: should publish EVENT_CANCELLED email notification with booking id")
+    void execute_whenBookingIdAndEmailPresent_shouldPublishCancellationEmail() {
+        variables.put("bookingId", 77L);
+        variables.put("userEmail", "attendee@test.com");
+
+        ArgumentCaptor<EmailNotificationEvent> captor =
+                ArgumentCaptor.forClass(EmailNotificationEvent.class);
+
+        action.execute(context);
+
+        verify(publisher).publishEmailNotification(captor.capture());
+        EmailNotificationEvent event = captor.getValue();
+        assertThat(event.getTo()).isEqualTo("attendee@test.com");
+        assertThat(event.getBody()).contains("77");
+        assertThat(event.getTemplateType()).isEqualTo("EVENT_CANCELLED");
+        assertThat(event.getSubject()).contains("cancelled");
+    }
+
+    @Test
+    @DisplayName("execute: should send to empty string when userEmail is null")
+    void execute_whenUserEmailNull_shouldSendToEmptyString() {
+        variables.put("bookingId", 5L);
+
+        ArgumentCaptor<EmailNotificationEvent> captor =
+                ArgumentCaptor.forClass(EmailNotificationEvent.class);
+
+        action.execute(context);
+
+        verify(publisher).publishEmailNotification(captor.capture());
+        assertThat(captor.getValue().getTo()).isEmpty();
+    }
+}
