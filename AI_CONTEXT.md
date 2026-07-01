@@ -1,10 +1,10 @@
 # AI CONTEXT SNAPSHOT — Event Ticketing Platform
 
-## Last Updated: Day 17 (2026-07-01) — Docker Multi-stage + Compose Polish + Security Headers: full stack verified via docker-compose up -d, all 7 containers healthy
+## Last Updated: Day 18 (2026-07-02) — CI/CD Pipeline + Production Deploy to Railway: backend deployed on Railway (prod profile active, Flyway migrated against real Postgres, app fully started), frontend live on Vercel. RabbitMQ healthcheck fix (management.health.rabbit.enabled: false) applied locally, pending push/deploy confirmation.
 
-## Branch: day-17-docker-compose-polish
+## Branch: main (day-18-ci-cd-pipeline.md merged via PR #23)
 
-## Test Status: 183/183 ALL passing (unchanged from Day 16B — Day 17 is infra/Docker/security-headers only, no test changes)
+## Test Status: 183/183 ALL passing (unchanged from Day 16B — Day 18 is CI/CD/deploy-config only, no test changes)
 
 ## 1. NON-NEGOTIABLE RULES (From instructions.txt + Overlay)
 
@@ -178,6 +178,11 @@ class YourControllerTest {
 | **E-009** | X-Frame-Options: DENY + HSTS (1yr, includeSubDomains) — backend, no CSP (breaks Swagger UI) | Security | ✅ Applied | SecurityConfig.java |
 | **E-009F** | CSP + X-Frame-Options + X-Content-Type-Options — frontend, connect-src derived from NEXT_PUBLIC_API_URL, no `*.railway.app` (deferred to Day 21) | Security | ✅ Applied | next.config.ts |
 | **17-docker** | Multi-stage Dockerfile (JDK builder → JRE runtime, non-root `appuser`, 619MB), `.dockerignore`, `app` service wired into compose | Infra | ✅ Applied | Dockerfile, .dockerignore, docker-compose.yml |
+| **E-006** (Day 18) | Complete `application-prod.yml` — real property names (`jwt.secret`, `frontend.url`, `stripe.*`, `rabbitmq.uri`), no fallback secrets | Config | ✅ Applied | application-prod.yml |
+| **E-003** (Day 18) | CORS startup guard — logs resolved `frontend.url`, refuses to start on wildcard origin | Security | ✅ Applied | WebConfig.java |
+| **18-mvnw** | `RUN chmod +x mvnw` in Dockerfile + git executable-bit fix — Railway build was failing with `Permission denied` (exit 126) | Infra | ✅ Applied | Dockerfile, mvnw |
+| **18-profile** | `SPRING_PROFILES_ACTIVE=prod` added to Railway variables — app was silently running under `local` profile (wrong datasource) with it missing | Infra | ✅ Applied | Railway dashboard (not in-repo) |
+| **18-health** | `management.health.rabbit.enabled: false` — RabbitMQ (CloudAMQP) connectivity issue was failing `/actuator/health` and blocking Railway deploys even though the app itself was fully healthy | Infra | ✅ Applied (local, pending push) | application-prod.yml |
 
 ---
 
@@ -198,6 +203,7 @@ class YourControllerTest {
 | 16B-CF | Checkout Flow Stabilization (sub-session) | ✅ Complete | 129/129 unit |
 | 16B | Backend Test Coverage Push (80%+) | ✅ Complete | 183/183 all passing — 81.4% INSTRUCTION (JaCoCo gate ✅) |
 | 17 | Docker Multi-stage + Compose Polish + Security Headers | ✅ Complete | 183/183 unchanged — Docker/infra day, verified via docker-compose up -d (all 7 containers healthy) |
+| 18 | CI/CD Pipeline + Production Deploy to Railway | ✅ Complete | 183/183 unchanged — CI/CD + deploy day. Backend deployed live on Railway (Postgres+Redis on Railway, RabbitMQ on CloudAMQP), frontend live on Vercel. See Section 10 for full deploy debugging log. |
 
 ---
 
@@ -353,9 +359,40 @@ This repository has two deployable parts:
 
 ---
 
-## 10. NEXT SESSION START — DAY 18
+## 10. NEXT SESSION START — DAY 19
 
-**Current Branch:** `day-17-docker-compose-polish`
+**Current Branch:** `main` (day-18-ci-cd-pipeline.md merged via PR #23)
+
+**Completed in Day 18 (CI/CD Pipeline + Production Deploy to Railway, 2026-07-02):**
+
+- `application-prod.yml` created: complete prod config using the app's actual property names
+  (`jwt.secret`, `frontend.url`, `stripe.*`, `rabbitmq.uri`) — the Day 18 session template used
+  wrong prefixes (`app.jwt.*`) that would have silently failed to bind; corrected against the real
+  `@Value` annotations in `JwtService`/`WebConfig`/`StripeConfig`.
+- `WebConfig.java`: `@PostConstruct` CORS guard — logs resolved `frontend.url`, throws
+  `IllegalStateException` on a wildcard origin (Fix E-003).
+- `.github/workflows/main.yml` created: CI-only pipeline (`backend-test`, `frontend-build`,
+  `repo-hygiene`) — no deploy jobs, since Railway and Vercel both auto-deploy natively via their
+  own GitHub integrations (pivoted away from the session template's `railway up` CLI + token
+  approach after Railway blocked token creation on an unverified trial account).
+- `Dockerfile` + `mvnw`: fixed `Permission denied` (exit 126) on Railway builds —
+  `RUN chmod +x mvnw` added, plus corrected the git executable-bit metadata.
+- Untracked `Plans/` (40 files) + `test_output.log` from `main` — were committed before
+  `.gitignore` caught them; files remain on disk, no history rewritten.
+- **Full production deploy achieved on Railway:** RabbitMQ hosted on CloudAMQP (Railway trial's
+  resource cap blocked provisioning it directly), `SPRING_PROFILES_ACTIVE=prod` added (was the
+  single missing variable keeping the app on the wrong `local` profile/datasource), Flyway
+  successfully migrated all 12 versions against the real Railway Postgres, app fully started.
+  Final blocker (`management.health.rabbit.enabled: false` — RabbitMQ health-indicator was
+  failing `/actuator/health` even though the app itself was fully healthy) applied locally,
+  pending push + deploy confirmation next session.
+- Frontend deployed live on Vercel (`event-ticketing-platform-nu.vercel.app`); custom domain
+  `eventora.app` DNS verification still pending (not blocking).
+- Full debugging narrative: `.claude/day-18-walkthrough.md`.
+
+**First task for next session — Day 19:** Confirm the RabbitMQ healthcheck fix deploys clean on
+Railway (`/actuator/health` → UP), then start Performance + k6 Load Tests + Swagger/OpenAPI — see
+`Plans/session-prompts/day-19-*.md` for the session prompt.
 
 **Completed in Day 17 (Docker Multi-stage + Compose Polish + Security Headers, 2026-07-01):**
 
