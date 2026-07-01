@@ -1,0 +1,35 @@
+# Secrets — never copy into image
+.env
+.env.*
+!.env.example
+
+# Build artifacts — multi-stage build produces its own; these are stale
+target/
+
+# Project documentation and plans — not needed in production image
+Plans/
+Archive/
+docs/
+
+# Git history
+.git
+.gitignore
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# GitHub Actions — not needed in container
+.github/
+
+# Claude Code project files — not needed in image
+.claude/
+
+# Logs
+*.log
+logs/
+
+# Frontend — separate deployment target (Vercel), not bundled with backend
+frontend/
