@@ -29,7 +29,7 @@
 | 16A | Platform Stabilization (Day 16A) | ✅ Complete | 116 | 104/104 unit passing ✅ | BookingQueryService (QR gate), AuthService organizer role, register flow, DataSeeder profile fix, env alignment. 12 Docker-only errors (pre-existing). UI sub-session: edit event page created, loading-state bug fixed, hero Sign In hidden when authenticated, GlobalExceptionHandler 405/404/415 handlers added |
 | 16B-CF | Checkout Flow Stabilization (sub-session) | ✅ Complete | 141 | 129/129 unit passing ✅ | 6 root-cause bugs fixed: price sync, resume checkout (Payment upsert fixes UNIQUE violation), PAYMENT_PENDING cancel+auto-expire, stale-closure dialog, explicit replace prompt, Booking History actions. +25 new tests. |
 | 16B | Backend Test Coverage Push (80%+) | ✅ Complete | 183 | 183/183 passing ✅ | JaCoCo 81.4% INSTRUCTION coverage — gate passed. Fix 16.1 (Lua concurrency) done. BookingControllerTest (13 tests), +54 new unit tests across 13 new test classes. |
-| 17 | Docker Multi-stage + Compose Polish | ⬜ Not Started | — | — | |
+| 17 | Docker Multi-stage + Compose Polish | ✅ Complete | — | N/A (Docker verified, not unit-tested) | Multi-stage Dockerfile (JDK builder → JRE runtime, non-root `appuser`, 619MB), `.dockerignore`, `app` service wired into `docker-compose.yml` with `service_healthy` deps (Fix 7.2), E-009 (X-Frame-Options + HSTS on backend), E-009F (CSP + X-Frame-Options + X-Content-Type-Options on frontend, no Railway wildcard). Full stack verified via `docker-compose up -d`: all 7 containers healthy, `/actuator/health` UP, seed data present, headers confirmed on both backend and frontend. |
 | 18 | CI/CD Pipeline (GitHub Actions) | ⬜ Not Started | — | — | |
 | 19 | Performance + k6 Load Tests + Swagger/OpenAPI | ⬜ Not Started | — | — | E-002 Swagger annotations, k6 Railway baseline + booking scenarios |
 | 20 | Code Quality + Security Hardening (M-002, M-004) | ⬜ Not Started | — | — | Bucket4j rate limiting, JWT denylist, CC-1/CC-2 final audit |
@@ -97,6 +97,8 @@
 | Fix 16B.11 | MEDIUM | 16B-CF | ✅ | reservationStore: unitPrice + eventId fields added |
 | Fix 16.1 | CRITICAL | 16B | ✅ | Concurrency test for reserveSeat() Lua script — 100-thread / 50-seat, startLatch, exactly 50 succeed |
 | Fix PW3-1 | CRITICAL | 1/2 | ✅ | Stripe account + CLI installed |
+| Fix E-009 | SECURITY | 17 | ✅ | X-Frame-Options: DENY + HSTS (1yr, includeSubDomains) added to SecurityConfig.java — no CSP (backend is JSON+Swagger only) |
+| Fix E-009F | SECURITY | 17 | ✅ | CSP + X-Frame-Options + X-Content-Type-Options added to next.config.ts — connect-src derived from NEXT_PUBLIC_API_URL, no *.railway.app wildcard (deferred to Day 21) |
 
 ---
 

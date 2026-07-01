@@ -1,16 +1,25 @@
+# ============================================================
+# LOCAL DEVELOPMENT ONLY — Do NOT use in production
+# For Railway deployment, environment variables are set via the
+# Railway dashboard. This file starts the full local stack, with
+# ${VAR:-default} fallbacks so `docker-compose up` works out of
+# the box without a custom .env. Override anything sensitive via
+# a local .env file (gitignored) for anything beyond throwaway use.
+# ============================================================
+
 services:
   postgres:
     image: postgres:17
     environment:
-      POSTGRES_DB: ticketing_db
-      POSTGRES_USER: ticketing
-      POSTGRES_PASSWORD: ticketing
+      POSTGRES_DB: ${POSTGRES_DB:-ticketing_db}
+      POSTGRES_USER: ${POSTGRES_USER:-ticketing}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ticketing}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ticketing -d ticketing_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ticketing} -d ${POSTGRES_DB:-ticketing_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -34,8 +43,8 @@ services:
       - "5672:5672"
       - "15672:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: ticketing
-      RABBITMQ_DEFAULT_PASS: ticketing
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-ticketing}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-ticketing}
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -69,6 +78,44 @@ services:
     ports:
       - "1025:1025"
       - "8025:8025"
+
+  app:
+    build: .
+    image: ticketing-backend:local
+    ports:
+      - "${SERVER_PORT:-8088}:${SERVER_PORT:-8088}"
+    environment:
+      SERVER_PORT: ${SERVER_PORT:-8088}
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ticketing_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-ticketing}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-ticketing}   # from .env, never hardcoded
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-ticketing}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-ticketing}     # from .env, never hardcoded
+      SPRING_MAIL_HOST: mailhog
+      SPRING_MAIL_PORT: 1025
+      JWT_SECRET: ${JWT_SECRET:-ZmFrZS1qc3ctc2VjcmV0LWtleS1mb3ItbG9jYWwtZGV2LTAwMDAwMDAwMDA=}   # from .env
+      STRIPE_PUBLIC_KEY: ${STRIPE_PUBLIC_KEY:-pk_test_placeholder}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder}          # from .env
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}    # from .env
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:${SERVER_PORT:-8088}/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
 volumes:
   pgdata:

@@ -36,6 +36,14 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .headers(headers -> headers
+                        .frameOptions(frame -> frame.deny())       // X-Frame-Options: DENY — prevents clickjacking
+                        .httpStrictTransportSecurity(hsts -> hsts  // HSTS — forces HTTPS in production (HTTPS-only header)
+                                .includeSubDomains(true)
+                                .maxAgeInSeconds(31536000)))
+                // CSP is NOT added here — backend serves JSON + Swagger UI; CSP belongs
+                // on the Next.js frontend only (next.config.ts). Adding it here breaks
+                // Swagger UI's inline scripts.
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**", "/api/auth/**", "/actuator/**", "/api/v1/payments/webhook").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/events", "/api/events/**").permitAll()
