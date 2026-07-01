@@ -8,6 +8,7 @@ WORKDIR /app
 # If only src/ changes, Docker reuses the dependency download layer.
 COPY .mvn/ .mvn
 COPY mvnw pom.xml ./
+RUN chmod +x mvnw
 RUN ./mvnw dependency:go-offline -q
 
 # Copy source after dependencies are cached
