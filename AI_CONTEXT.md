@@ -1,10 +1,10 @@
 # AI CONTEXT SNAPSHOT — Event Ticketing Platform
 
-## Last Updated: Day 16B (2026-06-30) — Backend Test Coverage Push: 81.4% INSTRUCTION coverage (JaCoCo gate ✅ PASSED), 183/183 tests passing
+## Last Updated: Day 17 (2026-07-01) — Docker Multi-stage + Compose Polish + Security Headers: full stack verified via docker-compose up -d, all 7 containers healthy
 
-## Branch: feat/platform-enhancements
+## Branch: day-17-docker-compose-polish
 
-## Test Status: 183/183 ALL passing (includes Docker-based Testcontainers integration tests — requires Docker Desktop running)
+## Test Status: 183/183 ALL passing (unchanged from Day 16B — Day 17 is infra/Docker/security-headers only, no test changes)
 
 ## 1. NON-NEGOTIABLE RULES (From instructions.txt + Overlay)
 
@@ -174,6 +174,10 @@ class YourControllerTest {
 | **16B.1** | Test `reserveSeat()` Lua Script explicitly (concurrency test) | Tests | ✅ Applied | InventoryServiceConcurrencyTest.java — 100-thread/50-seat startLatch test |
 | **16B-missing** | BookingControllerTest — 13 tests covering all booking endpoints + @PreAuthorize guards | Tests | ✅ Applied | BookingControllerTest.java |
 | **16B-coverage** | Backend Test Coverage Push: +54 new unit tests across 13 new test classes | Tests | ✅ Applied | 81.4% INSTRUCTION coverage, JaCoCo gate PASSED |
+| **7.2** (Day 17) | `app` service `depends_on: condition: service_healthy` for postgres/redis/rabbitmq | Infra | ✅ Applied | docker-compose.yml |
+| **E-009** | X-Frame-Options: DENY + HSTS (1yr, includeSubDomains) — backend, no CSP (breaks Swagger UI) | Security | ✅ Applied | SecurityConfig.java |
+| **E-009F** | CSP + X-Frame-Options + X-Content-Type-Options — frontend, connect-src derived from NEXT_PUBLIC_API_URL, no `*.railway.app` (deferred to Day 21) | Security | ✅ Applied | next.config.ts |
+| **17-docker** | Multi-stage Dockerfile (JDK builder → JRE runtime, non-root `appuser`, 619MB), `.dockerignore`, `app` service wired into compose | Infra | ✅ Applied | Dockerfile, .dockerignore, docker-compose.yml |
 
 ---
 
@@ -193,6 +197,7 @@ class YourControllerTest {
 | 16A | Platform Stabilization | ✅ Complete | 104/104 unit |
 | 16B-CF | Checkout Flow Stabilization (sub-session) | ✅ Complete | 129/129 unit |
 | 16B | Backend Test Coverage Push (80%+) | ✅ Complete | 183/183 all passing — 81.4% INSTRUCTION (JaCoCo gate ✅) |
+| 17 | Docker Multi-stage + Compose Polish + Security Headers | ✅ Complete | 183/183 unchanged — Docker/infra day, verified via docker-compose up -d (all 7 containers healthy) |
 
 ---
 
@@ -348,9 +353,21 @@ This repository has two deployable parts:
 
 ---
 
-## 10. NEXT SESSION START — DAY 16B (REMAINING)
+## 10. NEXT SESSION START — DAY 18
 
-**Current Branch:** `feat/platform-enhancements`
+**Current Branch:** `day-17-docker-compose-polish`
+
+**Completed in Day 17 (Docker Multi-stage + Compose Polish + Security Headers, 2026-07-01):**
+
+- `.dockerignore` created (excludes `.env`, `target/`, `Plans/`, `.git`, `.claude/`, `frontend/`)
+- `Dockerfile`: multi-stage build (`eclipse-temurin:21-jdk` builder → `eclipse-temurin:21-jre` runtime), non-root `appuser`, `EXPOSE 8088` (matches real `server.port`), `-XX:MaxRAMPercentage=75.0` — 619MB final image
+- `docker-compose.yml`: added `app` service with `depends_on: condition: service_healthy` for postgres/redis/rabbitmq (Fix 7.2), `image: ticketing-backend:local` pinned (prevents Compose's default `<project>-<service>:latest` duplicate-tag naming), postgres/rabbitmq credentials parameterized via `${VAR:-default}`, `SPRING_MAIL_HOST=mailhog` added (gap in the original session template — mail would've silently failed otherwise), "LOCAL DEVELOPMENT ONLY" comment block added
+- `.env.example` (root): added `POSTGRES_DB`/`POSTGRES_USER`/`POSTGRES_PASSWORD`/`RABBITMQ_USER`/`RABBITMQ_PASSWORD`/`SERVER_PORT`
+- `SecurityConfig.java`: `.headers(...)` with `frameOptions().deny()` (X-Frame-Options: DENY) + `httpStrictTransportSecurity()` (1yr, includeSubDomains) — Fix E-009, no CSP (backend is JSON+Swagger only)
+- `frontend/next.config.ts`: CSP + X-Frame-Options + X-Content-Type-Options via `headers()` — Fix E-009F. `connect-src` derived from `NEXT_PUBLIC_API_URL` at build/serve time (critical fix over the naive session-prompt template — without this, every API call from the frontend would be CSP-blocked since the backend is cross-origin at `:8088` vs the frontend's `:3000`). No `*.railway.app` wildcard (deferred to Day 21).
+- Full stack verified end-to-end: `docker-compose up -d` (no `--build` — reused existing image), all 7 containers healthy, `/actuator/health` → `UP`, seed data present, `X-Frame-Options: DENY` confirmed on backend, all three frontend headers confirmed via `npm run dev` + `curl -I localhost:3000`
+
+**First task for next session — Day 18:** CI/CD Pipeline (GitHub Actions) — see `Plans/session-prompts/day-18-*.md` for the session prompt.
 
 **Completed in Day 16A (all sub-sessions):**
 
@@ -384,9 +401,4 @@ This repository has two deployable parts:
 - reservationStore: added `unitPrice` + `eventId` fields
 - Tests: 129/129 unit passing (+25 new tests: BookingServiceTest, ReservationExpirationJobTest, GlobalExceptionHandlerTest, PaymentServiceTest updates)
 
-**First task for next session — Day 16B (remaining):** Backend Test Coverage Push (80%+)
-
-- Run `./mvnw verify -P coverage` to get baseline JaCoCo report
-- Add `BookingControllerTest` (9 tests — controller-layer security not yet covered)
-- Write `reserveSeat()` Lua script concurrency test (Fix 16B.1 — CRITICAL, still pending)
-- Verify 80%+ line coverage in JaCoCo HTML report (`target/site/jacoco/index.html`)
+**Completed in Day 16B (Backend Test Coverage Push, 2026-06-30):** 81.4% INSTRUCTION coverage, JaCoCo gate passed, 183/183 tests passing — see Section 4 rows `16B.1`, `16B-missing`, `16B-coverage` for details.
