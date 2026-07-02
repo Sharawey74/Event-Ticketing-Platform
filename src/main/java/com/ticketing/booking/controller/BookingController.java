@@ -25,6 +25,8 @@ import com.ticketing.payment.dto.RefundResponse;
 import com.ticketing.payment.service.RefundService;
 import com.ticketing.user.service.CustomUserDetails;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +46,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequestMapping("/api/v1/bookings")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Bookings")
 public class BookingController {
 
     private final BookingService bookingService;
@@ -57,6 +60,11 @@ public class BookingController {
      * Self-cancel a RESERVED booking. Only the owner may cancel, and only from RESERVED state.
      * Releases inventory back to Redis and the DB.
      */
+    @Operation(summary = "Cancel a booking", description = "Self-cancel a RESERVED or PAYMENT_PENDING booking owned by the caller. Releases inventory back to Redis and the DB.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Booking cancelled")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Not authenticated")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Booking not found")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Booking is not in a cancellable state")
     @DeleteMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> cancelBooking(
@@ -71,6 +79,12 @@ public class BookingController {
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
+    @Operation(summary = "Check in an attendee", description = "ORGANIZER/ADMIN only. Transitions a CONFIRMED booking to ATTENDED via the booking state machine.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Attendee checked in")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Not authenticated")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Caller is not an ORGANIZER or ADMIN")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Booking not found")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Booking is not in a check-in-eligible state")
     @PostMapping("/{bookingId}/check-in")
     @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
     public ResponseEntity<Void> checkIn(@PathVariable Long bookingId) {
@@ -86,6 +100,11 @@ public class BookingController {
      *
      * Ownership validated inside RefundService.
      */
+    @Operation(summary = "Request a refund", description = "Three-tier refund window: >=7 days before event = full refund, 3-6 days = 50% partial, <3 days = denied.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Refund processed or denial recorded")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Not authenticated")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Caller does not own this booking")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Booking not found")
     @PostMapping("/{id}/refunds")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<RefundResponse>> requestRefund(
@@ -100,6 +119,11 @@ public class BookingController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "Reserve tickets", description = "Creates a RESERVED booking and decrements inventory atomically via a Redis Lua floor guard. Hold expires after RESERVATION_TTL_SECONDS.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Booking reserved")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Not authenticated")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Event or ticket tier not found")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Event not published, or requested quantity exceeds available inventory")
     @PostMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<BookingResponse>> createBooking(
@@ -136,6 +160,9 @@ public class BookingController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "Get my bookings", description = "Returns all bookings owned by the authenticated user (flat response shape).")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "List of bookings")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Not authenticated")
     @GetMapping("/my")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<BookingResponse>>> getMyBookings(
@@ -150,6 +177,11 @@ public class BookingController {
      * booking state is CONFIRMED or ATTENDED. All other states return an empty ticket list.
      * State gate is enforced in BookingQueryService.
      */
+    @Operation(summary = "Get booking details", description = "Returns full booking detail including tickets/QR codes, which are only populated when the booking state is CONFIRMED or ATTENDED.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Booking detail")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Not authenticated")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Caller does not own this booking")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Booking not found")
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<BookingDetailsResponse>> getBookingById(

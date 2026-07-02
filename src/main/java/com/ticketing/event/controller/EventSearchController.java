@@ -16,6 +16,8 @@ import com.ticketing.common.util.BusinessConstants;
 import com.ticketing.event.dto.EventResponse;
 import com.ticketing.event.service.EventSearchService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 
@@ -23,12 +25,15 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/api/search/events")
 @RequiredArgsConstructor
 @Validated
+@Tag(name = "Search")
 public class EventSearchController {
 
     private static final Logger logger = LoggerFactory.getLogger(EventSearchController.class);
 
     private final EventSearchService eventSearchService;
 
+    @Operation(summary = "Search events", description = "Publicly viewable paginated event search by free-text query, category, and city.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Page of matching events")
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<EventResponse>>> searchEvents(
             @RequestParam(value = "q", required = false)

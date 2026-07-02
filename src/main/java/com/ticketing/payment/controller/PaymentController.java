@@ -13,6 +13,8 @@ import com.ticketing.user.service.CustomUserDetails;
 import com.ticketing.payment.dto.CheckoutSessionResponse;
 import com.ticketing.payment.service.PaymentService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -24,6 +26,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequestMapping("/api/bookings")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Payments")
 public class PaymentController {
 
     private final PaymentService paymentService;
@@ -35,6 +38,12 @@ public class PaymentController {
      *
      * @return CheckoutSessionResponse containing the Stripe-hosted checkout URL.
      */
+    @Operation(summary = "Create a Stripe checkout session", description = "Creates or resumes a Stripe Checkout Session for a RESERVED/PAYMENT_PENDING booking owned by the caller.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Checkout session created — response contains the Stripe-hosted checkout URL")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Not authenticated")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Caller does not own this booking")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Booking not found")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Booking is not in a checkout-eligible state")
     @PostMapping("/{id}/checkout")
     public ResponseEntity<ApiResponse<CheckoutSessionResponse>> createCheckoutSession(
             @PathVariable Long id,

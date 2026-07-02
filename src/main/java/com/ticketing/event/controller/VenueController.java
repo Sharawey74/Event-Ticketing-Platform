@@ -21,6 +21,8 @@ import com.ticketing.event.dto.CreateVenueRequest;
 import com.ticketing.event.dto.VenueResponse;
 import com.ticketing.event.service.VenueService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -28,12 +30,17 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/api/venues")
 @Validated
 @RequiredArgsConstructor
+@Tag(name = "Venues")
 public class VenueController {
 
     private static final Logger logger = LoggerFactory.getLogger(VenueController.class);
 
     private final VenueService venueService;
 
+    @Operation(summary = "Create a venue", description = "ADMIN only.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Venue created")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Not authenticated")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Caller is not an ADMIN")
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<VenueResponse>> createVenue(@Valid @RequestBody CreateVenueRequest request) {
@@ -42,6 +49,9 @@ public class VenueController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "Get venue details", description = "Publicly viewable.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Venue found")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Venue not found")
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<VenueResponse>> getVenue(@PathVariable Long id) {
         VenueResponse response = venueService.getVenueById(id);
@@ -49,6 +59,8 @@ public class VenueController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "List venues", description = "Publicly viewable paginated venue list.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Page of venues")
     @GetMapping
     public ResponseEntity<ApiResponse<Page<VenueResponse>>> listVenues(Pageable pageable) {
         Page<VenueResponse> response = venueService.listVenues(pageable);
@@ -56,6 +68,11 @@ public class VenueController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "Update a venue", description = "ADMIN only.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Venue updated")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Not authenticated")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Caller is not an ADMIN")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Venue not found")
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<VenueResponse>> updateVenue(
@@ -66,6 +83,11 @@ public class VenueController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "Delete a venue", description = "ADMIN only.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Venue deleted")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Not authenticated")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Caller is not an ADMIN")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Venue not found")
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteVenue(@PathVariable Long id) {

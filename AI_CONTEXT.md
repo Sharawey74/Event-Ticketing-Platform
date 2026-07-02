@@ -1,10 +1,10 @@
 # AI CONTEXT SNAPSHOT — Event Ticketing Platform
 
-## Last Updated: Day 18 (2026-07-02) — CI/CD Pipeline + Production Deploy to Railway: backend deployed on Railway (prod profile active, Flyway migrated against real Postgres, app fully started), frontend live on Vercel. RabbitMQ healthcheck fix (management.health.rabbit.enabled: false) applied locally, pending push/deploy confirmation.
+## Last Updated: Day 19 (2026-07-02) — Production Deploy Stabilization + Swagger/OpenAPI + k6 Load Test Scripts: a live production outage was fully root-caused and fixed (Rabbit/Mail health indicators, RabbitMQ localhost fallback, auto-recovery hang, and a server-port mismatch that was the final blocker) — backend confirmed live and healthy on Railway via direct curl to /actuator/health and /api/events. Then springdoc-openapi was wired in with all 9 controllers annotated, and the k6 load test scripts were fixed/extended (results still pending a live Railway run).
 
-## Branch: main (day-18-ci-cd-pipeline.md merged via PR #23)
+## Branch: day-19-performance-load-testing (local — 6 new commits from this session, not yet pushed; the earlier production-stabilization fixes for Rabbit/Mail health + RabbitConnectionConfig + auto-recovery were already merged to main via PR #26/#27 before this session's Swagger/k6 work began)
 
-## Test Status: 183/183 ALL passing (unchanged from Day 16B — Day 18 is CI/CD/deploy-config only, no test changes)
+## Test Status: 183/183 ALL passing (unchanged from Day 16B — Day 19 is production-config/tooling/docs only, no test changes; no TDD gate applies)
 
 ## 1. NON-NEGOTIABLE RULES (From instructions.txt + Overlay)
 
@@ -182,7 +182,13 @@ class YourControllerTest {
 | **E-003** (Day 18) | CORS startup guard — logs resolved `frontend.url`, refuses to start on wildcard origin | Security | ✅ Applied | WebConfig.java |
 | **18-mvnw** | `RUN chmod +x mvnw` in Dockerfile + git executable-bit fix — Railway build was failing with `Permission denied` (exit 126) | Infra | ✅ Applied | Dockerfile, mvnw |
 | **18-profile** | `SPRING_PROFILES_ACTIVE=prod` added to Railway variables — app was silently running under `local` profile (wrong datasource) with it missing | Infra | ✅ Applied | Railway dashboard (not in-repo) |
-| **18-health** | `management.health.rabbit.enabled: false` — RabbitMQ (CloudAMQP) connectivity issue was failing `/actuator/health` and blocking Railway deploys even though the app itself was fully healthy | Infra | ✅ Applied (local, pending push) | application-prod.yml |
+| **18-health** | `management.health.rabbit.enabled: false` — RabbitMQ (CloudAMQP) connectivity issue was failing `/actuator/health` and blocking Railway deploys even though the app itself was fully healthy | Infra | ✅ Confirmed live on Railway | application-prod.yml |
+| **19-mail** | `management.health.mail.enabled: false` — SMTP is not configured in production; the Mail health indicator was independently failing `/actuator/health` alongside the Rabbit indicator | Infra | ✅ Applied | application-prod.yml |
+| **19-rabbitconn** | `RabbitConnectionConfig` — explicit connection factory built from `spring.rabbitmq.uri`, fails fast on a blank URI instead of silently defaulting to `localhost:5672` | Infra | ✅ Applied | RabbitConnectionConfig.java |
+| **19-autorecovery** | `setAutomaticRecoveryEnabled(false)` + `setTopologyRecoveryEnabled(false)` on the hand-built connection factory — the raw RabbitMQ client's own recovery was conflicting with Spring AMQP's, causing the app to go fully unresponsive ~15-20 minutes after a healthy start | Infra | ✅ Applied | RabbitConnectionConfig.java |
+| **19-port** | `server.port` hardcoded to `8088` (was `${PORT:8088}`) — Railway's injected `PORT` (8080) was overriding it, so the app listened on 8080 while the proxy (routed to the Dockerfile's `EXPOSE 8088`) got connection refused on every request | Infra | ✅ Applied | application-prod.yml |
+| **E-002** | springdoc-openapi 2.8.17 wired in via `OpenApiConfig`; all 9 REST controllers annotated with `@Tag`/`@Operation`/`@ApiResponse`; `StripeWebhookController` marked `@Hidden`; `SecurityConfig` permits `/swagger-ui/**`, `/v3/api-docs/**` | Docs | ✅ Applied | OpenApiConfig.java, SecurityConfig.java, all 9 controllers |
+| **19-k6** | `load-test.js` port/path/`body.data.content` bugs fixed; `booking-reservation.js` + `inventory-pressure.js` added; `PERFORMANCE.md` created with setup guide and placeholder result tables | Tests | ✅ Applied (scripts ready, Railway run pending) | src/test/k6/*.js, PERFORMANCE.md |
 
 ---
 
@@ -204,6 +210,7 @@ class YourControllerTest {
 | 16B | Backend Test Coverage Push (80%+) | ✅ Complete | 183/183 all passing — 81.4% INSTRUCTION (JaCoCo gate ✅) |
 | 17 | Docker Multi-stage + Compose Polish + Security Headers | ✅ Complete | 183/183 unchanged — Docker/infra day, verified via docker-compose up -d (all 7 containers healthy) |
 | 18 | CI/CD Pipeline + Production Deploy to Railway | ✅ Complete | 183/183 unchanged — CI/CD + deploy day. Backend deployed live on Railway (Postgres+Redis on Railway, RabbitMQ on CloudAMQP), frontend live on Vercel. See Section 10 for full deploy debugging log. |
+| 19 | Production Deploy Stabilization + Swagger/OpenAPI + k6 Load Tests | ✅ Complete | 183/183 unchanged — production outage fully root-caused and fixed (Rabbit/Mail health indicators, RabbitMQ localhost fallback + auto-recovery hang, server-port mismatch), backend confirmed live and healthy on Railway. springdoc-openapi wired in with all 9 controllers annotated; k6 scripts fixed/extended, results pending a live Railway run. See Section 10 for full narrative. |
 
 ---
 
@@ -359,9 +366,31 @@ This repository has two deployable parts:
 
 ---
 
-## 10. NEXT SESSION START — DAY 19
+## 10. NEXT SESSION START — DAY 20
 
-**Current Branch:** `main` (day-18-ci-cd-pipeline.md merged via PR #23)
+**Current Branch:** `day-19-performance-load-testing` (local, 6 new commits — not yet pushed/merged)
+
+**Completed in Day 19 (Production Deploy Stabilization + Swagger/OpenAPI + k6 Load Tests, 2026-07-02):**
+
+- **Production outage fully root-caused and fixed**, in the order discovered:
+  1. `management.health.rabbit.enabled: false` + `management.health.mail.enabled: false` — Spring Boot's actuator health check was rolling RabbitMQ and SMTP connectivity into the overall `/actuator/health` status Railway uses to gate deploys, even though neither blocks core web traffic.
+  2. `RabbitConnectionConfig` — Spring Boot's auto-configured RabbitMQ connection was silently defaulting to `localhost:5672` in production despite `RABBITMQ_URL` being confirmed correct inside the running container; replaced with a hand-built connection factory that reads the URI directly and fails fast if it's blank.
+  3. `setAutomaticRecoveryEnabled(false)` + `setTopologyRecoveryEnabled(false)` on that same factory — after fix 2 deployed, the app started healthy but went fully unresponsive ~15-20 minutes later; root cause was the raw RabbitMQ client's own auto-recovery conflicting with Spring AMQP's separate recovery system (a documented gotcha Spring Boot's own auto-configuration normally avoids, which the manual factory had been missing).
+  4. `server.port` hardcoded to `8088` in `application-prod.yml` (was `${PORT:8088}`) — after fix 3 deployed, the app started fully healthy and stayed healthy, but was still fully unreachable from the public internet (502 "connection refused"). Root cause: Railway's injected `PORT` environment variable resolved to `8080`, which won over the `8088` fallback, so the app was listening on 8080 while Railway's proxy — configured against the Dockerfile's `EXPOSE 8088` — kept knocking on 8088.
+  - **Backend confirmed live and healthy** via direct `curl` to `https://backend-production-8daea.up.railway.app/actuator/health` (200, `{"status":"UP"}`) and `/api/events` (200) after fix 4 deployed.
+- `pom.xml`: added `springdoc-openapi-starter-webmvc-ui:2.8.17` (pinned specifically — earlier 2.x releases have a confirmed `NoSuchMethodError` incompatibility with Spring Boot 3.5.x).
+- `OpenApiConfig.java` (new): registers API title/description and a `bearerAuth` JWT security scheme for Swagger UI's Authorize button.
+- `SecurityConfig.java`: permits `/swagger-ui/**`, `/swagger-ui.html`, `/v3/api-docs/**`, `/v3/api-docs.yaml`.
+- All 9 REST controllers annotated with `@Tag`/`@Operation`/`@ApiResponse` (realistic 401/403/404/409 codes matching `GlobalExceptionHandler`'s actual mappings); `StripeWebhookController` marked `@Hidden` (Stripe-only callback, not client-facing). Verified live: booted the app locally, confirmed all 8 tags render in `/v3/api-docs`, webhook path correctly absent, Swagger UI reachable.
+- `src/test/k6/load-test.js`: fixed wrong port (8080→8088), wrong paths (`/events`→`/api/events`), and a silent bug reading `body.content` instead of `body.data.content` that meant the event-detail sub-check never actually ran.
+- `src/test/k6/booking-reservation.js` + `src/test/k6/inventory-pressure.js` (new): authenticated booking-creation load scenario and a high-concurrency oversell-pressure scenario verifying the Redis Lua floor guard degrades to clean 409s instead of overselling or 500ing.
+- `PERFORMANCE.md` (new): run instructions for all 3 k6 scripts, a curl sequence for creating a published test event with ticket tiers, and placeholder result tables (not yet filled in — k6 has not been run against live Railway).
+- Full walkthrough: `.claude/day-19-walkthrough.md` (gitignored, local-only — same convention as `day-18-walkthrough.md`).
+
+**First task for next session — Day 20:** Run the 3 k6 scripts against the now-healthy Railway backend
+per `PERFORMANCE.md`'s setup steps, paste results into its placeholder tables, then start Code Quality
+and Security Hardening (Bucket4j rate limiting, JWT denylist, CC-1/CC-2 final audit) — see
+`Plans/session-prompts/day-20-*.md` for the session prompt.
 
 **Completed in Day 18 (CI/CD Pipeline + Production Deploy to Railway, 2026-07-02):**
 

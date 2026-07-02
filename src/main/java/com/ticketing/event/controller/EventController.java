@@ -28,6 +28,8 @@ import com.ticketing.event.model.EventStatus;
 import com.ticketing.event.service.EventService;
 import com.ticketing.user.service.CustomUserDetails;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -35,12 +37,17 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/api/events")
 @Validated
 @RequiredArgsConstructor
+@Tag(name = "Events")
 public class EventController {
 
     private static final Logger logger = LoggerFactory.getLogger(EventController.class);
 
     private final EventService eventService;
 
+    @Operation(summary = "Create an event", description = "Creates a new event in DRAFT status. Must be explicitly published via /publish before bookings are accepted.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Event created")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Not authenticated")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Caller is not an ORGANIZER")
     @PostMapping
     @PreAuthorize("hasRole('ORGANIZER')")
     public ResponseEntity<ApiResponse<EventResponse>> createEvent(
@@ -54,6 +61,9 @@ public class EventController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "Get event details", description = "Publicly viewable event detail including venue, category, and ticket tiers.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Event found")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Event not found")
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<com.ticketing.event.dto.EventDetailResponse>> getEvent(@PathVariable Long id) {
         com.ticketing.event.dto.EventDetailResponse response = eventService.getEventById(id);
@@ -61,6 +71,8 @@ public class EventController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "List events", description = "Publicly viewable paginated event list with optional status/category/city filters.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Page of events")
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<EventResponse>>> getEvents(
         @RequestParam(required = false) EventStatus status,
@@ -80,6 +92,11 @@ public class EventController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "Update an event", description = "Updates an event owned by the authenticated organizer.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Event updated")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Not authenticated")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Caller is not the event's organizer")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Event not found")
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ORGANIZER')")
     public ResponseEntity<ApiResponse<EventResponse>> updateEvent(
@@ -94,6 +111,11 @@ public class EventController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "Delete an event", description = "Deletes an event owned by the authenticated organizer.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Event deleted")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Not authenticated")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Caller is not the event's organizer")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Event not found")
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ORGANIZER')")
     public ResponseEntity<ApiResponse<Void>> deleteEvent(@PathVariable Long id, Authentication authentication) {
@@ -104,6 +126,11 @@ public class EventController {
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
+    @Operation(summary = "Publish an event", description = "Transitions an event from DRAFT to PUBLISHED. Bookings are only accepted for PUBLISHED events.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Event published")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Not authenticated")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Caller is not the event's organizer")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Event not found")
     @PostMapping("/{id}/publish")
     @PreAuthorize("hasRole('ORGANIZER')")
     public ResponseEntity<ApiResponse<EventResponse>> publishEvent(@PathVariable Long id, Authentication authentication) {

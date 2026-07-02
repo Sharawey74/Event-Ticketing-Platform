@@ -21,6 +21,8 @@ import com.ticketing.event.dto.CategoryResponse;
 import com.ticketing.event.dto.CreateCategoryRequest;
 import com.ticketing.event.service.CategoryService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -28,12 +30,17 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/api/categories")
 @Validated
 @RequiredArgsConstructor
+@Tag(name = "Categories")
 public class CategoryController {
 
     private static final Logger logger = LoggerFactory.getLogger(CategoryController.class);
 
     private final CategoryService categoryService;
 
+    @Operation(summary = "Create a category", description = "ADMIN only.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Category created")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Not authenticated")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Caller is not an ADMIN")
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(
@@ -43,6 +50,9 @@ public class CategoryController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "Get category details", description = "Publicly viewable.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Category found")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Category not found")
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<CategoryResponse>> getCategory(@PathVariable Long id) {
         CategoryResponse response = categoryService.getCategoryById(id);
@@ -50,6 +60,8 @@ public class CategoryController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "List categories", description = "Publicly viewable paginated category list.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Page of categories")
     @GetMapping
     public ResponseEntity<ApiResponse<Page<CategoryResponse>>> listCategories(Pageable pageable) {
         Page<CategoryResponse> response = categoryService.listCategories(pageable);
@@ -57,6 +69,11 @@ public class CategoryController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "Update a category", description = "ADMIN only.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Category updated")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Not authenticated")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Caller is not an ADMIN")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Category not found")
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CategoryResponse>> updateCategory(
@@ -67,6 +84,11 @@ public class CategoryController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @Operation(summary = "Delete a category", description = "ADMIN only.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Category deleted")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Not authenticated")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Caller is not an ADMIN")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Category not found")
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteCategory(@PathVariable Long id) {
