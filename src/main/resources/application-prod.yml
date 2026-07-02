@@ -73,6 +73,8 @@ management:
   health:
     rabbit:
       enabled: false  # RabbitMQ powers async notifications only — must not gate the web service's healthcheck
+    mail:
+      enabled: false  # SMTP is not configured in production yet — must not gate the web service's healthcheck
 
 logging:
   level:
