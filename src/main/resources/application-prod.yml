@@ -1,5 +1,5 @@
 server:
-  port: ${PORT:8088}
+  port: 8088
   forward-headers-strategy: framework
   shutdown: graceful
 
