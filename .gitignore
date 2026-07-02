@@ -54,7 +54,8 @@ build/
 .claude
 CLAUDE.md
 *.txt
-
+logs.1782998927237.json
+logs.1782998931384.json
 ### Logs ###
 logs/
 *.log
