@@ -13,12 +13,12 @@ export const options = {
     },
 };
 
-const BASE_URL = 'http://localhost:8080/api/v1';
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:8088';
 
 export default function () {
     // 1. Fetch public events
-    const eventsRes = http.get(`${BASE_URL}/events`);
-    
+    const eventsRes = http.get(`${BASE_URL}/api/events`);
+
     check(eventsRes, {
         'events status is 200': (r) => r.status === 200,
         'events returned fast': (r) => r.timings.duration < 500,
@@ -28,10 +28,10 @@ export default function () {
     if (eventsRes.status === 200) {
         try {
             const body = JSON.parse(eventsRes.body);
-            if (body.content && body.content.length > 0) {
-                const eventId = body.content[0].id;
-                const eventDetailRes = http.get(`${BASE_URL}/events/${eventId}`);
-                
+            if (body.data && body.data.content && body.data.content.length > 0) {
+                const eventId = body.data.content[0].id;
+                const eventDetailRes = http.get(`${BASE_URL}/api/events/${eventId}`);
+
                 check(eventDetailRes, {
                     'event detail status is 200': (r) => r.status === 200,
                 });
