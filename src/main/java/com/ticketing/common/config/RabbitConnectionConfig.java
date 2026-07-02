@@ -58,6 +58,16 @@ public class RabbitConnectionConfig {
                 "RABBITMQ_URL is set but is not a valid AMQP connection URI: " + ex.getMessage(), ex);
         }
 
+        // Spring AMQP's CachingConnectionFactory has its own connection/topology recovery
+        // logic. The raw RabbitMQ Java client enables automatic recovery by default, and
+        // running both recovery mechanisms at once is a documented source of instability
+        // (leaked channels/threads, deadlocks during topology recovery) — this is exactly
+        // what the client's own "Automatic Recovery was Enabled" startup warning flags.
+        // Spring Boot's own auto-configuration disables this for the same reason; do the
+        // same here since this factory is built by hand.
+        rabbitClientFactory.setAutomaticRecoveryEnabled(false);
+        rabbitClientFactory.setTopologyRecoveryEnabled(false);
+
         log.info("RabbitMQ connection factory configured explicitly for host: {}", rabbitClientFactory.getHost());
         return new CachingConnectionFactory(rabbitClientFactory);
     }
