@@ -46,6 +46,13 @@ public class JwtFilter extends OncePerRequestFilter {
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
                 if (jwtService.isTokenValid(token, userDetails)) {
+                    // Fix M-004: denylist check runs only after signature/expiry validation
+                    // succeeds, so public endpoints never pay for a Redis lookup.
+                    if (jwtService.isTokenRevoked(token)) {
+                        SecurityContextHolder.clearContext();
+                        response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token has been revoked");
+                        return;
+                    }
                     UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
