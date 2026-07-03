@@ -32,8 +32,8 @@
 | 17 | Docker Multi-stage + Compose Polish | ✅ Complete | — | N/A (Docker verified, not unit-tested) | Multi-stage Dockerfile (JDK builder → JRE runtime, non-root `appuser`, 619MB), `.dockerignore`, `app` service wired into `docker-compose.yml` with `service_healthy` deps (Fix 7.2), E-009 (X-Frame-Options + HSTS on backend), E-009F (CSP + X-Frame-Options + X-Content-Type-Options on frontend, no Railway wildcard). Full stack verified via `docker-compose up -d`: all 7 containers healthy, `/actuator/health` UP, seed data present, headers confirmed on both backend and frontend. |
 | 18 | CI/CD Pipeline (GitHub Actions) + Production Deploy | ✅ Complete | — | 183/183 unchanged | `application-prod.yml` + CORS guard + CI-only GitHub Actions workflow (Railway/Vercel auto-deploy natively, no CLI token). Backend deployed live on Railway: RabbitMQ moved to CloudAMQP (Railway trial resource cap), `SPRING_PROFILES_ACTIVE=prod` fixed (was the missing var keeping app on `local` datasource), Flyway migrated all 12 versions against real Postgres, app fully started. Frontend live on Vercel. Final fix (`management.health.rabbit.enabled: false`) applied, pending push. Full narrative: `.claude/day-18-walkthrough.md`. |
 | 19 | Performance + k6 Load Tests + Swagger/OpenAPI | ✅ Complete | 183 | 183/183 unchanged | Preceded by an unplanned production outage fix: Rabbit/Mail health indicators disabled, explicit RabbitConnectionConfig (fixes localhost fallback + auto-recovery hang), server.port hardcoded to 8088 (fixes Railway proxy/app port mismatch) — backend confirmed live and healthy on Railway. Then: springdoc-openapi wired in, all 9 controllers annotated, load-test.js bugs fixed, booking-reservation.js + inventory-pressure.js added, PERFORMANCE.md created. k6 scripts not yet run against live Railway — results pending next session. |
-| 20 | Code Quality + Security Hardening (M-002, M-004) | ⬜ Not Started | — | — | Bucket4j rate limiting, JWT denylist, CC-1/CC-2 final audit |
-| 21 | Final Cleanup + Deploy to Railway + Vercel | ⬜ Not Started | — | — | Production smoke test, env var audit, README, KNOWN_ISSUES |
+| 20 | Code Quality + Security Hardening (M-002, M-004) | ✅ Complete | 191 | 191/191 passing ✅ | SECURITY-6 (`/actuator/**` ADMIN-only, health stays public), M-002 (Redis Lua rate limiting on auth/booking, gated by `app.rate-limit.enabled`), M-004 (JWT `jti` + Redis denylist + `/logout`), D19-1 (`TicketTier.availableCount` DB counter now symmetric across reserve/cancel/expire — a decrement-only fix would have leaked inventory, so the abandoned-hold expiry path was fixed too), CC-1 audit (3 `log.error` calls fixed to stop discarding stack traces). 82% INSTRUCTION coverage (verified via `./mvnw clean verify`), JaCoCo gate ✅ PASSED. Full narrative: `.claude/day-20-walkthrough.md`. |
+| 21 | Final Cleanup + Deploy to Railway + Vercel | ⬜ Not Started | — | — | Production smoke test, env var audit, README, KNOWN_ISSUES. Carries over: frontend must send `Idempotency-Key` header on booking creation before `app.rate-limit.enabled=true` reaches production. |
 
 ---
 
@@ -110,6 +110,11 @@
 | Fix 19-port | CRITICAL | 19 | ✅ | server.port hardcoded to 8088 in application-prod.yml (was `${PORT:8088}`) — Railway's injected PORT (8080) was overriding it, so the app listened on 8080 while the proxy (routed to the Dockerfile's EXPOSE 8088) got connection refused on every request |
 | Fix E-002 | GOOD | 19 | ✅ | springdoc-openapi 2.8.17 wired in via OpenApiConfig; all 9 REST controllers annotated with @Tag/@Operation/@ApiResponse; StripeWebhookController marked @Hidden; SecurityConfig permits /swagger-ui/**, /swagger-ui.html, /v3/api-docs/**, /v3/api-docs.yaml |
 | Fix 19-k6 | GOOD | 19 | ✅ (scripts ready, Railway run pending) | load-test.js port/path/body.data.content bugs fixed; booking-reservation.js + inventory-pressure.js added; PERFORMANCE.md created with setup guide and placeholder result tables |
+| Fix SECURITY-6 | P1 | 20 | ✅ | `/actuator/**` was fully `permitAll()`; now only `/actuator/health` is public, everything else requires `ADMIN` — SecurityConfig.java |
+| Fix M-002 | MEDIUM | 20 | ✅ | New `RateLimitFilter` (atomic Redis Lua INCR+EXPIRE) limits `/api/v1/auth/**` by IP and `POST /api/v1/bookings` by user, requires `Idempotency-Key` header, excludes Stripe webhook. `@Bean` in SecurityConfig (never a scanned `@Component`), gated by `app.rate-limit.enabled` (off by default, on in prod) — RateLimitFilter.java, SecurityConfig.java |
+| Fix M-004 | MEDIUM | 20 | ✅ | JWT `jti` claim + Redis denylist; `JwtFilter` checks it after signature validation; new `POST /api/v1/auth/logout` — JwtService.java, JwtFilter.java, AuthController.java |
+| Fix D19-1 | MEDIUM | 20 | ✅ | `TicketTier.availableCount` now decrements on `reserveTickets()` and is restored symmetrically on cancel, payment-pending expiry, AND reserved-hold expiry (the last path previously restored nothing — decrement-only would have permanently leaked inventory) — BookingService.java, ReservationExpirationJob.java |
+| Fix 20-cc1 | GOOD | 20 | ✅ | CC-1 audit found 3 `log.error()` calls passing `ex.getMessage()` instead of the exception object, silently discarding stack traces — fixed in PaymentService.java (×2) and WebhookService.java (×1) |
 
 ---
 
@@ -117,8 +122,8 @@
 
 | Metric | Current | Target |
 | :--- | :--- | :--- |
-| `./mvnw test` passing | 183 / 183 passing (all tests including Docker-based integration tests) | 100% |
-| Test coverage | 81.4% INSTRUCTION (6731/8268) — JaCoCo gate ✅ PASSED | 80%+ |
+| `./mvnw test` passing | 191 / 191 passing (all tests including Docker-based integration tests) | 100% |
+| Test coverage | 82% INSTRUCTION (7,155/8,624) — verified via `./mvnw clean verify`; JaCoCo gate ✅ PASSED | 80%+ |
 | Active @Autowired usages | 0 | 0 |
 | Active LocalDateTime usages | 0 | 0 |
 | Magic numbers in code | 0 | 0 |

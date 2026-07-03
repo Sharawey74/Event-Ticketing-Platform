@@ -1,10 +1,10 @@
 # AI CONTEXT SNAPSHOT — Event Ticketing Platform
 
-## Last Updated: Day 19 (2026-07-02) — Production Deploy Stabilization + Swagger/OpenAPI + k6 Load Test Scripts: a live production outage was fully root-caused and fixed (Rabbit/Mail health indicators, RabbitMQ localhost fallback, auto-recovery hang, and a server-port mismatch that was the final blocker) — backend confirmed live and healthy on Railway via direct curl to /actuator/health and /api/events. Then springdoc-openapi was wired in with all 9 controllers annotated, and the k6 load test scripts were fixed/extended (results still pending a live Railway run).
+## Last Updated: Day 20 (2026-07-03) — Code Quality + Security Hardening: restricted `/actuator/**` to ADMIN-only (only `/actuator/health` stays public), added Redis-Lua-backed rate limiting on auth/booking endpoints (M-002), added a JWT `jti` + Redis denylist with a new `/logout` endpoint (M-004), fixed a bug where `TicketTier.availableCount` in the database never decremented on reservation and could have permanently leaked inventory if fixed naively (D19-1), and audited/fixed 3 `log.error()` calls that were silently discarding stack traces (CC-1). 191/191 tests passing, 82% INSTRUCTION coverage verified via `./mvnw clean verify`, JaCoCo gate passed.
 
-## Branch: day-19-performance-load-testing (local — 6 new commits from this session, not yet pushed; the earlier production-stabilization fixes for Rabbit/Mail health + RabbitConnectionConfig + auto-recovery were already merged to main via PR #26/#27 before this session's Swagger/k6 work began)
+## Branch: day-20-code-quality (local — 6 new commits from this session on top of the Day 19 work, not yet pushed)
 
-## Test Status: 183/183 ALL passing (unchanged from Day 16B — Day 19 is production-config/tooling/docs only, no test changes; no TDD gate applies)
+## Test Status: 191/191 ALL passing (183 baseline + 8 new: D19-1 ×2, JWT denylist ×2, rate limiting ×4)
 
 ## 1. NON-NEGOTIABLE RULES (From instructions.txt + Overlay)
 
@@ -189,6 +189,11 @@ class YourControllerTest {
 | **19-port** | `server.port` hardcoded to `8088` (was `${PORT:8088}`) — Railway's injected `PORT` (8080) was overriding it, so the app listened on 8080 while the proxy (routed to the Dockerfile's `EXPOSE 8088`) got connection refused on every request | Infra | ✅ Applied | application-prod.yml |
 | **E-002** | springdoc-openapi 2.8.17 wired in via `OpenApiConfig`; all 9 REST controllers annotated with `@Tag`/`@Operation`/`@ApiResponse`; `StripeWebhookController` marked `@Hidden`; `SecurityConfig` permits `/swagger-ui/**`, `/v3/api-docs/**` | Docs | ✅ Applied | OpenApiConfig.java, SecurityConfig.java, all 9 controllers |
 | **19-k6** | `load-test.js` port/path/`body.data.content` bugs fixed; `booking-reservation.js` + `inventory-pressure.js` added; `PERFORMANCE.md` created with setup guide and placeholder result tables | Tests | ✅ Applied (scripts ready, Railway run pending) | src/test/k6/*.js, PERFORMANCE.md |
+| **SECURITY-6** (Day 20) | `/actuator/**` was fully `permitAll()` — closed to ADMIN-only, `/actuator/health` stays public for Docker/Railway healthchecks | Security | ✅ Applied | SecurityConfig.java |
+| **M-002** (Day 20) | Rate limiting via `RateLimitFilter` — atomic Redis Lua `INCR`+`EXPIRE` (same pattern as `DistributedLockService`), limits `/api/v1/auth/**` by IP and `POST /api/v1/bookings` by authenticated user, requires `Idempotency-Key` header, excludes Stripe webhook. `@Bean` in `SecurityConfig` (never a scanned `@Component`, so never loaded in `@WebMvcTest` slices), gated by `app.rate-limit.enabled` (off by default, on in prod — no dedicated `test` Spring profile exists in this project) | Security | ✅ Applied | RateLimitFilter.java, SecurityConfig.java, BusinessConstants.java, application-prod.yml |
+| **M-004** (Day 20) | JWT `jti` claim added to every token; `revokeToken()`/`isTokenRevoked()` denylist logic lives in `JwtService` (already mocked in every `@WebMvcTest` slice, so no test files needed to change); `JwtFilter` checks the denylist after signature validation, before `SecurityContext` population; new `POST /api/v1/auth/logout` | Security | ✅ Applied | JwtService.java, JwtFilter.java, AuthController.java, BusinessConstants.java |
+| **D19-1** (Day 20) | `BookingService.reserveTickets()` only ever decremented the Redis inventory counter, never the DB-persisted `TicketTier.availableCount` — `GET /api/events/{id}` showed a stale, falsely-high seat count during active holds (confirmed via k6 + direct Redis inspection in Day 19). Fixed with a DB-side decrement on reserve; a decrement-only fix would have permanently leaked inventory, since the abandoned-RESERVED-hold expiry path (`ReleaseSeatsAction` is a Redis-release stub only) restored nothing — so the release was added there too, mirroring the existing `cancelBooking`/`expireStalePaymentPending` increment pattern | Booking | ✅ Applied | BookingService.java, ReservationExpirationJob.java |
+| **20-cc1** | CC-1 audit found 3 `log.error()` calls passing `ex.getMessage()` instead of the exception object, silently discarding the stack trace, on Stripe session creation failure, Stripe refund failure, and the Stripe GSON deserialization fallback | Payment | ✅ Applied | PaymentService.java, WebhookService.java |
 
 ---
 
@@ -211,6 +216,7 @@ class YourControllerTest {
 | 17 | Docker Multi-stage + Compose Polish + Security Headers | ✅ Complete | 183/183 unchanged — Docker/infra day, verified via docker-compose up -d (all 7 containers healthy) |
 | 18 | CI/CD Pipeline + Production Deploy to Railway | ✅ Complete | 183/183 unchanged — CI/CD + deploy day. Backend deployed live on Railway (Postgres+Redis on Railway, RabbitMQ on CloudAMQP), frontend live on Vercel. See Section 10 for full deploy debugging log. |
 | 19 | Production Deploy Stabilization + Swagger/OpenAPI + k6 Load Tests | ✅ Complete | 183/183 unchanged — production outage fully root-caused and fixed (Rabbit/Mail health indicators, RabbitMQ localhost fallback + auto-recovery hang, server-port mismatch), backend confirmed live and healthy on Railway. springdoc-openapi wired in with all 9 controllers annotated; k6 scripts fixed/extended, results pending a live Railway run. See Section 10 for full narrative. |
+| 20 | Code Quality + Security Hardening (M-002, M-004) | ✅ Complete | 191/191 passing (+8 new) — 82% INSTRUCTION coverage, JaCoCo gate ✅. SECURITY-6, M-002, M-004, D19-1, CC-1 all applied. See Section 10 for full narrative and `.claude/day-20-walkthrough.md` for the plain-language write-up. |
 
 ---
 
@@ -265,6 +271,9 @@ When adding new services, do NOT add new exception types without adding a handle
 | POST | /api/v1/payments/webhook | No | (Secured via Stripe HMAC Signature) |
 | GET | /api/v1/bookings/my | Yes | USER/ORGANIZER/ADMIN (Returns flat BookingResponse) |
 | GET | /api/v1/bookings/{id} | Yes | Checked via Resource Ownership (Returns nested BookingDetailsResponse) |
+| POST | /api/v1/auth/logout | No (graceful no-op if unauthenticated) | Denylists the caller's JWT `jti` in Redis (Day 20, Fix M-004) |
+
+**Note (Day 20):** `/actuator/**` now requires `ADMIN` except `/actuator/health` (public). `/api/v1/auth/**` and `POST /api/v1/bookings` are rate-limited in production (`app.rate-limit.enabled=true`); the latter also requires an `Idempotency-Key` header.
 
 ---
 
@@ -366,9 +375,55 @@ This repository has two deployable parts:
 
 ---
 
-## 10. NEXT SESSION START — DAY 20
+## 10. NEXT SESSION START — DAY 21
 
-**Current Branch:** `day-19-performance-load-testing` (local, 6 new commits — not yet pushed/merged)
+**Current Branch:** `day-20-code-quality` (local, 6 new commits — not yet pushed/merged)
+
+**Completed in Day 20 (Code Quality + Security Hardening, 2026-07-03):**
+
+- **SECURITY-6:** `/actuator/**` was fully `permitAll()` in `SecurityConfig.java` — anyone on the
+  internet could hit `/actuator/env`, `/actuator/metrics`, etc. Split into `/actuator/health`
+  (still public, needed by Docker/Railway healthchecks) and everything else now `hasRole("ADMIN")`.
+- **M-002:** new `RateLimitFilter.java` — an atomic Redis Lua `INCR`+`EXPIRE` script (same
+  atomicity pattern as `DistributedLockService`) limits `/api/v1/auth/**` by client IP and
+  `POST /api/v1/bookings` by authenticated user (email/JWT subject), requires an
+  `Idempotency-Key` header on booking creation, and excludes the Stripe webhook entirely.
+  Registered as a `@Bean` inside `SecurityConfig` (never a scanned `@Component`) so it's never
+  loaded inside a `@WebMvcTest` slice, and gated by `app.rate-limit.enabled` (default `false`,
+  `true` in `application-prod.yml`) — this project has no dedicated `test` Spring profile, so a
+  property flag was the only reliable way to keep the existing test suite unaffected.
+- **M-004:** `JwtService.generateToken()` now sets a `jti` (JWT ID) claim; `revokeToken()`
+  denylists it in Redis for the remainder of the token's natural lifetime; `isTokenRevoked()`
+  checks it. All of this logic lives inside `JwtService` (already `@MockitoBean`'d in every
+  `@WebMvcTest` slice) rather than being injected into `JwtFilter`/`AuthController` directly —
+  that would have required adding a Redis mock to every single existing controller test.
+  `JwtFilter` checks the denylist only after signature/expiry validation already passed, so
+  public/invalid-token traffic never pays for the extra Redis lookup. New
+  `POST /api/v1/auth/logout` endpoint denylists the caller's current token.
+- **D19-1** (found during Day 19's k6 verification): `BookingService.reserveTickets()` never
+  decremented the DB-persisted `TicketTier.availableCount` column — only the Redis inventory
+  counter — so `GET /api/events/{id}` showed a stale, falsely-high seat count while holds were
+  active. Fixed with a symmetric decrement/release: `reserveTickets()` now decrements the DB
+  column, and `ReservationExpirationJob.expireReservedHold()` — previously relying on
+  `ReleaseSeatsAction`, a Redis-release stub that does nothing — now explicitly releases and
+  increments it back, mirroring the existing `cancelBooking()`/`expireStalePaymentPending()`
+  pattern. A decrement-only fix (as the session plan literally described) would have permanently
+  leaked inventory on every abandoned reservation.
+- **CC-1 audit:** found and fixed 3 `log.error()` calls (`PaymentService.java` ×2,
+  `WebhookService.java` ×1) that passed `ex.getMessage()` instead of the exception object,
+  silently discarding the stack trace.
+- Tests: 191/191 passing (183 baseline + 8 new — `JwtDenylistTest`, `RateLimitDisabledByDefaultTest`,
+  `RateLimitEnforcedTest`, plus one new test each in `BookingServiceReserveTest` and
+  `ReservationExpirationJobTest`). 82% INSTRUCTION coverage verified via `./mvnw clean verify`
+  (always use `clean verify`, not an IDE's incremental single-test run — a stale/partial
+  `target/jacoco.exec` merge can under-report coverage by several points). JaCoCo gate ✅ PASSED.
+- Full walkthrough: `.claude/day-20-walkthrough.md`.
+
+**First task for next session — Day 21:** Production smoke test against the live Railway
+deployment, then an environment-variable audit. Carries over from Day 20: the Next.js frontend
+must start sending an `Idempotency-Key` header on `POST /api/v1/bookings` before
+`app.rate-limit.enabled=true` reaches production, or booking creation will fail with 400 — see
+`Plans/session-prompts/day-21-*.md` for the full session prompt.
 
 **Completed in Day 19 (Production Deploy Stabilization + Swagger/OpenAPI + k6 Load Tests, 2026-07-02):**
 
