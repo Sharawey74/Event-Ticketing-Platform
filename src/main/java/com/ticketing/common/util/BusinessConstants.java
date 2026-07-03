@@ -35,4 +35,14 @@ public final class BusinessConstants {
     // QR Code generation (ZXing) — Fix CC-2
     public static final int QR_CODE_SIZE   = 300; // pixels (width and height)
     public static final int QR_CODE_MARGIN = 1;   // quiet zone modules around QR pattern
+
+    // JWT denylist (Fix M-004) — Redis key prefix for revoked token jti claims
+    public static final String JWT_DENYLIST_PREFIX = "jwt:denylist:";
+
+    // Rate limiting (Fix M-002) — Redis key prefixes and thresholds
+    public static final String RATE_LIMIT_REDIS_PREFIX_AUTH    = "rl:auth:";
+    public static final String RATE_LIMIT_REDIS_PREFIX_BOOKING = "rl:booking:";
+    public static final int RATE_LIMIT_AUTH_REQUESTS_PER_MINUTE    = 10;
+    public static final int RATE_LIMIT_BOOKING_REQUESTS_PER_MINUTE = 5;
+    public static final int RATE_LIMIT_WINDOW_SECONDS = 60;
 }

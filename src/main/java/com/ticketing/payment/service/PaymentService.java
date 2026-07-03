@@ -146,8 +146,10 @@ public class PaymentService {
             mockCheckoutUrl = successUrl.replace("{bookingId}", String.valueOf(bookingId))
                                         .replace("{CHECKOUT_SESSION_ID}", mockSessionId);
         } catch (StripeException e) {
-            log.error("[{}] [payment] Stripe session creation failed for booking {}: {}",
-                    correlationId, bookingId, e.getMessage());
+            // Fix CC-1: pass e itself (not e.getMessage()) as the trailing arg so SLF4J
+            // attaches the full stack trace instead of just the message text.
+            log.error("[{}] [payment] Stripe session creation failed for booking {}",
+                    correlationId, bookingId, e);
             throw new RuntimeException("Failed to create Stripe checkout session", e);
         }
 
@@ -230,8 +232,10 @@ public class PaymentService {
             log.info("[{}] [payment] Stripe refund of {} issued for payment intent {}",
                     correlationId, amount, paymentIntentId);
         } catch (com.stripe.exception.StripeException e) {
-            log.error("[{}] [payment] Stripe refund failed for payment intent {}: {}",
-                    correlationId, paymentIntentId, e.getMessage());
+            // Fix CC-1: pass e itself (not e.getMessage()) as the trailing arg so SLF4J
+            // attaches the full stack trace instead of just the message text.
+            log.error("[{}] [payment] Stripe refund failed for payment intent {}",
+                    correlationId, paymentIntentId, e);
             throw new RuntimeException("Failed to issue Stripe refund for payment intent: " + paymentIntentId, e);
         }
     }

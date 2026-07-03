@@ -234,4 +234,23 @@ class BookingServiceReserveTest {
                 assertThat(booking.getUser()).isEqualTo(user);
                 verify(lockService).releaseLock(any(), any());
         }
+
+        @Test
+        @DisplayName("reserveTickets: a successful reservation decrements the tier's availableCount in the database (Fix D19-1)")
+        void reserveTickets_whenSuccessful_shouldDecrementTierAvailableCountInDatabase() {
+                when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+                when(ticketTierRepository.findById(100L)).thenReturn(Optional.of(tier));
+                when(inventoryService.getAvailableCount(100L)).thenReturn(5);
+                when(lockService.acquireLock(any(), any(), anyLong())).thenReturn(true);
+                when(inventoryService.reserveSeat(100L, 3)).thenReturn(true);
+                when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+                when(pricingEngine.calculateFinalPrice(any(), any(), eq(3), anyInt(), anyInt()))
+                                .thenReturn(BigDecimal.valueOf(50));
+                when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
+
+                bookingService.reserveTickets(1L, 10L, 100L, 3);
+
+                verify(ticketTierRepository).save(tier);
+                assertThat(tier.getAvailableCount()).isEqualTo(7);
+        }
 }

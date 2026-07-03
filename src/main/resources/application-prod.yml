@@ -52,6 +52,10 @@ jwt:
   secret: ${JWT_SECRET}
   expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
+app:
+  rate-limit:
+    enabled: true # Fix M-002 — disabled everywhere else (local/tests default to false)
+
 frontend:
   url: ${FRONTEND_URL}
 

@@ -200,8 +200,10 @@ public class WebhookService {
                 }
             }
         } catch (Exception ex) {
-            log.error("[webhook] Stripe GSON fallback failed for event {}: {}",
-                    stripeEvent.getId(), ex.getMessage());
+            // Fix CC-1: pass ex itself (not ex.getMessage()) as the trailing arg so SLF4J
+            // attaches the full stack trace instead of just the message text.
+            log.error("[webhook] Stripe GSON fallback failed for event {}",
+                    stripeEvent.getId(), ex);
         }
 
         log.error("[webhook] Could not deserialize Stripe Session from event: {}", stripeEvent.getId());
