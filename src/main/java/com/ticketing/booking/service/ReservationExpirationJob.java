@@ -78,6 +78,12 @@ public class ReservationExpirationJob {
 
     /**
      * RESERVED hold timed out before checkout — drive it through the state machine to EXPIRED.
+     *
+     * Fix D19-1: {@code ReleaseSeatsAction} (fired by this transition) is a Redis-release stub
+     * only (Phase 1B), so the seat release and DB-side {@code availableCount} increment are done
+     * explicitly here — mirroring {@link #expireStalePaymentPending(Booking)} and
+     * {@code BookingService.cancelBooking} — to keep every release path symmetric with the
+     * decrement now applied in {@code BookingService.reserveTickets}.
      */
     private void expireReservedHold(Booking booking) {
         var stateMachine = stateMachineFactory.getStateMachine(Long.toString(booking.getId()));
@@ -88,6 +94,19 @@ public class ReservationExpirationJob {
 
         if (result != null && result.getResultType().name().equals("ACCEPTED")) {
             booking.setState(BookingState.EXPIRED);
+
+            if (!booking.getTickets().isEmpty()) {
+                int quantity = booking.getTickets().size();
+                Long tierId = booking.getTickets().get(0).getTier().getId();
+
+                inventoryService.releaseSeat(tierId, quantity);
+
+                TicketTier tier = ticketTierRepository.findById(tierId)
+                        .orElseThrow(() -> new EntityNotFoundException("Ticket tier not found: " + tierId));
+                tier.setAvailableCount(tier.getAvailableCount() + quantity);
+                ticketTierRepository.save(tier);
+            }
+
             bookingRepository.save(booking);
             log.info("Successfully expired booking {}", booking.getId());
         } else {

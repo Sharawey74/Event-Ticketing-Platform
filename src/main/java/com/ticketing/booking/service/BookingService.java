@@ -95,6 +95,11 @@ public class BookingService {
                 throw new IllegalStateException("Failed to reserve seats in inventory");
             }
 
+            // Fix D19-1: mirror the decrement in the DB-persisted tier so GET /api/events/{id}
+            // does not show a stale, falsely-high count while this hold is active.
+            tier.setAvailableCount(tier.getAvailableCount() - quantity);
+            ticketTierRepository.save(tier);
+
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
 
