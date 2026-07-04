@@ -4,7 +4,7 @@
 
 ### High-Concurrency Event Ticketing Platform
 
-**A modular-monolith backend engineered to guarantee zero ticket overselling under concurrent load, paired with a Next.js storefront and organizer console.**
+**A production-grade, high-concurrency event ticketing platform engineered with a Modular Monolith backend, Domain-Driven Design bounded contexts, Event-Driven async processing, and a Redis-atomic inventory layer that guarantees zero ticket oversell — deployed on Railway + Vercel.**
 
 [![Java](https://img.shields.io/badge/Java-21_LTS-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](#backend)
 [![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.5-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](#backend)
@@ -12,10 +12,9 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](#data--messaging)
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white)](#data--messaging)
 [![RabbitMQ](https://img.shields.io/badge/RabbitMQ-4-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white)](#data--messaging)
+[![Swagger](https://img.shields.io/badge/Swagger-OpenAPI_3-85EA2D?style=for-the-badge&logo=swagger&logoColor=black)](https://backend-production-8daea.up.railway.app/swagger-ui/index.html)
 
-[![Tests](https://img.shields.io/badge/tests-194%2F194_passing-2EA44F?style=flat-square)](#quality--testing)
-[![Coverage](https://img.shields.io/badge/coverage-83%25_instruction-2EA44F?style=flat-square)](#quality--testing)
-[![Testcontainers](https://img.shields.io/badge/Testcontainers-real_infra_in_tests-2496ED?style=flat-square&logo=testcontainers&logoColor=white)](#quality--testing)
+[![Testcontainers](https://img.shields.io/badge/Testcontainers-real_infrastructure-2496ED?style=flat-square&logo=testcontainers&logoColor=white)](#quality--testing)
 [![k6](https://img.shields.io/badge/k6-Grafana_Labs-7D64FF?style=flat-square&logo=k6&logoColor=white)](#performance)
 [![Docker](https://img.shields.io/badge/docker-multi--stage-2496ED?style=flat-square&logo=docker&logoColor=white)](#local-development)
 [![Deploy](https://img.shields.io/badge/deployed-Railway_%2B_Vercel-6E56CF?style=flat-square)](#production)
@@ -42,62 +41,137 @@
 
 ## Overview
 
-Eventora is a full-stack event ticketing system built around one hard constraint: **a ticket
-tier can never sell more seats than it has, even under concurrent, adversarial load** — without
-sacrificing throughput by serializing every request through a single database lock.
+Eventora is a full-stack event ticketing platform engineered around one non-negotiable invariant: **a ticket tier can never sell more seats than its defined capacity, even under concurrent, adversarial load** — without serializing every request through a single global lock.
 
-The backend is a Spring Boot **modular monolith** — strict domain boundaries (`event`, `booking`,
-`payment`, `inventory`, `pricing`, `notification`, `user`) that communicate only through service
-interfaces and DTOs, making any domain independently extractable into its own service later
-without a rewrite. The frontend is a Next.js App Router client consuming that API, with separate
-attendee and organizer experiences.
+The system applies a deliberate stack of architectural patterns, each chosen for a specific engineering reason:
+
+### Modular Monolith
+
+Seven cohesive domains (`event`, `booking`, `payment`, `inventory`, `pricing`, `notification`, `user`) each own their persistence, service logic, and API-boundary DTOs, communicating only through typed service interfaces — enforcing the same bounded-context discipline as microservices without the distributed-system failure modes. Any domain is independently extractable without a rewrite.
+
+### Domain-Driven Design (DDD)
+
+Each module maps to an explicit **Bounded Context**. Aggregates (`Booking`, `Event`, `TicketTier`) carry invariants directly — `@Version`-guarded optimistic locking, ownership checks, state constraints — rather than delegating correctness to the service layer.
+
+### Layered Architecture (Ports & Adapters–inspired)
+
+A strict **Controller → Service → Repository** layering is enforced per module. No service calls another module's repository directly; all cross-module data flows through published service interfaces, keeping the dependency graph explicit and every layer independently testable.
+
+### Event-Driven Architecture (Async Messaging)
+
+Post-booking side effects (QR generation, transactional email) are decoupled from the synchronous request path via **RabbitMQ** with dead-letter queues. This removes I/O-bound latency from the critical path and makes the notification subsystem independently scalable.
+
+### Finite State Machine (FSM)
+
+The booking lifecycle is modelled as an explicit **11-state FSM** (Spring State Machine, one instance per request). Legal transitions are declared as a formal graph — illegal transitions (e.g. checking in a cancelled booking) are rejected at the machine level, not through fragile conditional logic.
+
+### Atomic Inventory Pattern (Redis Lua + DB Dual-Write)
+
+A **three-layer atomicity strategy** prevents oversell without serializing all requests:
+
+1. **Redis Lua script** — atomic floor-guarded `DECRBY` (check + decrement as one indivisible operation), eliminating the TOCTOU race at the cache layer.
+2. **Per-user distributed lock** — prevents duplicate concurrent requests from the same user each passing the Lua check independently.
+3. **Conditional SQL `UPDATE`** — `UPDATE ... WHERE available_count >= :qty` mirrors the guard at the DB layer, ensuring correctness even if Redis diverges.
+
+### RESTful API Design
+
+A stateless **REST API** (30 endpoints, 9 controllers) with JWT Bearer auth (`SessionCreationPolicy.STATELESS`). `@PreAuthorize` RBAC gates endpoint access; a second object-level authorization check separately validates resource ownership — two independent enforcement layers.
+
+### Frontend: Server Components + BFF Topology
+
+Next.js 16 **App Router** splits React Server Components (data-fetching, SEO) from Client Components (interactivity). Server state via **TanStack Query**, UI state via **Zustand**, validation via **React Hook Form + Zod**. The Next.js layer acts as a **Backends-for-Frontends (BFF)**, the sole consumer of the Spring Boot API, shaping responses for distinct attendee and organizer surfaces.
 
 ---
 
 ## System Architecture
 
 ```text
-Next.js 16 Frontend (Vercel)
-   │
-   │  HTTPS + JWT
-   ▼
-Spring Boot Backend (Railway)
-   │
-   ├─ REST API Layer          30 endpoints · 9 controllers
-   │
-   ├─ Domain Services         event · booking · payment · inventory ·
-   │                          pricing · notification · user
-   │                          (talks to Stripe for checkout sessions + webhooks)
-   │
-   └─ Booking State Machine   11 states, one instance per request
+┌───────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                          SYSTEM ARCHITECTURE                                          │
+└───────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
-Domain Services read/write:
-   - PostgreSQL 17    source of truth
-   - Redis 7          inventory counters, distributed locks, JWT denylist, rate limits
-   - RabbitMQ 4       async notifications, consumed back into Domain Services
-                      for QR code generation and confirmation emails
+                                            ┌───────────────────────┐
+                                            │  Next.js 16 Frontend  │
+                                            │       (Vercel)        │
+                                            └───────────┬───────────┘
+                                                        │ HTTPS + JWT
+                                                        ▼
+                                            ┌───────────────────────┐
+                                            │  Spring Boot Backend  │
+                                            │       (Railway)       │
+                                            └───────────┬───────────┘
+                                                        │
+                ┌───────────────────────────────────────┼───────────────────────────────────────┐
+                │                                       │                                       │
+                ▼                                       ▼                                       ▼
+        ┌───────────────┐                     ┌───────────────────┐                     ┌───────────────┐
+        │   REST API    │                     │  Domain Services  │                     │ Booking State │
+        │     Layer     │                     │                   │                     │    Machine    │
+        │               │                     │ event · booking · │                     │               │
+        │ 30 endpoints  │                     │ payment ·         │                     │   11 states   │
+        │ 9 controllers │                     │ inventory ·       │                     │ 1 instance /  │
+        │               │                     │ pricing ·         │                     │    request    │
+        │               │                     │ notification ·    │                     │               │
+        │               │                     │ user              │                     │               │
+        └───────────────┘                     └─────────┬─────────┘                     └───────────────┘
+                                                        │
+                                                        ▼
+                                              ┌───────────────────┐
+                                              │      Stripe       │
+                                              │ checkout sessions │
+                                              │    + webhooks     │
+                                              └───────────────────┘
+
+                ┌───────────────────────────────────────┬───────────────────────────────────────┐
+                ▼                                       ▼                                       ▼
+        ┌───────────────┐                     ┌───────────────────┐                     ┌───────────────┐
+        │ PostgreSQL 17 │                     │      Redis 7      │                     │  RabbitMQ 4   │
+        │               │                     │                   │                     │               │
+        │   source of   │                     │ inventory counters│                     │     async     │
+        │     truth     │                     │ distributed locks │                     │ notifications │
+        │               │                     │   JWT denylist    │                     │               │
+        │               │                     │    rate limits    │                     │               │
+        └───────────────┘                     └───────────────────┘                     └───────┬───────┘
+                                                                                                │
+                                                                                                ▼
+                                                                                ┌───────────────────────────────┐
+                                                                                │ QR generation +               │
+                                                                                │ confirmation emails           │
+                                                                                └───────────────────────────────┘
 ```
 
 ### Reservation flow (concurrency-critical path)
 
 ```text
-1. Client            --> POST /api/v1/bookings --> BookingService
+    ┌──────────────────────────────────────────────────────────────────────────────┐
+    │                 RESERVATION FLOW — CONCURRENCY-CRITICAL PATH                 │
+    └──────────────────────────────────────────────────────────────────────────────┘
 
-2. BookingService     --> Redis: acquire per-user distributed lock
-3. BookingService     --> Redis: re-check availability (TOCTOU guard)
-4. BookingService     --> Redis: reserveSeat() -- atomic Lua floor guard
+ 1. Client             ── POST /api/v1/bookings ──► BookingService
 
-   If seats are available:
-   5. Redis            --> decremented, success
-   6. BookingService    --> PostgreSQL: atomic conditional UPDATE (availableCount -= n)
-   7. BookingService    --> PostgreSQL: INSERT Booking (state=RESERVED, expires_at=+5m)
-   8. BookingService    --> Client: 201 Created
+ 2. BookingService     ──► Redis            acquire per-user distributed lock
+ 3. BookingService     ──► Redis            re-check availability (TOCTOU guard)
+ 4. BookingService     ──► Redis            reserveSeat() — atomic Lua floor guard
 
-   If sold out:
-   5. Redis            --> rejected (floor guard)
-   6. BookingService    --> Client: 409 Conflict
+    ┌─ SEATS AVAILABLE ────────────────────────────────────────────────────────────┐
+    │                                                                              │
+    │  5. Redis            ──► BookingService   decremented, success               │
+    │  6. BookingService   ──► PostgreSQL       atomic conditional                 │
+    │                                           UPDATE (availableCount -= n)       │
+    │  7. BookingService   ──► PostgreSQL       INSERT Booking                     │
+    │                                           (state=RESERVED, expires=+5m)      │
+    │  8. BookingService   ──► Client           201 Created                        │
+    │                                                                              │
+    └──────────────────────────────────────────────────────────────────────────────┘
 
-9. BookingService     --> Redis: release lock
+    ┌─ SOLD OUT ───────────────────────────────────────────────────────────────────┐
+    │                                                                              │
+    │  5. Redis            ──► BookingService   rejected (floor guard)             │
+    │  6. BookingService   ──► Client           409 Conflict                       │
+    │                                                                              │
+    └──────────────────────────────────────────────────────────────────────────────┘
+
+ 9. BookingService     ──► Redis            release lock
 ```
 
 ---
