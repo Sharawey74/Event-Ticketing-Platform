@@ -221,6 +221,7 @@ class BookingServiceReserveTest {
                 when(inventoryService.getAvailableCount(100L)).thenReturn(5);
                 when(lockService.acquireLock(any(), any(), anyLong())).thenReturn(true);
                 when(inventoryService.reserveSeat(100L, 2)).thenReturn(true);
+                when(ticketTierRepository.decrementAvailableCount(100L, 2)).thenReturn(1);
                 when(userRepository.findById(1L)).thenReturn(Optional.of(user));
                 when(pricingEngine.calculateFinalPrice(any(), any(), eq(2), anyInt(), anyInt()))
                                 .thenReturn(BigDecimal.valueOf(50));
@@ -243,6 +244,7 @@ class BookingServiceReserveTest {
                 when(inventoryService.getAvailableCount(100L)).thenReturn(5);
                 when(lockService.acquireLock(any(), any(), anyLong())).thenReturn(true);
                 when(inventoryService.reserveSeat(100L, 3)).thenReturn(true);
+                when(ticketTierRepository.decrementAvailableCount(100L, 3)).thenReturn(1);
                 when(userRepository.findById(1L)).thenReturn(Optional.of(user));
                 when(pricingEngine.calculateFinalPrice(any(), any(), eq(3), anyInt(), anyInt()))
                                 .thenReturn(BigDecimal.valueOf(50));
@@ -250,7 +252,24 @@ class BookingServiceReserveTest {
 
                 bookingService.reserveTickets(1L, 10L, 100L, 3);
 
-                verify(ticketTierRepository).save(tier);
-                assertThat(tier.getAvailableCount()).isEqualTo(7);
+                verify(ticketTierRepository).decrementAvailableCount(100L, 3);
+        }
+
+        @Test
+        @DisplayName("reserveTickets: Day 21 hardening — DB-side decrement refusal releases the just-reserved Redis seat instead of leaking it")
+        void reserveTickets_whenDbDecrementRefused_shouldReleaseRedisSeatAndThrow() {
+                when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+                when(ticketTierRepository.findById(100L)).thenReturn(Optional.of(tier));
+                when(inventoryService.getAvailableCount(100L)).thenReturn(5);
+                when(lockService.acquireLock(any(), any(), anyLong())).thenReturn(true);
+                when(inventoryService.reserveSeat(100L, 1)).thenReturn(true);
+                when(ticketTierRepository.decrementAvailableCount(100L, 1)).thenReturn(0);
+
+                assertThatThrownBy(() -> bookingService.reserveTickets(1L, 10L, 100L, 1))
+                                .isInstanceOf(IllegalStateException.class)
+                                .hasMessageContaining("Not enough tickets available");
+
+                verify(inventoryService).releaseSeat(100L, 1);
+                verify(bookingRepository, never()).save(any(Booking.class));
         }
 }

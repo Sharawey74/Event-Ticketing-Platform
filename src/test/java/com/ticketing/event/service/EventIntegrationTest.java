@@ -202,10 +202,13 @@ class EventIntegrationTest {
 
         eventService.publishEvent(created.getId(), organizer.getId());
 
-        // Search using EventService.getEvents with filter
+        // Search using EventService.getEvents with filter. Page size is generous (not 10) because
+        // this test shares its Testcontainers Postgres instance with every other @SpringBootTest
+        // in the same run (Spring context caching) — other tests' PUBLISHED events accumulate in
+        // the same table, and a small page could push this test's own event onto a later page.
         EventFilterRequest filter = new EventFilterRequest();
         filter.setStatus(EventStatus.PUBLISHED);
-        Page<EventResponse> results = eventService.getEvents(filter, PageRequest.of(0, 10));
+        Page<EventResponse> results = eventService.getEvents(filter, PageRequest.of(0, 100));
 
         assertThat(results).isNotEmpty();
         assertThat(results.getContent())
