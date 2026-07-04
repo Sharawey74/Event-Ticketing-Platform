@@ -376,13 +376,9 @@ Full fix-by-fix security and reliability audit trail: [`PROGRESS.md`](PROGRESS.m
 
 <div align="center">
 
-If this project was useful or interesting, a star helps others find it.
-
-[![GitHub Repo stars](https://img.shields.io/github/stars/Sharawey74/Event-Ticketing-Platform?style=for-the-badge&logo=github&color=6E56CF)](https://github.com/Sharawey74/Event-Ticketing-Platform)
+If this project was useful or interesting, a star ⭐ helps others find it.
 
 **[Live Frontend](https://event-ticketing-platform-nu.vercel.app)** · **[Live API](https://backend-production-8daea.up.railway.app)** · **[API Docs](https://backend-production-8daea.up.railway.app/swagger-ui/index.html)** · **[Source](https://github.com/Sharawey74/Event-Ticketing-Platform)**
-
-[PROGRESS.md](PROGRESS.md) (day-by-day build log) · [PERFORMANCE.md](PERFORMANCE.md) (k6 methodology)
 
 Licensed under the [MIT License](LICENSE).
 
