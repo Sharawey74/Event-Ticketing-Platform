@@ -250,8 +250,7 @@ export default function Home() {
         {isError ? (
           <div className="rounded-2xl border border-outline-variant bg-surface-container-low p-8 text-center">
             <p className="text-on-surface-variant text-sm font-medium">
-              Could not load events — make sure the backend is running on port
-              8081.
+              Could not load events — make sure the backend is reachable at the URL below.
             </p>
             <p className="mt-1 text-xs text-outline">
               Expected:{" "}
