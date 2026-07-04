@@ -15,6 +15,8 @@
 
 [![Tests](https://img.shields.io/badge/tests-194%2F194_passing-2EA44F?style=flat-square)](#quality--testing)
 [![Coverage](https://img.shields.io/badge/coverage-83%25_instruction-2EA44F?style=flat-square)](#quality--testing)
+[![Testcontainers](https://img.shields.io/badge/Testcontainers-real_infra_in_tests-2496ED?style=flat-square&logo=testcontainers&logoColor=white)](#quality--testing)
+[![k6](https://img.shields.io/badge/k6-Grafana_Labs-7D64FF?style=flat-square&logo=k6&logoColor=white)](#performance)
 [![Docker](https://img.shields.io/badge/docker-multi--stage-2496ED?style=flat-square&logo=docker&logoColor=white)](#local-development)
 [![Deploy](https://img.shields.io/badge/deployed-Railway_%2B_Vercel-6E56CF?style=flat-square)](#production)
 
@@ -54,59 +56,53 @@ attendee and organizer experiences.
 
 ## System Architecture
 
-```mermaid
-flowchart LR
-    subgraph Client
-        FE["Next.js 16 Frontend<br/>(Vercel)"]
-    end
-
-    subgraph Backend["Spring Boot Backend (Railway)"]
-        API["REST API Layer<br/>30 endpoints · 9 controllers"]
-        SVC["Domain Services<br/>event · booking · payment · pricing"]
-        SM["Booking State Machine<br/>11 states"]
-    end
-
-    subgraph Data["Data & Messaging"]
-        PG[("PostgreSQL 17<br/>source of truth")]
-        RD[("Redis 7<br/>inventory · locks · JWT denylist")]
-        MQ[["RabbitMQ 4<br/>async notifications"]]
-    end
-
-    STRIPE["Stripe<br/>(checkout + webhooks)"]
-
-    FE -->|HTTPS / JWT| API
-    API --> SVC
-    SVC --> SM
-    SVC -->|source of truth| PG
-    SVC -->|atomic counters & locks| RD
-    SVC -->|async events| MQ
-    SVC <-->|checkout sessions & webhooks| STRIPE
-    MQ -->|QR generation, emails| SVC
+```text
+  Next.js 16 Frontend (Vercel)
+              │
+              │  HTTPS + JWT
+              ▼
+  Spring Boot Backend (Railway)
+   │
+   ├─ REST API Layer          30 endpoints · 9 controllers
+   │
+   ├─ Domain Services         event · booking · payment · inventory ·
+   │                          pricing · notification · user
+   │     └────────────────►   Stripe (checkout sessions + webhooks)
+   │
+   └─ Booking State Machine   11 states, one instance per request
+   │
+   ├──────────────►  PostgreSQL 17   source of truth
+   ├──────────────►  Redis 7         inventory counters · distributed
+   │                                 locks · JWT denylist · rate limits
+   └──────────────►  RabbitMQ 4      async notifications ─┐
+                                                           │
+              ▲── QR generation + confirmation emails ─────┘
 ```
 
 ### Reservation flow (concurrency-critical path)
 
-```mermaid
-sequenceDiagram
-    participant User as Client
-    participant App as BookingService
-    participant Redis as Redis (Lua script)
-    participant DB as PostgreSQL
+```text
+ 1. Client          ──POST /api/v1/bookings──►  BookingService
 
-    User->>App: POST /api/v1/bookings
-    App->>Redis: acquire per-user distributed lock
-    App->>Redis: re-check availability (TOCTOU guard)
-    App->>Redis: reserveSeat() — atomic Lua floor guard
-    alt seats available
-        Redis-->>App: decremented, success
-        App->>DB: atomic conditional UPDATE (availableCount -= n)
-        App->>DB: INSERT Booking (state=RESERVED, expires_at=+5m)
-        App-->>User: 201 Created
-    else sold out
-        Redis-->>App: rejected (floor guard)
-        App-->>User: 409 Conflict
-    end
-    App->>Redis: release lock
+ 2. BookingService   ──►  Redis: acquire per-user distributed lock
+ 3. BookingService   ──►  Redis: re-check availability (TOCTOU guard)
+ 4. BookingService   ──►  Redis: reserveSeat() — atomic Lua floor guard
+
+    ┌─ seats available ────────────────────────────────────────────┐
+    │ 5. Redis            ──►  decremented, success                │
+    │ 6. BookingService   ──►  PostgreSQL: atomic conditional       │
+    │                          UPDATE (availableCount -= n)         │
+    │ 7. BookingService   ──►  PostgreSQL: INSERT Booking           │
+    │                          (state=RESERVED, expires_at=+5m)     │
+    │ 8. BookingService   ──►  Client: 201 Created                  │
+    └────────────────────────────────────────────────────────────┘
+
+    ┌─ sold out ────────────────────────────────────────────────────┐
+    │ 5. Redis            ──►  rejected (floor guard)                │
+    │ 6. BookingService   ──►  Client: 409 Conflict                  │
+    └────────────────────────────────────────────────────────────┘
+
+ 9. BookingService   ──►  Redis: release lock
 ```
 
 ---
@@ -146,7 +142,8 @@ sequenceDiagram
 | API Docs | springdoc-openapi 2.8 (Swagger UI) |
 | QR Generation | ZXing 3.5 |
 | Coverage | JaCoCo 0.8 (80% instruction gate) |
-| Testing | JUnit 5 · Mockito · Testcontainers |
+| Unit & Integration Testing | JUnit 5 · Mockito · Testcontainers (real PostgreSQL, Redis, RabbitMQ in Docker) |
+| Load & Performance Testing | k6 (Grafana Labs) |
 
 ### Data & Messaging
 
