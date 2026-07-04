@@ -57,52 +57,47 @@ attendee and organizer experiences.
 ## System Architecture
 
 ```text
-  Next.js 16 Frontend (Vercel)
-              │
-              │  HTTPS + JWT
-              ▼
-  Spring Boot Backend (Railway)
+Next.js 16 Frontend (Vercel)
+   │
+   │  HTTPS + JWT
+   ▼
+Spring Boot Backend (Railway)
    │
    ├─ REST API Layer          30 endpoints · 9 controllers
    │
    ├─ Domain Services         event · booking · payment · inventory ·
    │                          pricing · notification · user
-   │     └────────────────►   Stripe (checkout sessions + webhooks)
+   │                          (talks to Stripe for checkout sessions + webhooks)
    │
    └─ Booking State Machine   11 states, one instance per request
-   │
-   ├──────────────►  PostgreSQL 17   source of truth
-   ├──────────────►  Redis 7         inventory counters · distributed
-   │                                 locks · JWT denylist · rate limits
-   └──────────────►  RabbitMQ 4      async notifications ─┐
-                                                           │
-              ▲── QR generation + confirmation emails ─────┘
+
+Domain Services read/write:
+   - PostgreSQL 17    source of truth
+   - Redis 7          inventory counters, distributed locks, JWT denylist, rate limits
+   - RabbitMQ 4       async notifications, consumed back into Domain Services
+                      for QR code generation and confirmation emails
 ```
 
 ### Reservation flow (concurrency-critical path)
 
 ```text
- 1. Client          ──POST /api/v1/bookings──►  BookingService
+1. Client            --> POST /api/v1/bookings --> BookingService
 
- 2. BookingService   ──►  Redis: acquire per-user distributed lock
- 3. BookingService   ──►  Redis: re-check availability (TOCTOU guard)
- 4. BookingService   ──►  Redis: reserveSeat() — atomic Lua floor guard
+2. BookingService     --> Redis: acquire per-user distributed lock
+3. BookingService     --> Redis: re-check availability (TOCTOU guard)
+4. BookingService     --> Redis: reserveSeat() -- atomic Lua floor guard
 
-    ┌─ seats available ────────────────────────────────────────────┐
-    │ 5. Redis            ──►  decremented, success                │
-    │ 6. BookingService   ──►  PostgreSQL: atomic conditional       │
-    │                          UPDATE (availableCount -= n)         │
-    │ 7. BookingService   ──►  PostgreSQL: INSERT Booking           │
-    │                          (state=RESERVED, expires_at=+5m)     │
-    │ 8. BookingService   ──►  Client: 201 Created                  │
-    └────────────────────────────────────────────────────────────┘
+   If seats are available:
+   5. Redis            --> decremented, success
+   6. BookingService    --> PostgreSQL: atomic conditional UPDATE (availableCount -= n)
+   7. BookingService    --> PostgreSQL: INSERT Booking (state=RESERVED, expires_at=+5m)
+   8. BookingService    --> Client: 201 Created
 
-    ┌─ sold out ────────────────────────────────────────────────────┐
-    │ 5. Redis            ──►  rejected (floor guard)                │
-    │ 6. BookingService   ──►  Client: 409 Conflict                  │
-    └────────────────────────────────────────────────────────────┘
+   If sold out:
+   5. Redis            --> rejected (floor guard)
+   6. BookingService    --> Client: 409 Conflict
 
- 9. BookingService   ──►  Redis: release lock
+9. BookingService     --> Redis: release lock
 ```
 
 ---
