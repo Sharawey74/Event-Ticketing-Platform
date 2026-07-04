@@ -75,6 +75,12 @@ public class BookingService {
             throw new IllegalStateException("Not enough tickets available");
         }
 
+        // Kept per-user-per-tier (not widened to per-tier): a distinct lock key per user lets
+        // different users' concurrent reservations for the same tier proceed in parallel — this
+        // lock's job is guarding one user's own re-entrancy/TOCTOU window, not serializing the
+        // shared tier row (that is now handled below by an atomic conditional UPDATE instead of
+        // a JPA read-modify-write, so no @Version conflict is possible regardless of how many
+        // different users write to the same tier concurrently — see decrementAvailableCount()).
         String lockKey = "tier:" + tierId + ":user:" + userId;
         String lockValue = UUID.randomUUID().toString();
 
@@ -97,8 +103,16 @@ public class BookingService {
 
             // Fix D19-1: mirror the decrement in the DB-persisted tier so GET /api/events/{id}
             // does not show a stale, falsely-high count while this hold is active.
-            tier.setAvailableCount(tier.getAvailableCount() - quantity);
-            ticketTierRepository.save(tier);
+            // Day 21 concurrency hardening: atomic conditional UPDATE rather than
+            // tier.setAvailableCount()+save() — see decrementAvailableCount() javadoc.
+            int updated = ticketTierRepository.decrementAvailableCount(tierId, quantity);
+            if (updated == 0) {
+                // Redis just approved this reservation but the DB-persisted count refused it
+                // (only possible if Redis and DB were already out of sync) — release the Redis
+                // seat rather than leaving it permanently decremented with no booking created.
+                inventoryService.releaseSeat(tierId, quantity);
+                throw new IllegalStateException("Not enough tickets available");
+            }
 
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));

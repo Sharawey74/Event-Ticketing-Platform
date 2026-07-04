@@ -40,4 +40,18 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.message")
                         .value("Checkout requires booking in RESERVED state, but was: CANCELLED"));
     }
+
+    /**
+     * Concurrency & Scalability Hardening (Day 21): @Version exists on Booking, TicketTier, and
+     * Event, but nothing caught ObjectOptimisticLockingFailureException before this test — any
+     * concurrent write conflict on those 3 entities outside checkIn() (the only @Retryable path)
+     * fell through to the generic 500 handler instead of a clean 409.
+     */
+    @Test
+    @WithMockUser
+    void throwOptimisticLockingFailure_shouldReturn409() throws Exception {
+        mockMvc.perform(post("/test/optimistic-lock"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false));
+    }
 }

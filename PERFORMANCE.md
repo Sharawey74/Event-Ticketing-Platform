@@ -10,6 +10,7 @@ Load testing uses [k6](https://k6.io/) (standalone CLI, not wired into CI). Scri
 | `load-test.js` | Baseline read-path load: public `GET /api/events` + `GET /api/events/{id}`. No auth required. |
 | `booking-reservation.js` | Authenticated booking creation (`POST /api/v1/bookings`) under moderate concurrency. |
 | `inventory-pressure.js` | High-concurrency burst against a low-capacity tier — verifies the Redis Lua floor guard degrades to clean 409s under oversell pressure instead of overselling or 500ing. |
+| `capacity-ramp.js` | Staged VU ramp (10→25→50→100→200) against a weighted, realistic journey mix (40% browse, 20% search, 25% reserve, 15% check own bookings) — establishes a real capacity number for the actual live deployment (1 Railway replica, 5-connection Hikari pool), not a local dev-machine baseline. Defaults `BASE_URL` to the Railway URL, unlike the other 3 scripts. |
 
 ## How to run
 
@@ -56,10 +57,38 @@ k6 run \
   src/test/k6/inventory-pressure.js
 ```
 
-## Prerequisite setup for scenarios 2 and 3
+### 4. Capacity ramp against live Railway (`capacity-ramp.js`)
 
-Both booking scenarios need a real published event with a real ticket tier, and a real JWT.
-Run this sequence against whichever `BASE_URL` you're testing:
+Unlike scenarios 1-3, this defaults `BASE_URL` to the live Railway URL — its purpose is a real
+capacity number for the actual deployment (1 replica, 5-connection Hikari pool), not a local
+dev-machine number. `AUTH_TOKEN`/`EVENT_ID`/`TIER_ID` are optional: without them the reserve and
+my-bookings journeys silently no-op and only the browse/search journeys run.
+
+```bash
+k6 run \
+  --env AUTH_TOKEN=<jwt> \
+  --env EVENT_ID=<id> \
+  --env TIER_ID=<id> \
+  src/test/k6/capacity-ramp.js
+```
+
+**While this is running**, poll RabbitMQ queue depth so a backlog on the notification/ticket-
+generation queues doesn't go unnoticed just because the HTTP response stayed fast (consumer
+concurrency is unset — Spring Boot's default, effectively 1 consumer per queue). Either watch
+CloudAMQP's management dashboard for the 3 queues, or poll its HTTP management API directly:
+
+```bash
+curl -s -u <cloudamqp-user>:<cloudamqp-password> \
+  "https://<cloudamqp-host>/api/queues" | jq '.[] | {name, messages, messages_ready}'
+```
+
+Record the peak `messages_ready` seen for each queue during the run alongside the k6 results
+below — there is no automated capture for this yet (see Known limitations).
+
+## Prerequisite setup for scenarios 2-4
+
+All 3 booking-related scenarios need a real published event with a real ticket tier, and a real
+JWT. Run this sequence against whichever `BASE_URL` you're testing:
 
 ```bash
 # 1. Register an organizer (or reuse an existing one)
@@ -220,9 +249,56 @@ guard never allowed more than the tier's true capacity (8) to succeed, never ret
 correctly degraded to clean 409s both while draining the last few seats (Run 1) and once fully
 sold out (Run 2).
 
+### Capacity Ramp — Railway (`capacity-ramp.js`)
+
+Run 2026-07-04 against the live Railway backend, full 6-stage ramp (10→25→50→100→200→0 VUs over
+16m00s). **Run scope was deliberately read-only**: no `AUTH_TOKEN`/`EVENT_ID`/`TIER_ID` were
+supplied, so the `reserve` and `my-bookings` journeys silently no-op per the script's design —
+only `browse` (40%) and `search` (20% → renormalized to 100% between the two active journeys)
+actually issued requests. This was a deliberate choice to get a real capacity number for the read
+path without creating load-test bookings or exercising the production rate limiter against a
+single-replica live deployment. A future run with real credentials would exercise all 4 journeys.
+
+**Aggregate results (whole run, all 200 max VUs):**
+
+| Metric | Value |
+| :--- | :--- |
+| Total requests | 32,577 (33.89 req/s average over 16m01s) |
+| Total iterations | 54,290 (56.48/s — higher than request count because the no-op reserve/my-bookings journeys still count as completed iterations) |
+| `http_req_failed` | **0.00%** (0 of 32,577) |
+| `checks_succeeded` | **100.00%** (32,577 of 32,577) |
+| `capacity_server_errors` (5xx) | **0** — threshold `count==0` ✓ passed |
+| Latency — browse (`p95` threshold `<500ms`) | avg 258.3ms · p90 340.4ms · **p95 394.0ms** ✓ passed |
+| Latency — search (`p95` threshold `<500ms`) | avg 260.7ms · p90 344.7ms · **p95 394.5ms** ✓ passed |
+| Latency — reserve / my-bookings | N/A this run — no-op (see scope note above); thresholds trivially passed at `0s` |
+| Overall latency | avg 259.1ms · min 200.1ms · median 219.3ms · max 3.51s · p95 394.1ms |
+| Peak concurrent VUs reached | 200 (full ramp target reached and sustained) |
+| Peak RabbitMQ queue depth | _not captured this run — see Known limitations_ |
+
+**What this shows:** the read path (event browsing + search) holds a sub-400ms p95 all the way up
+to 200 concurrent virtual users against the live single-replica Railway deployment, with zero
+failed requests and zero 5xx errors across the full 16-minute ramp. This is markedly higher
+latency than the local baseline (p95 15.9ms) — expected, since this traffic crosses the public
+internet to a real deployment rather than `localhost`, and the local baseline used a lower peak
+VU count (50, not 200).
+
+**Not captured in this run** (would require a follow-up run with real credentials):
+
+- A true per-VU-stage breakdown (10 / 25 / 50 / 100 / 200 taken separately) — k6's console summary
+  reports run-wide aggregates by default; per-stage numbers would need the script's requests
+  explicitly tagged by stage and analyzed from the raw JSON output (`--out json=...`), which this
+  run did not enable.
+- Booking-creation (`reserve`) and authenticated (`my-bookings`) journey numbers at scale.
+
 ## Known limitations
 
 - k6 is not wired into CI (`.github/workflows/main.yml` is test-only; no load-test job).
+- `capacity-ramp.js` has been run against live Railway (2026-07-04, read-only scope — browse/search
+  only, see results above), but RabbitMQ queue-depth was not captured during that run — it's a
+  manual dashboard/curl step (see "How to run" §4), not an automated metric, and there is no
+  Actuator/Micrometer RabbitMQ integration in this project (flagged as a Phase 1B stretch item).
+  A follow-up run with real credentials is still needed to get `reserve`/`my-bookings` numbers at
+  scale, and per-VU-stage (rather than whole-run) latency breakdowns.
 - Scenarios 2 and 3 require manually creating a test event/tier beforehand and cleaning it up
   (or leaving it as permanent fixture data) afterward — there is no automated teardown.
 - Running scenario 3 against production will permanently consume the low-capacity tier's
