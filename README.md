@@ -1,192 +1,317 @@
-# 🎫 Eventora — High-Concurrency Event Ticketing System
+<div align="center">
 
-A production-grade, distributed event ticketing platform engineered for high concurrency, ultra-low latency, and resilient asynchronous message handling. Built on a modern reactive-caching architecture to prevent overselling while maintaining high throughput.
+# 🎟️ Eventora
 
-![Java Version](https://img.shields.io/badge/Java-21-orange.svg?style=flat-square&logo=openjdk)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-brightgreen.svg?style=flat-square&logo=springboot)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue.svg?style=flat-square&logo=postgresql)
-![Redis](https://img.shields.io/badge/Redis-7-red.svg?style=flat-square&logo=redis)
-![RabbitMQ](https://img.shields.io/badge/RabbitMQ-4--management-orange.svg?style=flat-square&logo=rabbitmq)
-![Next.js](https://img.shields.io/badge/Next.js-15-black.svg?style=flat-square&logo=nextdotjs)
+### High-Concurrency Event Ticketing Platform
 
----
+**A modular-monolith backend engineered to guarantee zero ticket overselling under concurrent load, paired with a Next.js storefront and organizer console.**
 
-## 🏗️ Architectural Foundations
+[![Java](https://img.shields.io/badge/Java-21_LTS-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](#backend)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.5-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](#backend)
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](#frontend)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](#data--messaging)
+[![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white)](#data--messaging)
+[![RabbitMQ](https://img.shields.io/badge/RabbitMQ-4-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white)](#data--messaging)
 
-TicketCraft is designed with a focus on strict system limits, reliability under spike load, and modular enterprise design patterns:
+[![Tests](https://img.shields.io/badge/tests-194%2F194_passing-2EA44F?style=flat-square)](#quality--testing)
+[![Coverage](https://img.shields.io/badge/coverage-83%25_instruction-2EA44F?style=flat-square)](#quality--testing)
+[![Docker](https://img.shields.io/badge/docker-multi--stage-2496ED?style=flat-square&logo=docker&logoColor=white)](#local-development)
+[![Deploy](https://img.shields.io/badge/deployed-Railway_%2B_Vercel-6E56CF?style=flat-square)](#production)
 
-- **Atomic Inventory Reservation:** Implements Redis Lua floor guards to guarantee zero overselling under heavy load without blocking database connections.
-- **Asynchronous Message Processing:** Leverages RabbitMQ with dead-letter-exchanges (DLQs) to reliably decouple expensive tasks like ticket QR code generation and email notifications.
-- **Optimal Data Fetching:** Enforces strict `@EntityGraph` query isolation to completely eliminate JPA N+1 lazy loading performance degradations.
-- **Audit-Ready Schema Strategy:** Uses PostgreSQL database-level ENUM types for user roles, soft delete mechanisms for reservation records, and UTC `Instant` timeline tracking.
-- **Clean Architecture & DI:** Strictly enforces constructor-only dependency injection, thin controllers returning standardized wrapper schemas, and separate presentation layer DTOs.
+**[Live Frontend](https://event-ticketing-platform-nu.vercel.app) · [Live API](https://backend-production-8daea.up.railway.app) · [API Docs](https://backend-production-8daea.up.railway.app/swagger-ui/index.html)**
 
----
-
-## 🛠️ Infrastructure & Tech Stack
-
-| Component | Technology | Role |
-| :--- | :--- | :--- |
-| **Language Runtime** | Java 21 (LTS) | Clean OOP, Pattern Matching, virtual-thread ready |
-| **Framework Core** | Spring Boot 3.x / Web / Security | Security filters, transaction handling, dependency injection |
-| **Primary Database** | PostgreSQL 17 | Relational persistence, transactional isolation |
-| **Database Migration** | Flyway | Versioned, immutable, database-level schema changes |
-| **Caching & Lock** | Redis 7 | Distributed state tracking, atomic reservation floor checks |
-| **Message Broker** | RabbitMQ 4 | Asynchronous tasks, transaction decoupling |
-| **Frontend Client** | Next.js 15 (App Router) | High-performance search, filtering, and booking portal |
+</div>
 
 ---
 
-## 🚀 Quick Start
+## Table of Contents
 
-1. Start all infrastructure components:
-   - `docker-compose up -d`
-   - **PostgreSQL:** Port 5432
-   - **Redis:** Port 6379
-   - **RabbitMQ:** Port 5672 (AMQP) / 15672 (Management Dashboard)
-   - **pgAdmin:** Port 5050 (Database GUI Browser)
-   - **Redis Commander:** Port 8081 (Redis GUI Browser)
-   - **Mailhog:** Port 1025 (SMTP Server) / 8025 (Web UI Email Browser)
-2. Compile the backend:
-   - `./mvnw compile`
-3. Run the application locally:
-   - `./mvnw spring-boot:run`
+- [Overview](#overview)
+- [System Architecture](#system-architecture)
+- [Engineering Highlights](#engineering-highlights)
+- [Tech Stack](#tech-stack)
+- [Domain & API Surface](#domain--api-surface)
+- [Quality & Testing](#quality--testing)
+- [Environments](#environments)
+- [Performance](#performance)
+- [Security Posture](#security-posture)
 
 ---
 
-## 📝 System Design Notes
+## Overview
 
-- Uses Flyway migrations configured in `src/main/resources/db/migration` for schema evolution.
-- Enforces `Instant` for all time fields globally to prevent server timezone mismatch.
-- Centralizes all system limits and business constraints in [BusinessConstants.java](file:///c:/Users/DELL/Desktop/Event-Ticketing-Platform/src/main/java/com/ticketing/common/util/BusinessConstants.java).
+Eventora is a full-stack event ticketing system built around one hard constraint: **a ticket
+tier can never sell more seats than it has, even under concurrent, adversarial load** — without
+sacrificing throughput by serializing every request through a single database lock.
 
----
-
-## 📊 Performance Optimizations
-
-### N+1 Query Elimination
-
-**Problem:** JPA lazy loading caused N+1 queries on paginated event lists. With 10 events and 3 LAZY associations each (organizer, category, venue), one page request generated **31+ SQL queries**.
-
-**Fix:** `@EntityGraph(attributePaths = {"organizer", "category", "venue"})` applied to all list/search methods in `EventRepository` and `BookingRepository`.
-
-| Scenario | Before Fix | After Fix |
-| :--- | :--- | :--- |
-| Fetch 10 events | 31 queries | **1 query** |
-| Fetch event by ID | 4 queries | **1 query** |
-| Search published events | 31 queries | **1 query** |
-| Fetch 10 bookings | 21 queries | **1 query** |
-
-> Rule: `FetchType.EAGER` is **never** used. N+1 is always fixed via `@EntityGraph` or `JOIN FETCH`.
+The backend is a Spring Boot **modular monolith** — strict domain boundaries (`event`, `booking`,
+`payment`, `inventory`, `pricing`, `notification`, `user`) that communicate only through service
+interfaces and DTOs, making any domain independently extractable into its own service later
+without a rewrite. The frontend is a Next.js App Router client consuming that API, with separate
+attendee and organizer experiences.
 
 ---
 
-## Day-by-Day Implementation Progress (Week 1 Completed)
+## System Architecture
 
-### Day 1: Project Initialization & DB Schema
+```mermaid
+flowchart LR
+    subgraph Client
+        FE["Next.js 16 Frontend<br/>(Vercel)"]
+    end
 
-- Scaffolded Spring Boot application.
-- Configured initial Flyway migration scripts (`V1` to `V9`) for tables: `users`, `events`, `categories`, `venues`, `ticket_tiers`, `bookings`, `tickets`, `payments`, `refunds`.
-- **Optimization:** Defined explicit PostgreSQL ENUM types for roles, soft delete (`deleted_at`) fields on bookings, and enforced UTC timezone using `Instant` for all date-time properties to prevent timezone mismatch anomalies.
+    subgraph Backend["Spring Boot Backend (Railway)"]
+        API["REST API Layer<br/>30 endpoints · 9 controllers"]
+        SVC["Domain Services<br/>event · booking · payment · pricing"]
+        SM["Booking State Machine<br/>11 states"]
+    end
 
-### Day 2: Authentication & Event Domain
+    subgraph Data["Data & Messaging"]
+        PG[("PostgreSQL 17<br/>source of truth")]
+        RD[("Redis 7<br/>inventory · locks · JWT denylist")]
+        MQ[["RabbitMQ 4<br/>async notifications"]]
+    end
 
-- JWT security implementation with custom filters (`JwtFilter`) and authorization configuration (`SecurityConfig`).
-- Event domain services, repository, and controller.
-- **Rule:** Absolute constructor-only dependency injection and class-level `@Transactional(readOnly = true)` pattern.
+    STRIPE["Stripe<br/>(checkout + webhooks)"]
 
-### Day 3: Venue, Category, & Event Search
+    FE -->|HTTPS / JWT| API
+    API --> SVC
+    SVC --> SM
+    SVC -->|source of truth| PG
+    SVC -->|atomic counters & locks| RD
+    SVC -->|async events| MQ
+    SVC <-->|checkout sessions & webhooks| STRIPE
+    MQ -->|QR generation, emails| SVC
+```
 
-- Implemented full CRUD controllers and services for Category, Venue, and Event.
-- Added event search filtering (`EventSearchService`) with pageable queries.
-- Secured write operations for Venues/Categories (`@PreAuthorize("hasRole('ADMIN')")`) and Events (`@PreAuthorize("hasRole('ORGANIZER') or hasRole('ADMIN')")`).
-
-### Day 4: Next.js Frontend
-
-- Integrated Next.js 15 client (`frontend/`) with search, filter capability, and event details route `/events/[id]`.
-- Wired client to query the backend dynamically based on `NEXT_PUBLIC_API_URL`.
-
-### Day 5: High-Concurrency Inventory & Async Messaging
-
-- **Lua Floor Guard:** Avoided overselling by implementing a Redis Lua script floor guard (`reserveSeat()`) guaranteeing atomic decrements only when seats are available.
-- **Warm-up Readiness:** Added `InventoryWarmupHealthIndicator` to block Kubernetes/Railway health checks until inventory is successfully populated in Redis cache from database on startup.
-- **RabbitMQ Config:** Set up dead-letter-exchanges (DLQs), and async QR code generation task flow offloaded to `ticket.generation.queue`.
-
-### Day 6: N+1 Query Fixes & E2E Testing
-
-- Optimized JPA queries via `@EntityGraph` (reducing SQL queries for 10 events/bookings from 31+ to exactly 1).
-- Set up integration testing suite with Docker Testcontainers (PostgreSQL & Redis).
-- Created k6 performance baseline testing scripts.
-
-### Day 7: Week 1 Polish & Production Readiness
-
-- Standardized logging using MDC correlation ID propagation across all filters and services (`X-Correlation-ID`).
-- Docker Compose improvements: Added container healthchecks to PostgreSQL, Redis, and RabbitMQ to block the application startup until they are ready (`service_healthy`).
-- Centralized error response patterns in `GlobalExceptionHandler` mapping entities to descriptive client payloads.
-
----
-
-## Core System Architecture & Guidelines
-
-### 1. High Concurrency Ticket Reservation Flow
+### Reservation flow (concurrency-critical path)
 
 ```mermaid
 sequenceDiagram
-    participant User as Client / Frontend
-    participant App as Spring Boot Backend
-    participant Redis as Redis Cache (Lua script)
-    participant DB as PostgreSQL Database
-    
-    User->>App: POST /api/bookings (Reserve tickets)
-    App->>Redis: reserveSeat(tierId, quantity) via Lua
-    alt Lua Check: Available Count >= Request Quantity
-        Redis-->>App: Return success (New count)
-        App->>DB: Save Booking (State: RESERVED, expires_at: 5m)
-        App-->>User: Return 201 (Reserved Booking ID)
-    else Lua Check: Insufficient Count
-        Redis-->>App: Return failure (-1 / -2)
-        App-->>User: Return 400 (Insufficient Inventory)
+    participant User as Client
+    participant App as BookingService
+    participant Redis as Redis (Lua script)
+    participant DB as PostgreSQL
+
+    User->>App: POST /api/v1/bookings
+    App->>Redis: acquire per-user distributed lock
+    App->>Redis: re-check availability (TOCTOU guard)
+    App->>Redis: reserveSeat() — atomic Lua floor guard
+    alt seats available
+        Redis-->>App: decremented, success
+        App->>DB: atomic conditional UPDATE (availableCount -= n)
+        App->>DB: INSERT Booking (state=RESERVED, expires_at=+5m)
+        App-->>User: 201 Created
+    else sold out
+        Redis-->>App: rejected (floor guard)
+        App-->>User: 409 Conflict
     end
+    App->>Redis: release lock
 ```
-
-### 2. Mandatory Coding Conventions
-
-- **No Field Injection:** Constructor injection only using `@RequiredArgsConstructor` on all service and controller components.
-- **Timezones:** Use `java.time.Instant` for all timestamp database columns and JPA fields. `LocalDateTime` is strictly prohibited.
-- **Read-Only Transactions:** Enforce `@Transactional(readOnly = true)` at the class level on services. Mutating database operations must override this with a local `@Transactional`.
-- **Security:** Write operations must explicitly check user roles with `@PreAuthorize` method annotations. Web tests must inherit `TestSecurityConfig`.
-- **No Magic Numbers:** All constants must be registered in [BusinessConstants.java](file:///c:/Users/DELL/Desktop/Event-Ticketing-Platform/src/main/java/com/ticketing/common/util/BusinessConstants.java).
 
 ---
 
-## Full-Stack Local Execution
+## Engineering Highlights
+
+### Concurrency & Data Integrity
+
+| Mechanism | Implementation |
+| :--- | :--- |
+| **Oversell prevention** | A Redis Lua script performs the availability check and decrement as one atomic operation — verified by a dedicated test firing 100 concurrent threads at a 50-seat tier: exactly 50 succeed, 0 oversold. |
+| **DB/cache consistency** | The PostgreSQL mirror of available inventory is written via a single atomic conditional `UPDATE ... WHERE available_count >= :qty`, not a read-modify-write — eliminating a class of race condition where a losing optimistic-lock transaction could roll back a booking while the Redis seat stayed decremented. |
+| **TOCTOU guard** | Availability is checked once before acquiring the reservation lock, then re-checked *inside* the lock before committing, closing the classic check-then-act race window. |
+| **Optimistic locking** | `@Version` on `Booking`, `TicketTier`, and `Event`; `ObjectOptimisticLockingFailureException` maps to a clean `409` rather than a raw `500`. |
+| **State machine** | An 11-state Spring State Machine (`@EnableStateMachineFactory`, one instance per request) governs the booking lifecycle, preventing invalid transitions such as checking in a cancelled booking. |
+| **Idempotency** | Stripe webhook delivery is deduplicated via a database `UNIQUE` constraint (not an `existsBy…` pre-check, which is race-prone under concurrent delivery); booking creation requires a client-supplied `Idempotency-Key` header. |
+
+### Reliability
+
+- **Multi-replica-safe scheduling** — the reservation-expiry job acquires a distributed lock before running, so it's safe to run the same deployment across multiple backend instances without double-processing.
+- **Structured, traceable logging** — a correlation ID propagates from the inbound HTTP request through every service log line via MDC, so a single request can be traced end-to-end in the logs.
+- **Async offloading** — QR code generation and transactional emails are dispatched through RabbitMQ (with dead-letter queues) rather than blocking the request thread.
+
+---
+
+## Tech Stack
 
 ### Backend
 
-Run unit and mock security tests:
+| Layer | Technology |
+| :--- | :--- |
+| Language / Runtime | Java 21 (LTS) |
+| Framework | Spring Boot 3.5, Spring Security, Spring Data JPA |
+| State Management | Spring State Machine 4.0 |
+| Payments | Stripe Java SDK 23.3 |
+| Auth | JJWT 0.11 |
+| API Docs | springdoc-openapi 2.8 (Swagger UI) |
+| QR Generation | ZXing 3.5 |
+| Coverage | JaCoCo 0.8 (80% instruction gate) |
+| Testing | JUnit 5 · Mockito · Testcontainers |
 
-```bash
-./mvnw test
-```
+### Data & Messaging
 
-Start the local server (Ensure Docker Desktop is active if running Testcontainers):
-
-```bash
-./mvnw spring-boot:run
-```
+| Layer | Technology |
+| :--- | :--- |
+| Primary Datastore | PostgreSQL 17 · Flyway (12 versioned migrations) |
+| Cache / Distributed Locking | Redis 7 (Lettuce client) |
+| Async Messaging | RabbitMQ 4 |
 
 ### Frontend
 
-Configure the environment variables in `frontend/.env.local`:
+| Layer | Technology |
+| :--- | :--- |
+| Framework | Next.js 16 (App Router, TypeScript strict) |
+| UI Runtime | React 19 |
+| Styling | Tailwind CSS 4 |
+| Server State | TanStack Query 5 |
+| Client State | Zustand 5 |
+| Forms & Validation | React Hook Form 7 · Zod 4 |
+| Payments | Stripe.js |
+| Testing | Vitest |
 
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8080
+### Infrastructure & Deployment
+
+| Concern | Technology |
+| :--- | :--- |
+| Containerization | Docker — multi-stage build (`eclipse-temurin:21-jdk` → `21-jre`, non-root, ~619MB) |
+| Local Orchestration | Docker Compose (7 services, health-gated startup) |
+| CI | GitHub Actions — backend test+coverage gate, frontend build, secret-leak scan |
+| Backend Hosting | Railway |
+| Frontend Hosting | Vercel |
+
+---
+
+## Domain & API Surface
+
+```
+com.ticketing
+├── event/          Events, venues, categories, search
+├── booking/         Reservation lifecycle, state machine, tickets
+├── payment/         Stripe checkout, webhooks, refunds
+├── inventory/        Redis-backed atomic seat counters
+├── pricing/          Early-bird / group / surge pricing engine
+├── notification/     Async email + QR generation consumers
+├── user/             Authentication, JWT, roles
+└── common/           Security, exception handling, correlation IDs, shared config
 ```
 
-Install dependencies and start development server:
+| Metric | Value |
+| :--- | :--- |
+| REST endpoints | 30 across 9 controllers |
+| Role-restricted endpoints (`@PreAuthorize`) | 18 |
+| Domain services | 21 |
+| Repositories | 11 |
+| API-boundary DTOs | 25 (JPA entities are never exposed through the API) |
+| Database migrations | 12 (Flyway, immutable once applied) |
+
+---
+
+## Quality & Testing
+
+| Metric | Result |
+| :--- | :--- |
+| Backend test suite | **194 / 194 passing** |
+| Instruction coverage (JaCoCo) | **83%** (gate: 80% minimum) |
+| Dedicated concurrency tests | 2 — a 100-thread/50-seat Redis floor-guard proof, and a second end-to-end test through the full reservation path (DB write included) |
+| Integration tests | Real PostgreSQL, Redis, and RabbitMQ via Testcontainers — no mocked infrastructure in integration suites |
+| `@WebMvcTest` security coverage | Every slice runs the real Spring Security filter chain (`addFilters=false` is never used, so `@PreAuthorize` is always exercised) |
+
+Run locally:
 
 ```bash
-cd frontend
-npm install
-npm run dev
+./mvnw verify              # full backend suite + coverage gate
+cd frontend && npm test    # frontend component/helper tests
 ```
+
+---
+
+## Environments
+
+### Production
+
+| Component | Provider | Notes |
+| :--- | :--- | :--- |
+| Frontend | **Vercel** | Auto-deploys from `main`; CSP `connect-src` derived from `NEXT_PUBLIC_API_URL` at build time |
+| Backend | **Railway** | Single container, Docker image built from the repo `Dockerfile`; `SPRING_PROFILES_ACTIVE=prod` |
+| Database | Railway-managed PostgreSQL | Reached via `DATABASE_URL` |
+| Cache / Locks | Railway-managed Redis | |
+| Messaging | CloudAMQP (managed RabbitMQ) | |
+| Payments | Stripe (test mode) | |
+
+All production configuration is environment-variable driven — no secrets or environment-specific
+URLs are ever committed to source (verify via `.gitignore`: `.env` is excluded everywhere).
+
+### Local Development
+
+**Prerequisites:** Java 21 · Node.js 20 · Docker Desktop
+
+```bash
+# 1. Infrastructure
+cp .env.example .env
+docker-compose up -d postgres redis rabbitmq mailhog
+
+# 2. Backend  (http://localhost:8088, Swagger at /swagger-ui/index.html)
+./mvnw spring-boot:run
+
+# 3. Frontend (http://localhost:3000)
+cd frontend
+cp .env.example .env.local   # NEXT_PUBLIC_API_URL=http://localhost:8088
+npm install && npm run dev
+```
+
+| Service | Port | Purpose |
+| :--- | :--- | :--- |
+| Backend API | `8088` | Spring Boot application |
+| PostgreSQL | `5432` | Primary datastore |
+| Redis | `6379` | Inventory counters, locks, JWT denylist, rate limiting |
+| RabbitMQ | `5672` / `15672` | AMQP / management UI |
+| pgAdmin | `5050` | Database browser |
+| Redis Commander | `8082` | Redis browser |
+| Mailhog | `1025` / `8025` | SMTP capture / web UI |
+
+No accounts are seeded by default — register via `/auth/register`. Stripe test card:
+`4242 4242 4242 4242`, any future expiry, any 3-digit CVC.
+
+---
+
+## Performance
+
+k6 load-test results (full methodology and raw numbers in [`PERFORMANCE.md`](PERFORMANCE.md)):
+
+| Scenario | Result |
+| :--- | :--- |
+| Baseline read path (50 VUs) | p95 15.9ms, 0.00% error rate, 74.4 req/s |
+| Booking creation under contention (20 VUs) | p95 55.4ms, 0 server errors, floor guard held at exactly the tier's true capacity |
+| Inventory-pressure burst (100 VUs vs. an 8-seat tier) | Up to 270 req/s, 99.9%+ correctly rejected with `409`, **zero oversell, zero 5xx** across repeated runs |
+| Capacity ramp — **live Railway**, 10→200 VUs over 16 min | 32,577 requests, **0 failed, 0 server errors**, read-path p95 held at **394ms** at peak 200 concurrent VUs against the single-replica production deployment |
+
+---
+
+## Security Posture
+
+Led by the control, not the threat — every row below is an implemented and verified mechanism in
+this codebase, not an aspirational claim. Access control specifically uses **two independent
+layers**: RBAC decides whether a role may call an endpoint at all; object-level authorization
+separately decides whether the specific resource requested belongs to the caller. Neither
+substitutes for the other.
+
+| Control | Defends Against |
+| :--- | :--- |
+| **Parameterized queries (JPA/JPQL only)** | SQL Injection — zero native or string-concatenated SQL queries anywhere in the codebase. |
+| **React JSX auto-escaping · JSON-only API · frontend CSP** | Cross-Site Scripting (XSS) — no server-rendered HTML templates, `dangerouslySetInnerHTML` is never used, and a `Content-Security-Policy` restricts script sources as defense-in-depth. |
+| **Stateless JWT auth (no ambient cookies)** | Cross-Site Request Forgery (CSRF) — the API is stateless (`SessionCreationPolicy.STATELESS`) and authenticated via a Bearer token a cross-site page cannot silently attach, so CSRF's underlying attack vector doesn't exist here. Spring Security's CSRF filter is deliberately disabled — the correct configuration for a token-authenticated REST API, not an oversight. |
+| **Role-Based Access Control (RBAC)** | Unauthorized endpoint access — `@PreAuthorize` role checks (`USER` / `ORGANIZER` / `ADMIN`) gate 18 of 30 endpoints. |
+| **Object-level authorization** | Insecure Direct Object References / Broken Object Level Authorization — RBAC alone only proves a role may call an endpoint, not that a specific resource belongs to the caller. Booking read/cancel operations separately re-validate `booking.getUser().getId().equals(requestingUserId)` before returning or mutating data. |
+| **Server-side role validation on registration** | Privilege Escalation — `Role.ADMIN` is explicitly rejected in `AuthService.register()` regardless of what a client sends, not merely omitted from a form. |
+| **JWT `jti` + Redis denylist** | Session/Token Hijacking — logout immediately revokes the token's `jti` rather than waiting out its natural expiry. |
+| **Redis Lua rate limiting** | Brute Force / Credential Stuffing — atomic `INCR`+`EXPIRE` caps auth attempts at 10/minute/IP in production. |
+| **`X-Frame-Options: DENY`** | Clickjacking. |
+| **`X-Content-Type-Options: nosniff`** | MIME-Sniffing. |
+| **HSTS (1yr, includeSubDomains)** | Transport Downgrade / MITM. |
+| **BCrypt password hashing** | Credential exposure on data breach — passwords are never stored or logged in plaintext. |
+| **Bean Validation at the controller boundary** | Malformed or malicious input reaching services or repositories. |
+| **Exact-origin CORS** | Cross-origin abuse — never a wildcard. |
+| **`ADMIN`-only actuator** | Sensitive endpoint exposure — every `/actuator/**` route requires `ADMIN` except `/health`. |
+| **Environment-variable-driven configuration** | Secret leakage — no hardcoded secrets anywhere in source (verified by repository-wide scan); `.env` is git-ignored everywhere; Stripe runs in test mode only (`sk_test_` / `pk_test_`). |
+
+Full fix-by-fix security and reliability audit trail: [`PROGRESS.md`](PROGRESS.md).
