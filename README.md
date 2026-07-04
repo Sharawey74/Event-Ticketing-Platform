@@ -4,7 +4,7 @@
 
 ### High-Concurrency Event Ticketing Platform
 
-**A production-grade, high-concurrency event ticketing platform engineered with a Modular Monolith backend, Domain-Driven Design bounded contexts, Event-Driven async processing, and a Redis-atomic inventory layer that guarantees zero ticket oversell — deployed on Railway + Vercel.**
+**A production-grade, high-concurrency event ticketing platform engineered with a Modular Monolith backend, domain-oriented bounded contexts, event-driven async processing, and a Redis-atomic inventory layer that guarantees zero ticket oversell — deployed on Railway + Vercel.**
 
 [![Java](https://img.shields.io/badge/Java-21_LTS-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](#backend)
 [![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.5-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](#backend)
@@ -33,6 +33,7 @@
 - [Tech Stack](#tech-stack)
 - [Domain & API Surface](#domain--api-surface)
 - [Quality & Testing](#quality--testing)
+- [CI/CD Pipeline](#cicd-pipeline)
 - [Environments](#environments)
 - [Performance](#performance)
 - [Security Posture](#security-posture)
@@ -45,41 +46,14 @@ Eventora is a full-stack event ticketing platform engineered around one non-nego
 
 The system applies a deliberate stack of architectural patterns, each chosen for a specific engineering reason:
 
-### Modular Monolith
-
-Seven cohesive domains (`event`, `booking`, `payment`, `inventory`, `pricing`, `notification`, `user`) each own their persistence, service logic, and API-boundary DTOs, communicating only through typed service interfaces — enforcing the same bounded-context discipline as microservices without the distributed-system failure modes. Any domain is independently extractable without a rewrite.
-
-### Domain-Driven Design (DDD)
-
-Each module maps to an explicit **Bounded Context**. Aggregates (`Booking`, `Event`, `TicketTier`) carry invariants directly — `@Version`-guarded optimistic locking, ownership checks, state constraints — rather than delegating correctness to the service layer.
-
-### Layered Architecture (Ports & Adapters–inspired)
-
-A strict **Controller → Service → Repository** layering is enforced per module. No service calls another module's repository directly; all cross-module data flows through published service interfaces, keeping the dependency graph explicit and every layer independently testable.
-
-### Event-Driven Architecture (Async Messaging)
-
-Post-booking side effects (QR generation, transactional email) are decoupled from the synchronous request path via **RabbitMQ** with dead-letter queues. This removes I/O-bound latency from the critical path and makes the notification subsystem independently scalable.
-
-### Finite State Machine (FSM)
-
-The booking lifecycle is modelled as an explicit **11-state FSM** (Spring State Machine, one instance per request). Legal transitions are declared as a formal graph — illegal transitions (e.g. checking in a cancelled booking) are rejected at the machine level, not through fragile conditional logic.
-
-### Atomic Inventory Pattern (Redis Lua + DB Dual-Write)
-
-A **three-layer atomicity strategy** prevents oversell without serializing all requests:
-
-1. **Redis Lua script** — atomic floor-guarded `DECRBY` (check + decrement as one indivisible operation), eliminating the TOCTOU race at the cache layer.
-2. **Per-user distributed lock** — prevents duplicate concurrent requests from the same user each passing the Lua check independently.
-3. **Conditional SQL `UPDATE`** — `UPDATE ... WHERE available_count >= :qty` mirrors the guard at the DB layer, ensuring correctness even if Redis diverges.
-
-### RESTful API Design
-
-A stateless **REST API** (30 endpoints, 9 controllers) with JWT Bearer auth (`SessionCreationPolicy.STATELESS`). `@PreAuthorize` RBAC gates endpoint access; a second object-level authorization check separately validates resource ownership — two independent enforcement layers.
-
-### Frontend: Server Components + BFF Topology
-
-Next.js 16 **App Router** splits React Server Components (data-fetching, SEO) from Client Components (interactivity). Server state via **TanStack Query**, UI state via **Zustand**, validation via **React Hook Form + Zod**. The Next.js layer acts as a **Backends-for-Frontends (BFF)**, the sole consumer of the Spring Boot API, shaping responses for distinct attendee and organizer surfaces.
+- **Modular Monolith** — seven cohesive domains (`event`, `booking`, `payment`, `inventory`, `pricing`, `notification`, `user`), each owning its persistence, service logic, and API-boundary DTOs, communicating only through typed service interfaces; independently extractable without a rewrite.
+- **Domain-Oriented Modules (Bounded Contexts)** — each module maps to an explicit context; core entities (`Booking`, `TicketTier`, `Event`) carry invariants directly via `@Version`-guarded optimistic locking and ownership checks (see Engineering Highlights).
+- **Layered Architecture** — a strict Controller → Service → Repository layering per module; no service reaches into another module's repository directly.
+- **Event-Driven Async Processing** — post-booking side effects (QR generation, email) are decoupled from the request path via RabbitMQ with dead-letter queues (see Reliability, below).
+- **Finite State Machine** — the booking lifecycle is an explicit 11-state machine (Spring State Machine); illegal transitions are rejected at the machine level (see Engineering Highlights).
+- **Atomic Inventory Guard** — a three-layer strategy prevents oversell without serializing requests (see Engineering Highlights and the reservation-flow diagram below).
+- **RESTful API** — a stateless surface (30 endpoints, 9 controllers) with JWT auth, RBAC, and a separate object-level authorization check (see Security Posture).
+- **Frontend** — a Next.js 16 App Router client (React Server Components for data-fetching/SEO, Client Components for interactivity) consuming the REST API directly.
 
 ---
 
@@ -241,7 +215,7 @@ Next.js 16 **App Router** splits React Server Components (data-fetching, SEO) fr
 | :--- | :--- |
 | Containerization | Docker — multi-stage build (`eclipse-temurin:21-jdk` → `21-jre`, non-root, ~619MB) |
 | Local Orchestration | Docker Compose (7 services, health-gated startup) |
-| CI | GitHub Actions — backend test+coverage gate, frontend build, secret-leak scan |
+| CI/CD | GitHub Actions — see [CI/CD Pipeline](#cicd-pipeline) |
 | Backend Hosting | Railway |
 | Frontend Hosting | Vercel |
 
@@ -288,6 +262,20 @@ Run locally:
 ./mvnw verify              # full backend suite + coverage gate
 cd frontend && npm test    # frontend component/helper tests
 ```
+
+---
+
+## CI/CD Pipeline
+
+GitHub Actions runs three independent jobs on every push and pull request to `main` and `develop` — this workflow only gates whether code merges, it never deploys anything itself.
+
+| Job | What it does |
+| :--- | :--- |
+| **Backend — Maven Test + JaCoCo** | `./mvnw verify` — full test suite plus the coverage gate; the JaCoCo report is uploaded as a build artifact even when the job fails. |
+| **Frontend — Vitest + Next.js Build** | `npm test` (Vitest), then `npm run build` using `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` from GitHub Secrets. |
+| **Repo Hygiene** | Fails the build if any `.env*` file, `target/`, `frontend/node_modules/`, or `frontend/.next/` is ever tracked in git. |
+
+Deploys are handled independently of this workflow: Railway and Vercel each auto-deploy from `main` through their own native GitHub integration, entirely outside GitHub Actions.
 
 ---
 
@@ -381,3 +369,21 @@ substitutes for the other.
 | **Environment-variable-driven configuration** | Secret leakage — no hardcoded secrets anywhere in source (verified by repository-wide scan); `.env` is git-ignored everywhere; Stripe runs in test mode only (`sk_test_` / `pk_test_`). |
 
 Full fix-by-fix security and reliability audit trail: [`PROGRESS.md`](PROGRESS.md).
+
+---
+
+## Star This Repo
+
+<div align="center">
+
+If this project was useful or interesting, a star helps others find it.
+
+[![GitHub Repo stars](https://img.shields.io/github/stars/Sharawey74/Event-Ticketing-Platform?style=for-the-badge&logo=github&color=6E56CF)](https://github.com/Sharawey74/Event-Ticketing-Platform)
+
+**[Live Frontend](https://event-ticketing-platform-nu.vercel.app)** · **[Live API](https://backend-production-8daea.up.railway.app)** · **[API Docs](https://backend-production-8daea.up.railway.app/swagger-ui/index.html)** · **[Source](https://github.com/Sharawey74/Event-Ticketing-Platform)**
+
+[PROGRESS.md](PROGRESS.md) (day-by-day build log) · [PERFORMANCE.md](PERFORMANCE.md) (k6 methodology)
+
+Licensed under the [MIT License](LICENSE).
+
+</div>
