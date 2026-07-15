@@ -1,10 +1,14 @@
 # AI CONTEXT SNAPSHOT — Event Ticketing Platform
 
-## Last Updated: Day 20 (2026-07-03) — Code Quality + Security Hardening: restricted `/actuator/**` to ADMIN-only (only `/actuator/health` stays public), added Redis-Lua-backed rate limiting on auth/booking endpoints (M-002), added a JWT `jti` + Redis denylist with a new `/logout` endpoint (M-004), fixed a bug where `TicketTier.availableCount` in the database never decremented on reservation and could have permanently leaked inventory if fixed naively (D19-1), and audited/fixed 3 `log.error()` calls that were silently discarding stack traces (CC-1). 191/191 tests passing, 82% INSTRUCTION coverage verified via `./mvnw clean verify`, JaCoCo gate passed.
+## Last Updated: Day 22b (2026-07-15) — Frontend Design Handoff: applied 3 Claude Design mockup exports (Landing, Dashboard, Organizer Dashboard) to the live Next.js frontend. Landing page hero kept its real search form and photo background (explicit instruction) but gained a stats row, a "Become an Organizer" CTA, and three new sections (Feature Strip, Featured Events using real data, For-Organizers teaser); the old category-chip filter + full grid was removed in favor of a small featured-events teaser linking to `/search`. Footer gained Product + Support columns (all real routes, no invented pages). Dashboard and Organizer Dashboard pages got empty-state and visual polish only — no data-fetching logic touched. `npm run build` (the actual Vercel deploy step) succeeds cleanly; `npm run test` 4/4 unchanged; 9 pre-existing lint errors in 6 untouched files confirmed NOT introduced by this work (verified via `git diff`) and confirmed not to block `next build`.
 
-## Branch: day-20-code-quality (local — 6 new commits from this session on top of the Day 19 work, not yet pushed)
+## Previously — Day 22 (2026-07-15) — Seed Data: 15 real-world-plausible, privately organized Egyptian events added via `V13__seed_egypt_private_events.sql` (Flyway migration, IMMUTABLE), so the live storefront/dashboard have real content instead of empty states. Adds 1 new category (`Conference`), 2 new `ORGANIZER` seed users, 15 `PUBLISHED` events across 8 existing private/commercial venues (Cairo, Alexandria, Hurghada, Sharm El Sheikh, Dahab, El Gouna), and 30 ticket tiers (2 per event). Deliberately excludes museums and government-run cultural/antiquities venues by design. 194/194 tests passing (unchanged), ~83.8% INSTRUCTION coverage (gate-scoped) verified via `./mvnw clean verify`, JaCoCo gate passed.
 
-## Test Status: 194/194 ALL passing (191 Day 20 baseline + 3 new Day 21 pre-session: OptimisticLockingFailureException handler, DB-decrement-refusal case, end-to-end reservation concurrency test — Fix 21-1), 83% INSTRUCTION coverage verified via `./mvnw clean verify`
+## Previously — Day 20 (2026-07-03) — Code Quality + Security Hardening: restricted `/actuator/**` to ADMIN-only (only `/actuator/health` stays public), added Redis-Lua-backed rate limiting on auth/booking endpoints (M-002), added a JWT `jti` + Redis denylist with a new `/logout` endpoint (M-004), fixed a bug where `TicketTier.availableCount` in the database never decremented on reservation and could have permanently leaked inventory if fixed naively (D19-1), and audited/fixed 3 `log.error()` calls that were silently discarding stack traces (CC-1). 191/191 tests passing, 82% INSTRUCTION coverage verified via `./mvnw clean verify`, JaCoCo gate passed.
+
+## Branch: feat/seed-data-frontend-refresh (local — renamed from day-22-seed-egypt-events, created from main, not yet pushed)
+
+## Test Status: 194/194 ALL passing (unchanged from Day 21 baseline — this session only added a data-seed Flyway migration, no Java code changes), ~83.8% INSTRUCTION coverage (gate-scoped) verified via `./mvnw clean verify`
 
 ## 1. NON-NEGOTIABLE RULES (From instructions.txt + Overlay)
 
@@ -60,8 +64,10 @@ Every agent session must enforce these without exception:
 | V9__seed_data.sql | 5 categories (Music, Sports, Comedy, Theater, Festival) + 3 venues | IMMUTABLE |
 | V10__add_ticket_tier_version.sql | @Version column on ticket_tiers for optimistic locking | IMMUTABLE |
 | V11__add_waitlist_and_refund_reason.sql | waitlist_entries table + bookings.refund_denial_reason | IMMUTABLE |
+| V12__add_egyptian_venues.sql | Additional real Egyptian tourism-city venues (Giza, Alexandria, Luxor, Aswan, Hurghada, Sharm El Sheikh, Dahab) | IMMUTABLE |
+| V13__seed_egypt_private_events.sql | 1 new category (Conference), 2 new ORGANIZER users, 15 PUBLISHED Egyptian private events + 30 ticket tiers | IMMUTABLE |
 
-**NEXT MIGRATION MUST BE: V12__...**
+**NEXT MIGRATION MUST BE: V14__...**
 
 ---
 
@@ -218,6 +224,7 @@ class YourControllerTest {
 | 18 | CI/CD Pipeline + Production Deploy to Railway | ✅ Complete | 183/183 unchanged — CI/CD + deploy day. Backend deployed live on Railway (Postgres+Redis on Railway, RabbitMQ on CloudAMQP), frontend live on Vercel. See Section 10 for full deploy debugging log. |
 | 19 | Production Deploy Stabilization + Swagger/OpenAPI + k6 Load Tests | ✅ Complete | 183/183 unchanged — production outage fully root-caused and fixed (Rabbit/Mail health indicators, RabbitMQ localhost fallback + auto-recovery hang, server-port mismatch), backend confirmed live and healthy on Railway. springdoc-openapi wired in with all 9 controllers annotated; k6 scripts fixed/extended, results pending a live Railway run. See Section 10 for full narrative. |
 | 20 | Code Quality + Security Hardening (M-002, M-004) | ✅ Complete | 191/191 passing (+8 new) — 82% INSTRUCTION coverage, JaCoCo gate ✅. SECURITY-6, M-002, M-004, D19-1, CC-1 all applied. See Section 10 for full narrative and `.claude/day-20-walkthrough.md` for the plain-language write-up. |
+| 22 | Seed Data — 15 Egyptian Private Events (V13 migration) | ✅ Complete | 194/194 unchanged — data-only day, no Java code changes. `V13__seed_egypt_private_events.sql` adds 1 category, 2 ORGANIZER users, 15 PUBLISHED events, 30 ticket tiers. Verified via Flyway history, direct SQL row counts, `/api/search/events` (unfiltered + category-filtered), `/api/events/{id}` detail resolution, organizer login + `/organizer/events` dashboard (both API and real browser), and public `/search` page. Full narrative in Section 10. |
 
 ---
 
@@ -376,7 +383,91 @@ This repository has two deployable parts:
 
 ---
 
-## 10. NEXT SESSION START — DAY 21
+## 10. NEXT SESSION START — DAY 23
+
+**Current Branch:** `feat/seed-data-frontend-refresh` (local, renamed from `day-22-seed-egypt-events`, created from `main`, not yet pushed/merged)
+
+**Completed in Day 22b (Frontend Design Handoff, 2026-07-15):**
+
+- Applied 3 Claude Design mockup exports (`Eventora Landing.dc.html`, `Eventora Dashboard.dc.html`,
+  `Eventora Organizer Dashboard.dc.html`) to the live frontend, re-implemented as React/Tailwind
+  rather than copied verbatim (the mockups use template placeholders, not real code).
+- `page.tsx` (Landing): per explicit instruction, kept the hero's real photo background and fully
+  functional search form (query/city/date + Search Events) — added a stats row (Events hosted /
+  Tickets sold / On-time check-ins, decorative marketing copy same as the mockup itself), a
+  "Become an Organizer" CTA anchoring to a new `#organizers` section, a new 3-column Feature Strip
+  (static marketing copy), a new Featured Events section (first 6 real published events via the
+  existing `<EventCard>`/react-query wiring, "See all events →" link to `/search`), and a new dark
+  For-Organizers teaser section with a decorative (non-real-data) dashboard panel. Removed the old
+  category-chip filter + full events grid — that filtering now lives solely on `/search`, which
+  already has its own filter UI. Added `{ id: 6, name: "Conference" }` to `fallbackCategories`
+  (id confirmed stable: V13 inserts Conference as the first row after V1–V12's categories, so it
+  always lands on id 6 in any environment that runs migrations in order).
+- `footer.tsx`: expanded from a single Terms/Privacy row into Product + Support columns (explicitly
+  no Company column). Every link points to a real existing route — `/search`, `/#organizers`,
+  `/organizer/events/new`, `/terms`, `/privacy`, plus a `mailto:` for Contact — no invented
+  `/pricing` or `/help-center` pages.
+- `dashboard/bookings/page.tsx` + `organizer/events/page.tsx`: visual-only polish (profile card
+  gradient/avatar overlap, stat-card icon shape, a "Revenue (EGP)" legend chip on the organizer
+  sales chart) plus enriched empty states (the Booking History empty state went from a bare
+  sentence to icon + title + description + "Explore Events" CTA, matching the mockup and the
+  pattern already used elsewhere on the same page). All react-query fetching/mutation logic in
+  both files is untouched.
+- Verified: `git diff` confirmed no raw hex colors were introduced (everything routes through the
+  existing `--color-*` design tokens); `npm run lint` surfaced 9 pre-existing errors + 7 warnings
+  across 6 files this session never touched (`dashboard/bookings/[id]/page.tsx`,
+  `organizer/events/[id]/edit/page.tsx`, `TicketTierSelector.tsx`, `CartDrawer.tsx`,
+  `event-card.tsx`, `bookings/[id]/confirmation/page.tsx`) — confirmed pre-existing via `git diff`,
+  not introduced by this work; `npm run build` (the actual command Vercel runs on deploy) succeeds
+  cleanly and is unaffected by those lint errors, since this Next.js version doesn't run ESLint as
+  part of `next build`; `npm run test` (vitest) 4/4 passing, unchanged. Both dev servers were
+  stopped, caches cleared (`rm -rf frontend/.next`), and restarted fresh; all three redesigned
+  pages plus the shared footer were then verified in a real browser against the Day 22 seed data
+  (organizer login as `events@caironightslive.eg`, `/organizer/events` showing its 8 real events,
+  the landing page's Featured Events section, DOM/network inspection showing zero errors beyond a
+  harmless dev-mode CSP/eval sandbox warning).
+- Branch renamed from `day-22-seed-egypt-events` to `feat/seed-data-frontend-refresh` per explicit
+  instruction to use feature-branch naming convention (matches the existing `feat/` precedent in
+  this repo, e.g. `feat/platform-enhancements`).
+
+**Completed in Day 22 (Seed Data — 15 Egyptian Private Events, 2026-07-15):**
+
+- Executed `docs/Core/22_seed_data_plan_egypt_private_events.md` end-to-end: created
+  `V13__seed_egypt_private_events.sql` (IMMUTABLE, next migration is V14) exactly as specified —
+  1 new `Conference` category, 2 new `ORGANIZER` seed users (`events@caironightslive.eg`,
+  `bookings@redsealiveent.eg`, password `EventoraSeed@2026`), 15 `PUBLISHED` events across 8
+  existing private/commercial venues, and 30 ticket tiers (2 per event). Museums and
+  government-run cultural/antiquities venues excluded by design.
+- Verified against a real local Postgres (via `docker-compose up -d postgres redis rabbitmq
+  mailhog` + Docker Desktop, since the Flyway Maven plugin couldn't resolve its dependencies
+  offline — used Spring Boot's auto-run-Flyway-on-startup path instead, per the plan's documented
+  fallback): Flyway history shows V13 applied successfully; row counts confirmed exact (+15
+  events, +30 ticket_tiers, +2 ORGANIZER users, +1 category); `GET /api/search/events` returns all
+  15 new titles, and category-filtering by the new `Conference` category returns exactly the 2
+  conference events; `GET /api/events/{id}` resolves organizer/category/venue/ticketTiers
+  correctly for a spot-checked event.
+- Confirmed the bcrypt seed-password hash round-trips against the running app: logged in as
+  `events@caironightslive.eg` via both a direct API call and a real browser session against the
+  Next.js frontend, and confirmed `/organizer/events` (My Events dashboard) lists exactly that
+  organizer's 8 events. Also spot-checked the public `/search` page in-browser — all 15 new events
+  render with correct title/date/city/category/starting price.
+- Ran the full suite: `./mvnw clean verify` → 194/194 tests passing (unchanged — this was a
+  data-only migration, no Java/production code touched), JaCoCo gate passed (~83.8%
+  INSTRUCTION coverage, gate-scoped — consistent with the Day 21 baseline). No test in the
+  suite hardcodes an event/category/venue/ticket-tier row count, so nothing needed updating.
+- Work done on a new branch (`feat/seed-data-frontend-refresh`, cut from `main`, initially named
+  `day-22-seed-egypt-events` then renamed) rather than on `main` directly, per this session's
+  explicit instruction.
+
+**First task for next session — Day 23:** Day 21's carryover items are still open (frontend must
+send an `Idempotency-Key` header on `POST /api/v1/bookings` before `app.rate-limit.enabled=true`
+reaches production; the 6 browser-based Critical Path smoke tests and Railway/Vercel env var
+audits in `PROGRESS.md`'s Day 21 row are still the user's to complete). Resume there, or pick up
+whatever the next `Plans/session-prompts/day-23-*.md` specifies once written.
+
+---
+
+## Previously — NEXT SESSION START — DAY 21
 
 **Current Branch:** `day-20-code-quality` (local, 6 new commits — not yet pushed/merged)
 
