@@ -157,19 +157,19 @@ export default function DashboardBookingsPage() {
       {/* Profile + Stats Section */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
         {/* Profile Card */}
-        <div className="lg:col-span-4 bg-surface-container-lowest rounded-xl p-stack-lg shadow-md border border-surface-container-high flex flex-col items-center justify-center text-center relative overflow-hidden">
-          <div className="absolute top-0 w-full bg-linear-to-r from-primary-container to-secondary opacity-20 h-24"></div>
-          <div className="w-24 h-24 rounded-full border-4 border-surface-container-lowest shadow-md bg-surface-container-high flex items-center justify-center relative z-10 overflow-hidden mb-4">
+        <div className="lg:col-span-4 bg-surface-container-lowest rounded-xl shadow-md border border-surface-container-high flex flex-col items-center justify-center text-center relative overflow-hidden">
+          <div className="absolute top-0 w-full bg-linear-to-br from-primary-fixed via-primary-container to-secondary-container h-20"></div>
+          <div className="w-24 h-24 rounded-full border-4 border-surface-container-lowest shadow-md bg-surface-container-high flex items-center justify-center relative z-10 overflow-hidden mt-10 mb-4">
              <span className="font-hero-headline-mobile text-primary">{userEmail ? userEmail.charAt(0).toUpperCase() : "U"}</span>
           </div>
-          <h2 className="font-section-heading text-on-surface mb-1">Welcome back, {userName}!</h2>
-          <p className="font-body text-on-surface-variant mb-6">{userEmail || "user@example.com"}</p>
+          <h2 className="font-section-heading text-on-surface mb-1 px-stack-lg">Welcome back, {userName}!</h2>
+          <p className="font-body text-on-surface-variant mb-6 px-stack-lg">{userEmail || "user@example.com"}</p>
         </div>
 
         {/* Stats Grid */}
         <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-gutter">
           <div className="bg-surface-container-lowest rounded-xl p-stack-lg shadow-md border border-surface-container-high hover:shadow-xl transition-shadow duration-300 flex flex-col items-start">
-            <div className="w-12 h-12 rounded-full bg-primary-container/20 text-primary flex items-center justify-center mb-4">
+            <div className="w-12 h-12 rounded-xl bg-primary-container/20 text-primary flex items-center justify-center mb-4">
               <span className="material-symbols-outlined">confirmation_number</span>
             </div>
             <div className="flex items-end gap-2">
@@ -179,7 +179,7 @@ export default function DashboardBookingsPage() {
             <p className="font-body text-on-surface-variant">Total Bookings</p>
           </div>
           <div className="bg-surface-container-lowest rounded-xl p-stack-lg shadow-md border border-surface-container-high hover:shadow-xl transition-shadow duration-300 flex flex-col items-start">
-            <div className="w-12 h-12 rounded-full bg-secondary-container/20 text-secondary flex items-center justify-center mb-4">
+            <div className="w-12 h-12 rounded-xl bg-secondary-container/20 text-secondary flex items-center justify-center mb-4">
               <span className="material-symbols-outlined">event_upcoming</span>
             </div>
             <p className="text-4xl font-black text-on-surface leading-tight">{upcomingEvents.length}</p>
@@ -187,7 +187,7 @@ export default function DashboardBookingsPage() {
             <p className="text-xs text-on-surface-variant mt-0.5">Next 30 days: {upcomingNext30}</p>
           </div>
           <div className="bg-surface-container-lowest rounded-xl p-stack-lg shadow-md border border-surface-container-high hover:shadow-xl transition-shadow duration-300 flex flex-col items-start">
-            <div className="w-12 h-12 rounded-full bg-tertiary-container/20 text-tertiary flex items-center justify-center mb-4">
+            <div className="w-12 h-12 rounded-xl bg-tertiary-container/20 text-tertiary flex items-center justify-center mb-4">
               <span className="material-symbols-outlined">account_balance_wallet</span>
             </div>
             <p className="text-4xl font-black text-on-surface leading-tight">EGP {totalSpent.toFixed(0)}</p>
@@ -360,8 +360,13 @@ export default function DashboardBookingsPage() {
             </table>
           </div>
         ) : (
-          <div className="bg-surface-container-lowest rounded-xl p-8 border border-surface-container-high text-center">
-            <p className="font-body text-on-surface-variant">Your history is empty.</p>
+          <div className="bg-surface-container-lowest rounded-xl p-14 border border-surface-container-high text-center flex flex-col items-center">
+            <span className="material-symbols-outlined text-[64px] text-surface-container-highest mb-4">receipt_long</span>
+            <h3 className="font-body-lg font-bold text-on-surface mb-2">Your history is empty</h3>
+            <p className="font-body text-on-surface-variant mb-6 max-w-sm">Once you book an event, your tickets and receipts will show up here.</p>
+            <Link href="/search" className="btn-gradient text-on-primary font-label-sm px-6 py-3 rounded-full hover:shadow-lg transition-all">
+              Explore Events
+            </Link>
           </div>
         )}
       </section>
