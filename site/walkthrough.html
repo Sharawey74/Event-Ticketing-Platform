@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Product Walkthrough — Eventora</title>
+<meta name="description" content="A real user and organizer journey through Eventora, captured live on the production deployment — discover, book, and manage.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="container">
+    <a href="index.html" class="nav-logo"><span class="mark"></span>Eventora</a>
+    <nav class="nav-links">
+      <a href="index.html">Overview</a>
+      <a href="architecture.html">Architecture</a>
+      <a href="walkthrough.html" class="active">Walkthrough</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="btn btn-outline" href="https://github.com/Sharawey74/Event-Ticketing-Platform" target="_blank" rel="noopener">Source</a>
+      <a class="btn btn-gradient" href="https://event-ticketing-platform-nu.vercel.app/" target="_blank" rel="noopener">Live App</a>
+    </div>
+    <button class="nav-toggle" aria-label="Menu"><span></span><span></span><span></span></button>
+  </div>
+  <div class="nav-mobile-menu">
+    <a href="index.html">Overview</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="walkthrough.html">Walkthrough</a>
+    <a href="https://github.com/Sharawey74/Event-Ticketing-Platform" target="_blank" rel="noopener">Source</a>
+    <a href="https://event-ticketing-platform-nu.vercel.app/" target="_blank" rel="noopener">Live App</a>
+  </div>
+</header>
+
+<section class="page-hero">
+  <div class="container">
+    <span class="eyebrow">Product Walkthrough</span>
+    <h1 class="hero-headline" style="font-size:clamp(28px,4vw,42px)">A real journey, captured live on production.</h1>
+    <p class="body-lg" style="color:rgba(255,255,255,0.75);max-width:640px">Every screenshot below is the actual
+      <a href="https://event-ticketing-platform-nu.vercel.app/" target="_blank" rel="noopener" style="color:#c9a6f7">live deployment</a>
+      — real seeded Egyptian events, a real Stripe test-mode purchase, and a real organizer account. Click any image to zoom.</p>
+  </div>
+</section>
+
+<div class="container">
+
+  <section class="walk-section">
+    <h2 class="section-heading"><span class="walk-badge">Discover</span></h2>
+
+    <div class="walk-row">
+      <div class="walk-media browser-frame">
+        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">event-ticketing-platform-nu.vercel.app</span></div>
+        <img src="assets/img/screenshots/01-landing-hero.webp" alt="Landing page hero with search" loading="lazy">
+      </div>
+      <div class="walk-copy">
+        <h3>Landing page</h3>
+        <p>The real photo-backed hero with a functional search bar (query, city, date), a trust-stat row, and a
+          featured-events strip backed by real published event data — not placeholder cards.</p>
+      </div>
+    </div>
+
+    <div class="walk-row reverse">
+      <div class="walk-media browser-frame">
+        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">…/search?categoryId=1</span></div>
+        <img src="assets/img/screenshots/02-search-results.webp" alt="Search results filtered by category" loading="lazy">
+      </div>
+      <div class="walk-copy">
+        <h3>Search &amp; filter</h3>
+        <p>Filtering by category, city, text, and date against real seeded Egyptian venues and events — Cairo,
+          Alexandria, Hurghada, Sharm El Sheikh, Dahab, and El Gouna.</p>
+      </div>
+    </div>
+
+    <div class="walk-row">
+      <div class="walk-media browser-frame">
+        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">…/events/1</span></div>
+        <img src="assets/img/screenshots/03-event-detail.webp" alt="Event detail page" loading="lazy">
+      </div>
+      <div class="walk-copy">
+        <h3>Event detail</h3>
+        <p>Full venue, schedule, and organizer info, with live ticket tiers pulled straight from PostgreSQL —
+          <code>availableCount</code> decremented atomically on every reservation.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="walk-section">
+    <h2 class="section-heading"><span class="walk-badge">Book</span></h2>
+
+    <div class="walk-row">
+      <div class="walk-media browser-frame">
+        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">…/events/1</span></div>
+        <img src="assets/img/screenshots/04-ticket-selection-cart.webp" alt="Ticket tier selection" loading="lazy">
+      </div>
+      <div class="walk-copy">
+        <h3>Ticket selection</h3>
+        <p>Tier selection with live quantity controls and a running total, calculated client-side and re-verified
+          server-side at reservation time.</p>
+      </div>
+    </div>
+
+    <div class="walk-row reverse">
+      <div class="walk-media browser-frame">
+        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">checkout.stripe.com</span></div>
+        <img src="assets/img/screenshots/05-stripe-checkout.webp" alt="Stripe hosted checkout page" loading="lazy">
+      </div>
+      <div class="walk-copy">
+        <h3>Stripe checkout <em style="color:var(--color-on-surface-variant);font-weight:400">(test mode)</em></h3>
+        <p>A genuine Stripe-hosted checkout session — not a mock. Filled here with Stripe's own test card
+          (<code>4242 4242 4242 4242</code>) to prove the integration is real, end to end.</p>
+      </div>
+    </div>
+
+    <div class="walk-row">
+      <div class="walk-media browser-frame">
+        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">…/bookings/2/confirmation</span></div>
+        <img src="assets/img/screenshots/06-booking-confirmation.webp" alt="Booking confirmation page" loading="lazy">
+      </div>
+      <div class="walk-copy">
+        <h3>Payment confirmation</h3>
+        <p>Stripe's own redirect confirms the charge succeeded immediately after payment.</p>
+        <p class="walk-note">While capturing this walkthrough, the asynchronous webhook that finalizes the booking
+          record (and triggers QR generation) didn't land in the production environment within the capture window —
+          a real issue, noted below, rather than something papered over.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="walk-section">
+    <h2 class="section-heading"><span class="walk-badge">Manage</span></h2>
+
+    <div class="walk-row">
+      <div class="walk-media browser-frame">
+        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">…/dashboard/bookings</span></div>
+        <img src="assets/img/screenshots/07-dashboard-bookings-list.webp" alt="Attendee dashboard bookings list" loading="lazy">
+      </div>
+      <div class="walk-copy">
+        <h3>Attendee dashboard</h3>
+        <p>Booking history with live countdown timers on held reservations, and one-click resume for an
+          in-progress checkout.</p>
+      </div>
+    </div>
+
+    <div class="walk-row reverse">
+      <div class="walk-media browser-frame">
+        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">…/dashboard/bookings/2</span></div>
+        <img src="assets/img/screenshots/08-booking-detail-qr-ticket.webp" alt="Booking detail page mid-processing" loading="lazy">
+      </div>
+      <div class="walk-copy">
+        <h3>Booking detail &amp; QR ticket</h3>
+        <p>Once a webhook confirms payment, this page renders the ticket's QR code for check-in.</p>
+        <p class="walk-note">Shown here mid-processing rather than faked: this booking's payment succeeded on
+          Stripe's side, but backend confirmation — and QR generation — is gated on the webhook described above,
+          which hadn't landed yet at capture time.</p>
+      </div>
+    </div>
+
+    <div class="walk-row">
+      <div class="walk-media browser-frame">
+        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">…/organizer/events</span></div>
+        <img src="assets/img/screenshots/09-organizer-dashboard.webp" alt="Organizer sales dashboard" loading="lazy">
+      </div>
+      <div class="walk-copy">
+        <h3>Organizer dashboard</h3>
+        <p>Sales-over-time chart and per-event sales progress, revenue, and quick actions — logged in as a real
+          seeded organizer account.</p>
+      </div>
+    </div>
+
+    <div class="walk-row reverse">
+      <div class="walk-media browser-frame">
+        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">…/organizer/events/15/attendees</span></div>
+        <img src="assets/img/screenshots/10-organizer-attendees-checkin.webp" alt="Organizer attendee check-in list" loading="lazy">
+      </div>
+      <div class="walk-copy">
+        <h3>Attendee check-in</h3>
+        <p>The organizer-side attendee list, searchable by name, email, or booking reference — this is where
+          day-of check-in happens.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="walk-section">
+    <h2 class="section-heading"><span class="walk-badge">Responsive</span></h2>
+    <div class="walk-row">
+      <div class="walk-media browser-frame" style="max-width:320px">
+        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">mobile · 390px</span></div>
+        <img src="assets/img/screenshots/11-responsive-mobile-landing.webp" alt="Mobile landing page" loading="lazy">
+      </div>
+      <div class="walk-copy">
+        <h3>Mobile layout</h3>
+        <p>The same landing page at a 390px mobile viewport — single-column stack, full-width cards, no
+          horizontal scroll.</p>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<section class="page-section" style="text-align:center">
+  <div class="container">
+    <h2 class="section-heading">Try it yourself</h2>
+    <a class="btn btn-gradient" href="https://event-ticketing-platform-nu.vercel.app/" target="_blank" rel="noopener">Open the live app &rarr;</a>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container">
+    <div>
+      <div class="nav-logo" style="color:#fff"><span class="mark"></span>Eventora</div>
+      <p style="margin-top:12px;font-size:14px">A portfolio-grade showcase of production concurrency, reliability,
+        and security patterns for a real ticketing platform.</p>
+    </div>
+    <div>
+      <h4>Project</h4>
+      <a href="index.html">Overview</a>
+      <a href="architecture.html">Architecture</a>
+      <a href="walkthrough.html">Walkthrough</a>
+    </div>
+    <div>
+      <h4>Links</h4>
+      <a href="https://event-ticketing-platform-nu.vercel.app/" target="_blank" rel="noopener">Live App</a>
+      <a href="https://backend-production-8daea.up.railway.app/swagger-ui/index.html" target="_blank" rel="noopener">API Docs</a>
+      <a href="https://github.com/Sharawey74/Event-Ticketing-Platform" target="_blank" rel="noopener">Source (GitHub)</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">
+      <span>MIT License</span>
+      <span>Built by Abdelrhman Mohamed</span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/main.js"></script>
+</body>
+</html>

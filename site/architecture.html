@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architecture — Eventora</title>
+<meta name="description" content="Engineering deep-dive: concurrency guarantees, reliability mechanisms, tech stack, and security posture behind Eventora.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="container">
+    <a href="index.html" class="nav-logo"><span class="mark"></span>Eventora</a>
+    <nav class="nav-links">
+      <a href="index.html">Overview</a>
+      <a href="architecture.html" class="active">Architecture</a>
+      <a href="walkthrough.html">Walkthrough</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="btn btn-outline" href="https://github.com/Sharawey74/Event-Ticketing-Platform" target="_blank" rel="noopener">Source</a>
+      <a class="btn btn-gradient" href="https://event-ticketing-platform-nu.vercel.app/" target="_blank" rel="noopener">Live App</a>
+    </div>
+    <button class="nav-toggle" aria-label="Menu"><span></span><span></span><span></span></button>
+  </div>
+  <div class="nav-mobile-menu">
+    <a href="index.html">Overview</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="walkthrough.html">Walkthrough</a>
+    <a href="https://github.com/Sharawey74/Event-Ticketing-Platform" target="_blank" rel="noopener">Source</a>
+    <a href="https://event-ticketing-platform-nu.vercel.app/" target="_blank" rel="noopener">Live App</a>
+  </div>
+</header>
+
+<section class="page-hero">
+  <div class="container">
+    <span class="eyebrow">Engineering Deep-Dive</span>
+    <h1 class="hero-headline" style="font-size:clamp(28px,4vw,42px)">How zero-oversell actually works.</h1>
+    <p class="body-lg" style="color:rgba(255,255,255,0.75);max-width:640px">A modular monolith with seven bounded
+      contexts, an atomic Redis inventory guard, and a strict layered architecture — chosen for specific engineering
+      reasons, not defaults.</p>
+  </div>
+</section>
+
+<section class="page-section">
+  <div class="container">
+    <h2 class="section-heading">System architecture</h2>
+    <p class="muted">Next.js talks to a Spring Boot backend over a stateless JWT-authenticated REST API. PostgreSQL
+      is the source of truth; Redis holds inventory counters, distributed locks, and the JWT denylist; RabbitMQ
+      offloads QR generation and email so the request path never blocks on them.</p>
+    <div class="diagram-card">
+<pre>┌───────────────────────┐
+│  Next.js 16 Frontend  │
+│       (Vercel)        │
+└───────────┬───────────┘
+            │ HTTPS + JWT
+            ▼
+┌───────────────────────┐
+│  Spring Boot Backend  │
+│       (Railway)       │
+└───────────┬───────────┘
+            │
+   ┌────────┼─────────────────┐
+   ▼        ▼                 ▼
+┌───────┐ ┌────────────────┐ ┌───────────────┐
+│  REST │ │ Domain Services│ │ Booking State │
+│ API   │ │ event·booking· │ │   Machine     │
+│30 ep, │ │ payment·       │ │  11 states,   │
+│9 ctrl │ │ inventory·     │ │ 1 / request   │
+└───────┘ │ pricing·notif· │ └───────────────┘
+          │ user           │
+          └────────┬───────┘
+                   ▼
+          ┌────────────────┐
+          │     Stripe     │
+          │ checkout +     │
+          │   webhooks     │
+          └────────────────┘
+
+   ┌────────┬─────────────────┐
+   ▼        ▼                 ▼
+┌───────┐ ┌──────────┐ ┌───────────┐
+│Postgres│ │  Redis   │ │ RabbitMQ  │
+│source  │ │inventory,│ │  async    │
+│of truth│ │locks, JWT│ │notif. +   │
+│        │ │denylist  │ │QR gen.    │
+└───────┘ └──────────┘ └───────────┘</pre>
+    </div>
+  </div>
+</section>
+
+<section class="page-section" id="concurrency">
+  <div class="container">
+    <h2 class="section-heading">Reservation flow — the concurrency-critical path</h2>
+    <div class="diagram-card">
+<pre>1. Client          ── POST /api/v1/bookings ──► BookingService
+2. BookingService  ──► Redis     acquire per-user distributed lock
+3. BookingService  ──► Redis     re-check availability (TOCTOU guard)
+4. BookingService  ──► Redis     reserveSeat() — atomic Lua floor guard
+
+  SEATS AVAILABLE                       SOLD OUT
+  5. Redis decremented, success         5. Redis rejects (floor guard)
+  6. Postgres atomic conditional        6. Client ◄── 409 Conflict
+     UPDATE (available_count -= n)
+  7. Postgres INSERT Booking
+     (state=RESERVED, expires=+5m)
+  8. Client ◄── 201 Created
+
+9. BookingService  ──► Redis     release lock</pre>
+    </div>
+
+    <h3 style="margin-top:32px">Concurrency &amp; data integrity</h3>
+    <table class="data-table">
+      <tr><th>Mechanism</th><th>Implementation</th></tr>
+      <tr><td>Oversell prevention</td><td>A Redis Lua script performs the availability check and decrement as one
+        atomic operation — verified by 100 concurrent threads against a 50-seat tier: exactly 50 succeed, 0 oversold.</td></tr>
+      <tr><td>DB/cache consistency</td><td>The PostgreSQL inventory mirror is written via a single atomic conditional
+        <code>UPDATE … WHERE available_count &gt;= :qty</code>, not a read-modify-write.</td></tr>
+      <tr><td>TOCTOU guard</td><td>Availability is checked once before acquiring the lock, then re-checked
+        <em>inside</em> the lock before committing.</td></tr>
+      <tr><td>Optimistic locking</td><td><code>@Version</code> on Booking, TicketTier, and Event;
+        <code>ObjectOptimisticLockingFailureException</code> maps to a clean 409, not a raw 500.</td></tr>
+      <tr><td>State machine</td><td>An 11-state Spring State Machine (one instance per request) governs the booking
+        lifecycle, rejecting illegal transitions like checking in a cancelled booking.</td></tr>
+      <tr><td>Idempotency</td><td>Stripe webhook delivery is deduplicated via a database UNIQUE constraint, not a
+        race-prone <code>existsBy…</code> pre-check; booking creation requires an <code>Idempotency-Key</code> header.</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="page-section" id="reliability">
+  <div class="container">
+    <h2 class="section-heading">Reliability</h2>
+    <ul style="color:var(--color-on-surface-variant);line-height:1.9">
+      <li><strong>Multi-replica-safe scheduling</strong> — the reservation-expiry job acquires a distributed lock
+        before running, safe across multiple backend instances.</li>
+      <li><strong>Structured, traceable logging</strong> — a correlation ID propagates from the inbound HTTP request
+        through every service log line via MDC.</li>
+      <li><strong>Async offloading</strong> — QR generation and transactional emails dispatch through RabbitMQ
+        (with dead-letter queues) instead of blocking the request thread.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="page-section">
+  <div class="container">
+    <h2 class="section-heading">Tech stack</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:32px">
+      <div>
+        <h4 style="margin:0 0 8px">Backend</h4>
+        <table class="data-table">
+          <tr><td>Language / Runtime</td><td>Java 21 (LTS)</td></tr>
+          <tr><td>Framework</td><td>Spring Boot 3.5, Security, Data JPA</td></tr>
+          <tr><td>State management</td><td>Spring State Machine 4.0</td></tr>
+          <tr><td>Payments</td><td>Stripe Java SDK 23.3</td></tr>
+          <tr><td>Auth</td><td>JJWT 0.11</td></tr>
+          <tr><td>QR generation</td><td>ZXing 3.5</td></tr>
+          <tr><td>Coverage</td><td>JaCoCo (80% instruction gate)</td></tr>
+          <tr><td>Testing</td><td>JUnit 5 · Mockito · Testcontainers</td></tr>
+          <tr><td>Load testing</td><td>k6 (Grafana Labs)</td></tr>
+        </table>
+      </div>
+      <div>
+        <h4 style="margin:0 0 8px">Data &amp; messaging</h4>
+        <table class="data-table">
+          <tr><td>Primary datastore</td><td>PostgreSQL 17 · Flyway (13 migrations)</td></tr>
+          <tr><td>Cache / locking</td><td>Redis 7 (Lettuce client)</td></tr>
+          <tr><td>Async messaging</td><td>RabbitMQ 4</td></tr>
+        </table>
+        <h4 style="margin:24px 0 8px">Infrastructure</h4>
+        <table class="data-table">
+          <tr><td>Containerization</td><td>Docker, multi-stage build (~619MB)</td></tr>
+          <tr><td>Local orchestration</td><td>Docker Compose, 7 health-gated services</td></tr>
+          <tr><td>Backend hosting</td><td>Railway</td></tr>
+          <tr><td>Frontend hosting</td><td>Vercel</td></tr>
+        </table>
+      </div>
+      <div>
+        <h4 style="margin:0 0 8px">Frontend</h4>
+        <table class="data-table">
+          <tr><td>Framework</td><td>Next.js 16 (App Router, TS strict)</td></tr>
+          <tr><td>UI runtime</td><td>React 19</td></tr>
+          <tr><td>Styling</td><td>Tailwind CSS 4</td></tr>
+          <tr><td>Server state</td><td>TanStack Query 5</td></tr>
+          <tr><td>Client state</td><td>Zustand 5</td></tr>
+          <tr><td>Forms</td><td>React Hook Form 7 · Zod 4</td></tr>
+          <tr><td>Payments</td><td>Stripe.js</td></tr>
+          <tr><td>Testing</td><td>Vitest</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="page-section">
+  <div class="container">
+    <h2 class="section-heading">Domain &amp; API surface</h2>
+    <div class="diagram-card">
+<pre>com.ticketing
+├── event/         Events, venues, categories, search
+├── booking/       Reservation lifecycle, state machine, tickets
+├── payment/       Stripe checkout, webhooks, refunds
+├── inventory/     Redis-backed atomic seat counters
+├── pricing/       Early-bird / group / surge pricing engine
+├── notification/  Async email + QR generation consumers
+├── user/          Authentication, JWT, roles
+└── common/        Security, exceptions, correlation IDs</pre>
+    </div>
+    <table class="data-table">
+      <tr><th>Metric</th><th>Value</th></tr>
+      <tr><td>REST endpoints</td><td>30 across 9 controllers</td></tr>
+      <tr><td>Role-restricted endpoints (@PreAuthorize)</td><td>18</td></tr>
+      <tr><td>Domain services</td><td>21</td></tr>
+      <tr><td>API-boundary DTOs</td><td>25 (JPA entities never exposed)</td></tr>
+      <tr><td>Database migrations</td><td>13 (Flyway, immutable once applied)</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="page-section">
+  <div class="container">
+    <h2 class="section-heading">Quality &amp; CI/CD</h2>
+    <table class="data-table">
+      <tr><th>Metric</th><th>Result</th></tr>
+      <tr><td>Backend test suite</td><td>194 / 194 passing</td></tr>
+      <tr><td>Instruction coverage (JaCoCo)</td><td>83% (gate: 80% minimum)</td></tr>
+      <tr><td>Dedicated concurrency tests</td><td>2 — a 100-thread Redis floor-guard proof, plus a full
+        end-to-end reservation-path test (DB write included)</td></tr>
+      <tr><td>Integration tests</td><td>Real PostgreSQL, Redis, and RabbitMQ via Testcontainers</td></tr>
+    </table>
+    <p class="muted">GitHub Actions runs three independent jobs on every push/PR — Maven test + JaCoCo gate, Vitest +
+      Next.js build, and a repo-hygiene check that fails the build if any <code>.env</code>, <code>target/</code>, or
+      <code>node_modules/</code> is ever tracked. Railway and Vercel each auto-deploy from <code>main</code> natively.</p>
+  </div>
+</section>
+
+<section class="page-section">
+  <div class="container">
+    <h2 class="section-heading">Performance</h2>
+    <table class="data-table">
+      <tr><th>Scenario</th><th>Result</th></tr>
+      <tr><td>Baseline read path (50 VUs)</td><td>p95 15.9ms, 0.00% error rate, 74.4 req/s</td></tr>
+      <tr><td>Booking creation under contention (20 VUs)</td><td>p95 55.4ms, 0 server errors, floor guard held at exactly the tier's true capacity</td></tr>
+      <tr><td>Inventory-pressure burst (100 VUs vs. 8-seat tier)</td><td>Up to 270 req/s, 99.9%+ correctly rejected with 409, zero oversell, zero 5xx</td></tr>
+      <tr><td>Capacity ramp — live Railway, 10→200 VUs over 16 min</td><td>32,577 requests, 0 failed, 0 server errors, read-path p95 held at 394ms at peak</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="page-section" id="security">
+  <div class="container">
+    <h2 class="section-heading">Security posture</h2>
+    <p class="muted">Access control uses two independent layers: RBAC decides whether a role may call an endpoint;
+      object-level authorization separately decides whether the specific resource belongs to the caller.</p>
+    <table class="data-table">
+      <tr><th>Control</th><th>Defends against</th></tr>
+      <tr><td>Parameterized queries (JPA/JPQL only)</td><td>SQL injection</td></tr>
+      <tr><td>React JSX auto-escaping · JSON-only API · CSP</td><td>Cross-site scripting (XSS)</td></tr>
+      <tr><td>Stateless JWT auth, no ambient cookies</td><td>Cross-site request forgery (CSRF)</td></tr>
+      <tr><td>Role-based access control (RBAC)</td><td>Unauthorized endpoint access — 18 of 30 endpoints gated</td></tr>
+      <tr><td>Object-level authorization</td><td>Broken object-level authorization / IDOR</td></tr>
+      <tr><td>JWT <code>jti</code> + Redis denylist</td><td>Session/token hijacking after logout</td></tr>
+      <tr><td>Redis Lua rate limiting</td><td>Brute force / credential stuffing (10/min/IP)</td></tr>
+      <tr><td>BCrypt password hashing</td><td>Credential exposure on data breach</td></tr>
+      <tr><td>Environment-variable-driven config</td><td>Secret leakage — no hardcoded secrets in source</td></tr>
+    </table>
+    <p class="muted">Full 16-row audit trail in the
+      <a href="https://github.com/Sharawey74/Event-Ticketing-Platform#security-posture" target="_blank" rel="noopener" style="color:var(--color-primary);font-weight:600">project README</a>.</p>
+  </div>
+</section>
+
+<section class="page-section" style="text-align:center">
+  <div class="container">
+    <h2 class="section-heading">Want to see it running?</h2>
+    <a class="btn btn-gradient" href="walkthrough.html">View the product walkthrough &rarr;</a>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container">
+    <div>
+      <div class="nav-logo" style="color:#fff"><span class="mark"></span>Eventora</div>
+      <p style="margin-top:12px;font-size:14px">A portfolio-grade showcase of production concurrency, reliability,
+        and security patterns for a real ticketing platform.</p>
+    </div>
+    <div>
+      <h4>Project</h4>
+      <a href="index.html">Overview</a>
+      <a href="architecture.html">Architecture</a>
+      <a href="walkthrough.html">Walkthrough</a>
+    </div>
+    <div>
+      <h4>Links</h4>
+      <a href="https://event-ticketing-platform-nu.vercel.app/" target="_blank" rel="noopener">Live App</a>
+      <a href="https://backend-production-8daea.up.railway.app/swagger-ui/index.html" target="_blank" rel="noopener">API Docs</a>
+      <a href="https://github.com/Sharawey74/Event-Ticketing-Platform" target="_blank" rel="noopener">Source (GitHub)</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">
+      <span>MIT License</span>
+      <span>Built by Abdelrhman Mohamed</span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/main.js"></script>
+</body>
+</html>
