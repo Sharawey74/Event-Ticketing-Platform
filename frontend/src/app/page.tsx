@@ -4,7 +4,7 @@
 import { useMemo, useState } from "react";
 
 import { useQuery } from "@tanstack/react-query";
-import { Calendar, MapPin, Search } from "lucide-react";
+import { Calendar, MapPin, QrCode, Search, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -22,21 +22,45 @@ const fallbackCategories = [
   { id: 3, name: "Comedy" },
   { id: 4, name: "Theater" },
   { id: 5, name: "Festival" },
+  { id: 6, name: "Conference" },
 ] as const;
 
-type AppliedFilters = {
-  query: string;
-  city: string;
-  date: string;
-  categoryId: number | null;
-};
+const FEATURED_EVENTS_LIMIT = 6;
 
-const initialFilters: AppliedFilters = {
-  query: "",
-  city: "",
-  date: "",
-  categoryId: null,
-};
+const HERO_STATS = [
+  { label: "Events hosted", value: "12,400+" },
+  { label: "Tickets sold", value: "2.1M" },
+  { label: "On-time check-ins", value: "98%" },
+] as const;
+
+const FEATURE_STRIP = [
+  {
+    icon: Sparkles,
+    title: "Real-time seat availability",
+    description:
+      "See exactly what's open, down to the seat, updated the instant someone else books.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Secure Stripe checkout",
+    description:
+      "Bank-grade encryption and Stripe-powered payments protect every transaction, every time.",
+  },
+  {
+    icon: QrCode,
+    title: "Instant QR tickets",
+    description:
+      "Tickets land in your inbox the second you pay — scan and walk in, no printing required.",
+  },
+] as const;
+
+const ORGANIZER_POINTS = [
+  "Set up your event page in minutes, no design skills needed",
+  "Real-time analytics dashboard tracks every sale as it happens",
+  "Get paid out fast with automatic Stripe payouts",
+] as const;
+
+const noFilters: EventFilters = {};
 
 export default function Home() {
   const router = useRouter();
@@ -45,14 +69,6 @@ export default function Home() {
   const [draftQuery, setDraftQuery] = useState("");
   const [draftCity, setDraftCity] = useState("");
   const [draftDate, setDraftDate] = useState("");
-  const [appliedFilters, setAppliedFilters] =
-    useState<AppliedFilters>(initialFilters);
-
-  const eventFilters: EventFilters = {
-    q: appliedFilters.query || undefined,
-    city: appliedFilters.city || undefined,
-    categoryId: appliedFilters.categoryId ?? undefined,
-  };
 
   const { data: categoriesData } = useQuery({
     queryKey: ["categories"],
@@ -69,8 +85,8 @@ export default function Home() {
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ["events", eventFilters],
-    queryFn: () => fetchPublishedEvents(eventFilters),
+    queryKey: ["events", "featured"],
+    queryFn: () => fetchPublishedEvents(noFilters),
     retry: 1,
   });
 
@@ -86,7 +102,7 @@ export default function Home() {
     return mapping;
   }, [venuesData]);
 
-  const events = eventsData?.content ?? [];
+  const events = (eventsData?.content ?? []).slice(0, FEATURED_EVENTS_LIMIT);
 
   function applySearch(): void {
     router.push(
@@ -94,16 +110,9 @@ export default function Home() {
         query: draftQuery,
         city: draftCity,
         date: draftDate,
-        categoryId: appliedFilters.categoryId?.toString() ?? "",
+        categoryId: "",
       }),
     );
-  }
-
-  function toggleCategory(categoryId: number): void {
-    setAppliedFilters((previous) => ({
-      ...previous,
-      categoryId: previous.categoryId === categoryId ? null : categoryId,
-    }));
   }
 
   return (
@@ -144,6 +153,12 @@ export default function Home() {
                 <Search className="h-4 w-4" />
                 Browse Events
               </Link>
+              <a
+                href="#organizers"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-primary text-sm font-semibold hover:bg-white/90 transition-all"
+              >
+                Become an Organizer
+              </a>
               {!isLoggedIn && (
                 <Link
                   href="/auth/login"
@@ -199,50 +214,63 @@ export default function Home() {
               Search Events
             </button>
           </div>
+
+          {/* Trust stats */}
+          <div className="mt-8 flex flex-wrap gap-8 border-t border-white/15 pt-6">
+            {HERO_STATS.map((stat) => (
+              <div key={stat.label} className="flex flex-col gap-0.5">
+                <span className="text-2xl font-extrabold text-white">
+                  {stat.value}
+                </span>
+                <span className="text-xs text-white/65">{stat.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* ── Category Chips ── */}
-      <section className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6">
-        <div className="no-scrollbar flex gap-2 overflow-x-auto pb-2">
-          {categories.map((category) => {
-            const isActive = appliedFilters.categoryId === category.id;
-            return (
-              <button
-                key={category.id}
-                className={`rounded-full border px-4 py-2 text-sm font-medium transition-all ${
-                  isActive
-                    ? "border-primary bg-primary text-white shadow-md"
-                    : "border-outline-variant bg-surface text-on-surface-variant hover:border-primary hover:text-primary"
-                }`}
-                onClick={() => toggleCategory(category.id)}
-                type="button"
-              >
-                {category.name}
-              </button>
-            );
-          })}
+      {/* ── Feature Strip ── */}
+      <section className="mx-auto w-full max-w-6xl px-4 py-14 md:px-6 md:py-20">
+        <div className="grid gap-8 sm:grid-cols-3">
+          {FEATURE_STRIP.map((feature) => (
+            <div key={feature.title} className="flex flex-col gap-4">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <feature.icon className="h-5 w-5" />
+              </span>
+              <h3 className="text-lg font-bold text-on-surface">
+                {feature.title}
+              </h3>
+              <p className="text-sm leading-relaxed text-on-surface-variant">
+                {feature.description}
+              </p>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* ── Events Grid ── */}
+      {/* ── Featured Events ── */}
       <section className="mx-auto w-full max-w-6xl px-4 pb-16 md:px-6">
-        <div className="mb-5 flex items-end justify-between">
-          <h2 className="text-2xl font-semibold text-on-surface">
-            Upcoming Events
-          </h2>
-          <p className="text-sm text-on-surface-variant">
-            {eventsData?.totalElements ?? 0} total events
-          </p>
+        <div className="mb-6 flex items-end justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-on-surface">
+              Featured events
+            </h2>
+            <p className="text-sm text-on-surface-variant">
+              Handpicked and going fast this season.
+            </p>
+          </div>
+          <Link
+            href="/search"
+            className="whitespace-nowrap text-sm font-bold text-primary hover:text-primary-container"
+          >
+            See all events →
+          </Link>
         </div>
 
         {isLoading ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="h-64 rounded-2xl shimmer"
-              />
+              <div key={i} className="h-64 rounded-2xl shimmer" />
             ))}
           </div>
         ) : null}
@@ -262,31 +290,106 @@ export default function Home() {
         ) : null}
 
         {!isLoading && !isError ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {events.map((event) => (
-              <EventCard
-                key={event.id}
-                event={event}
-                venueCity={
-                  event.venueId
-                    ? (venueCityById.get(event.venueId) ?? "")
-                    : ""
-                }
-                categoryName={
-                  event.categoryId
-                    ? (categories.find(c => c.id === event.categoryId)?.name ?? "")
-                    : ""
-                }
-              />
-            ))}
-
-            {events.length === 0 ? (
-              <p className="col-span-full rounded-2xl border border-outline-variant bg-surface-container-low p-8 text-center text-sm text-on-surface-variant">
-                No events match the current filters.
-              </p>
-            ) : null}
-          </div>
+          events.length > 0 ? (
+            <div className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-2 md:-mx-6 md:px-6">
+              {events.map((event) => (
+                <div key={event.id} className="w-[280px] shrink-0">
+                  <EventCard
+                    event={event}
+                    venueCity={
+                      event.venueId
+                        ? (venueCityById.get(event.venueId) ?? "")
+                        : ""
+                    }
+                    categoryName={
+                      event.categoryId
+                        ? (categories.find((c) => c.id === event.categoryId)?.name ?? "")
+                        : ""
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-2xl border border-outline-variant bg-surface-container-low p-8 text-center text-sm text-on-surface-variant">
+              No published events yet — check back soon.
+            </p>
+          )
         ) : null}
+      </section>
+
+      {/* ── For Organizers ── */}
+      <section id="organizers" className="bg-zinc-950 text-white">
+        <div className="mx-auto grid w-full max-w-6xl gap-14 px-4 py-16 sm:grid-cols-2 md:px-6 md:py-24">
+          <div className="flex max-w-lg flex-col gap-5">
+            <span className="text-xs font-bold uppercase tracking-[0.12em] text-violet-300">
+              For Organizers
+            </span>
+            <h2 className="text-3xl font-extrabold leading-tight tracking-tight md:text-4xl">
+              Host with confidence, get paid fast.
+            </h2>
+            <p className="text-base leading-relaxed text-white/70">
+              Set up your event page in minutes, track sales with a live
+              dashboard, and receive payouts directly — no spreadsheets, no
+              guesswork.
+            </p>
+
+            <ul className="mt-2 flex flex-col gap-3.5">
+              {ORGANIZER_POINTS.map((point) => (
+                <li key={point} className="flex items-start gap-3">
+                  <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                  <span className="text-sm leading-relaxed text-white/85">
+                    {point}
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            <Link
+              href="/auth/register"
+              className="mt-3 w-fit rounded-full bg-primary px-7 py-3 text-sm font-bold text-white transition hover:bg-primary-container"
+            >
+              Become an Organizer
+            </Link>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm">
+            <div className="mb-5 flex items-center justify-between">
+              <span className="text-sm font-bold">Organizer Dashboard</span>
+              <div className="flex gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
+                <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
+                <span className="h-1.5 w-1.5 rounded-full bg-white/40" />
+              </div>
+            </div>
+            <div className="mb-5 grid grid-cols-2 gap-3.5">
+              <div className="flex flex-col gap-1 rounded-xl bg-white/5 p-4">
+                <span className="text-xs text-white/55">Total sales</span>
+                <span className="text-xl font-extrabold">EGP 48,210</span>
+                <span className="text-xs text-emerald-400">
+                  +18% this week
+                </span>
+              </div>
+              <div className="flex flex-col gap-1 rounded-xl bg-white/5 p-4">
+                <span className="text-xs text-white/55">Tickets sold</span>
+                <span className="text-xl font-extrabold">1,284</span>
+                <span className="text-xs text-emerald-400">+9% this week</span>
+              </div>
+            </div>
+            <div className="rounded-xl bg-white/5 p-4">
+              <span className="text-xs text-white/55">Sales this week</span>
+              <div className="mt-3.5 flex h-20 items-end gap-2">
+                {[35, 52, 40, 70, 58, 88, 100].map((height, index) => (
+                  <div
+                    key={index}
+                    className="flex-1 rounded-t bg-linear-to-t from-primary to-primary-container"
+                    style={{ height: `${height}%` }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
     </div>
   );

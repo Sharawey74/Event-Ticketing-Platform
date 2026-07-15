@@ -81,8 +81,14 @@ export default function OrganizerDashboardPage() {
 
       {/* Sales Chart Card */}
       <div className="bg-surface-container-lowest rounded-xl shadow-md p-stack-lg mb-stack-lg border border-outline-variant/30">
-        <div className="flex justify-between items-center mb-stack-lg">
-          <h2 className="font-section-heading text-section-heading text-on-surface">Sales Over Time</h2>
+        <div className="flex justify-between items-center mb-stack-lg flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <h2 className="font-section-heading text-section-heading text-on-surface">Sales Over Time</h2>
+            <span className="inline-flex items-center gap-1.5 bg-surface-container-low rounded-full px-2.5 py-1">
+              <span className="w-2 h-2 rounded-full bg-primary" />
+              <span className="font-caption text-on-surface-variant">Revenue (EGP)</span>
+            </span>
+          </div>
           <button className="text-on-surface-variant hover:text-primary font-label-sm flex items-center gap-1 transition-colors">
             Last 30 Days
             <span className="material-symbols-outlined text-[18px]">keyboard_arrow_down</span>
@@ -215,13 +221,15 @@ export default function OrganizerDashboardPage() {
               </div>
             ))
           ) : (
-            <div className="bg-surface-container-lowest rounded-xl border border-surface-container-high p-8 text-center flex flex-col items-center justify-center">
+            <div className="bg-surface-container-lowest rounded-xl border border-surface-container-high p-14 text-center flex flex-col items-center justify-center">
               <span className="material-symbols-outlined text-[48px] text-surface-container-highest mb-4">event_note</span>
-              <p className="font-body text-on-surface-variant mb-4">You haven&apos;t created any events yet.</p>
-              <Link 
-                href="/organizer/events/new" 
-                className="bg-primary text-on-primary rounded-full px-6 py-2 shadow-sm hover:shadow-md transition-shadow font-label-sm"
+              <h3 className="font-body-lg font-bold text-on-surface mb-2">You haven&apos;t created any events yet</h3>
+              <p className="font-body text-on-surface-variant mb-6 max-w-sm">Create your first event and start selling tickets in minutes.</p>
+              <Link
+                href="/organizer/events/new"
+                className="bg-primary text-on-primary rounded-full px-6 py-3 shadow-sm hover:shadow-md transition-shadow font-label-sm flex items-center gap-2"
               >
+                <span className="material-symbols-outlined text-[18px]">add</span>
                 Create Your First Event
               </Link>
             </div>
