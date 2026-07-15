@@ -93,8 +93,8 @@ export default function EditEventPage() {
       api.get(`/api/events/${id}`),
     ])
       .then(([catRes, venueRes, eventRes]) => {
-        setCategories(catRes.data?.data ?? catRes.data ?? []);
-        setVenues(venueRes.data?.data ?? venueRes.data ?? []);
+        setCategories(catRes.data?.data?.content ?? []);
+        setVenues(venueRes.data?.data?.content ?? []);
 
         const ev = eventRes.data?.data ?? eventRes.data;
         setEventTitle(ev.title ?? "");
