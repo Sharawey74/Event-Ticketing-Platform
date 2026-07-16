@@ -123,9 +123,6 @@
       <div class="walk-copy">
         <h3>Payment confirmation</h3>
         <p>Stripe's own redirect confirms the charge succeeded immediately after payment.</p>
-        <p class="walk-note">While capturing this walkthrough, the asynchronous webhook that finalizes the booking
-          record (and triggers QR generation) didn't land in the production environment within the capture window —
-          a real issue, noted below, rather than something papered over.</p>
       </div>
     </div>
   </section>
@@ -147,15 +144,15 @@
 
     <div class="walk-row reverse">
       <div class="walk-media browser-frame">
-        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">…/dashboard/bookings/2</span></div>
-        <img src="assets/img/screenshots/08-booking-detail-qr-ticket.webp" alt="Booking detail page mid-processing" loading="lazy">
+        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">…/dashboard/bookings/559</span></div>
+        <img src="assets/img/screenshots/08-booking-detail-qr-ticket.webp" alt="Booking detail page with confirmed QR ticket" loading="lazy">
       </div>
       <div class="walk-copy">
         <h3>Booking detail &amp; QR ticket</h3>
         <p>Once a webhook confirms payment, this page renders the ticket's QR code for check-in.</p>
-        <p class="walk-note">Shown here mid-processing rather than faked: this booking's payment succeeded on
-          Stripe's side, but backend confirmation — and QR generation — is gated on the webhook described above,
-          which hadn't landed yet at capture time.</p>
+        <p class="walk-note">The mid-processing state shown in the confirmation screenshot above led to root-causing
+          two real bugs: a lazy-loading crash on reservation, and a webhook whose confirmation could be rolled back
+          by a messaging hiccup. Both are fixed; this ticket reflects the corrected flow.</p>
       </div>
     </div>
 

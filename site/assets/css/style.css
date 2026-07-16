@@ -126,7 +126,8 @@ a { color: inherit; text-decoration: none; }
 }
 .nav-logo .mark {
   width: 28px; height: 28px; border-radius: 8px;
-  background: linear-gradient(135deg, var(--color-primary), #8b3ff0);
+  background-image: url('../../favicon.svg');
+  background-size: cover;
   flex: none;
 }
 .nav-links {
