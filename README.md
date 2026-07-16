@@ -378,7 +378,7 @@ Full fix-by-fix security and reliability audit trail: [`PROGRESS.md`](PROGRESS.m
 
 If this project was useful or interesting, a star ⭐ helps others find it.
 
-**[Live Frontend](https://event-ticketing-platform-nu.vercel.app)** · **[Live API](https://backend-production-8daea.up.railway.app)** · **[API Docs](https://backend-production-8daea.up.railway.app/swagger-ui/index.html)** · **[Source](https://github.com/Sharawey74/Event-Ticketing-Platform)**
+**[Live Frontend](https://event-ticketing-platform-nu.vercel.app)** · **[Live API](https://backend-production-8daea.up.railway.app)** · **[API Docs](https://backend-production-8daea.up.railway.app/swagger-ui/index.html)** · **[Showcase](https://sharawey74.github.io/Event-Ticketing-Platform/)**
 
 Licensed under the [MIT License](LICENSE).
 
