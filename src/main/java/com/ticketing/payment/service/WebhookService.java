@@ -157,7 +157,18 @@ public class WebhookService {
                 .correlationId(correlationId)
                 .build();
         
-        bookingEventPublisher.publishBookingConfirmation(confirmationEvent);
+        // Fix (Bug 2): a RabbitMQ publish failure must never roll back the CONFIRMED state
+        // or the idempotency insert above — both already reflect a genuine successful payment.
+        // Swallowing here means this booking's ticket-generation/email event is not retried
+        // automatically; a durable outbox/retry pattern would close that gap but is out of
+        // scope for this fix.
+        try {
+            bookingEventPublisher.publishBookingConfirmation(confirmationEvent);
+        } catch (Exception ex) {
+            log.error("[{}] [webhook] Failed to publish BookingConfirmedEvent for booking {} — "
+                    + "booking remains CONFIRMED, but async ticket generation/email will not fire "
+                    + "for this event", correlationId, booking.getId(), ex);
+        }
     }
 
     private void handlePaymentExpired(com.stripe.model.Event stripeEvent, String correlationId) {
