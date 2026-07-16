@@ -55,7 +55,12 @@ public class BookingService {
             throw new IllegalArgumentException("Invalid ticket quantity. Max allowed: " + BusinessConstants.MAX_TICKETS_PER_BOOKING);
         }
 
-        Event event = eventRepository.findById(eventId)
+        // Fix (Bug 1): findByIdWithDetails eagerly fetches organizer/category/venue so the
+        // controller can safely read booking.getEvent().getVenue()/.getCategory() even after
+        // this transactional method returns and its Hibernate session closes (production runs
+        // with spring.jpa.open-in-view=false — a plain findById() left those lazy and caused a
+        // LazyInitializationException -> 500 despite the booking having already committed).
+        Event event = eventRepository.findByIdWithDetails(eventId)
                 .orElseThrow(() -> new EntityNotFoundException("Event not found: " + eventId));
         
         if (event.getStatus() != EventStatus.PUBLISHED) {

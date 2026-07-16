@@ -102,7 +102,7 @@ class BookingServiceReserveTest {
                                 .isInstanceOf(IllegalArgumentException.class)
                                 .hasMessageContaining("Invalid ticket quantity");
 
-                verify(eventRepository, never()).findById(anyLong());
+                verify(eventRepository, never()).findByIdWithDetails(anyLong());
         }
 
         @Test
@@ -114,13 +114,13 @@ class BookingServiceReserveTest {
                                 .isInstanceOf(IllegalArgumentException.class)
                                 .hasMessageContaining("Max allowed");
 
-                verify(eventRepository, never()).findById(anyLong());
+                verify(eventRepository, never()).findByIdWithDetails(anyLong());
         }
 
         @Test
         @DisplayName("reserveTickets: event not found should throw EntityNotFoundException")
         void reserveTickets_whenEventNotFound_shouldThrowEntityNotFoundException() {
-                when(eventRepository.findById(10L)).thenReturn(Optional.empty());
+                when(eventRepository.findByIdWithDetails(10L)).thenReturn(Optional.empty());
 
                 assertThatThrownBy(() -> bookingService.reserveTickets(1L, 10L, 100L, 1))
                                 .isInstanceOf(EntityNotFoundException.class)
@@ -131,7 +131,7 @@ class BookingServiceReserveTest {
         @DisplayName("reserveTickets: unpublished event should throw IllegalStateException")
         void reserveTickets_whenEventNotPublished_shouldThrowIllegalStateException() {
                 event = Event.builder().id(10L).status(EventStatus.DRAFT).build();
-                when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+                when(eventRepository.findByIdWithDetails(10L)).thenReturn(Optional.of(event));
 
                 assertThatThrownBy(() -> bookingService.reserveTickets(1L, 10L, 100L, 1))
                                 .isInstanceOf(IllegalStateException.class)
@@ -141,7 +141,7 @@ class BookingServiceReserveTest {
         @Test
         @DisplayName("reserveTickets: tier not found should throw EntityNotFoundException")
         void reserveTickets_whenTierNotFound_shouldThrowEntityNotFoundException() {
-                when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+                when(eventRepository.findByIdWithDetails(10L)).thenReturn(Optional.of(event));
                 when(ticketTierRepository.findById(100L)).thenReturn(Optional.empty());
 
                 assertThatThrownBy(() -> bookingService.reserveTickets(1L, 10L, 100L, 1))
@@ -159,7 +159,7 @@ class BookingServiceReserveTest {
                                 .totalCapacity(50)
                                 .availableCount(10)
                                 .build();
-                when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+                when(eventRepository.findByIdWithDetails(10L)).thenReturn(Optional.of(event));
                 when(ticketTierRepository.findById(100L)).thenReturn(Optional.of(wrongTier));
 
                 assertThatThrownBy(() -> bookingService.reserveTickets(1L, 10L, 100L, 1))
@@ -170,7 +170,7 @@ class BookingServiceReserveTest {
         @Test
         @DisplayName("reserveTickets: insufficient inventory before lock should throw IllegalStateException")
         void reserveTickets_whenInventoryInsufficient_shouldThrowIllegalStateException() {
-                when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+                when(eventRepository.findByIdWithDetails(10L)).thenReturn(Optional.of(event));
                 when(ticketTierRepository.findById(100L)).thenReturn(Optional.of(tier));
                 when(inventoryService.getAvailableCount(100L)).thenReturn(0);
 
@@ -184,7 +184,7 @@ class BookingServiceReserveTest {
         @Test
         @DisplayName("reserveTickets: lock acquisition failure should throw IllegalStateException")
         void reserveTickets_whenLockNotAcquired_shouldThrowIllegalStateException() {
-                when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+                when(eventRepository.findByIdWithDetails(10L)).thenReturn(Optional.of(event));
                 when(ticketTierRepository.findById(100L)).thenReturn(Optional.of(tier));
                 when(inventoryService.getAvailableCount(100L)).thenReturn(5);
                 when(lockService.acquireLock(any(), any(), anyLong())).thenReturn(false);
@@ -199,7 +199,7 @@ class BookingServiceReserveTest {
         @Test
         @DisplayName("reserveTickets: TOCTOU guard fires when inventory depletes after lock acquired")
         void reserveTickets_whenInventoryDepletedInsideLock_shouldThrowIllegalStateException() {
-                when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+                when(eventRepository.findByIdWithDetails(10L)).thenReturn(Optional.of(event));
                 when(ticketTierRepository.findById(100L)).thenReturn(Optional.of(tier));
                 // first check: enough; second check (inside lock): depleted
                 when(inventoryService.getAvailableCount(100L)).thenReturn(5).thenReturn(0);
@@ -216,7 +216,7 @@ class BookingServiceReserveTest {
         @Test
         @DisplayName("reserveTickets: happy path creates and persists booking with correct amount")
         void reserveTickets_whenAllConditionsMet_shouldCreateAndSaveBooking() {
-                when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+                when(eventRepository.findByIdWithDetails(10L)).thenReturn(Optional.of(event));
                 when(ticketTierRepository.findById(100L)).thenReturn(Optional.of(tier));
                 when(inventoryService.getAvailableCount(100L)).thenReturn(5);
                 when(lockService.acquireLock(any(), any(), anyLong())).thenReturn(true);
@@ -239,7 +239,7 @@ class BookingServiceReserveTest {
         @Test
         @DisplayName("reserveTickets: a successful reservation decrements the tier's availableCount in the database (Fix D19-1)")
         void reserveTickets_whenSuccessful_shouldDecrementTierAvailableCountInDatabase() {
-                when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+                when(eventRepository.findByIdWithDetails(10L)).thenReturn(Optional.of(event));
                 when(ticketTierRepository.findById(100L)).thenReturn(Optional.of(tier));
                 when(inventoryService.getAvailableCount(100L)).thenReturn(5);
                 when(lockService.acquireLock(any(), any(), anyLong())).thenReturn(true);
@@ -258,7 +258,7 @@ class BookingServiceReserveTest {
         @Test
         @DisplayName("reserveTickets: Day 21 hardening — DB-side decrement refusal releases the just-reserved Redis seat instead of leaking it")
         void reserveTickets_whenDbDecrementRefused_shouldReleaseRedisSeatAndThrow() {
-                when(eventRepository.findById(10L)).thenReturn(Optional.of(event));
+                when(eventRepository.findByIdWithDetails(10L)).thenReturn(Optional.of(event));
                 when(ticketTierRepository.findById(100L)).thenReturn(Optional.of(tier));
                 when(inventoryService.getAvailableCount(100L)).thenReturn(5);
                 when(lockService.acquireLock(any(), any(), anyLong())).thenReturn(true);
