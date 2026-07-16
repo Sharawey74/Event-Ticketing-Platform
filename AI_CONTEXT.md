@@ -1,14 +1,16 @@
 # AI CONTEXT SNAPSHOT — Event Ticketing Platform
 
-## Last Updated: Day 22b (2026-07-15) — Frontend Design Handoff: applied 3 Claude Design mockup exports (Landing, Dashboard, Organizer Dashboard) to the live Next.js frontend. Landing page hero kept its real search form and photo background (explicit instruction) but gained a stats row, a "Become an Organizer" CTA, and three new sections (Feature Strip, Featured Events using real data, For-Organizers teaser); the old category-chip filter + full grid was removed in favor of a small featured-events teaser linking to `/search`. Footer gained Product + Support columns (all real routes, no invented pages). Dashboard and Organizer Dashboard pages got empty-state and visual polish only — no data-fetching logic touched. `npm run build` (the actual Vercel deploy step) succeeds cleanly; `npm run test` 4/4 unchanged; 9 pre-existing lint errors in 6 untouched files confirmed NOT introduced by this work (verified via `git diff`) and confirmed not to block `next build`.
+## Last Updated: Day 23 (2026-07-16) — Fixed 2 production bugs surfaced while building the GitHub Pages portfolio site, and polished the site itself. **Bug 1**: `BookingService.reserveTickets()` loaded `Event` via a plain `findById()`, leaving `venue`/`category` lazy; production's `spring.jpa.open-in-view: false` closed the Hibernate session before `BookingController` read those fields, throwing `LazyInitializationException` → 500 despite the reservation having already committed. Fixed by switching to the existing `findByIdWithDetails()`. **Bug 2**: `WebhookService.handlePaymentSuccess()` published a `BookingConfirmedEvent` to RabbitMQ with no error handling, inside the same transaction as the `CONFIRMED` state write and the idempotency insert — a broker hiccup threw an unchecked exception and rolled back everything, including the idempotency guard, so a Stripe retry hit the identical failure again. Fixed by catching and logging instead of rethrowing. **Frontend**: the booking confirmation page never checked `booking.state` before rendering "Booking Confirmed!" — now gates on real state (confirmed / terminal-failure / still-processing-with-refresh-button). Both backend fixes reproduced Red via new/updated tests before the fix and confirmed Green after; 196/196 tests passing, JaCoCo gate passed. **Portfolio site** (`site/`): replaced the `08-booking-detail-qr-ticket` screenshot — previously an honest "mid-processing" capture from before the fix — with a real capture of a `CONFIRMED` booking with a genuine QR code (captured locally against the fixed code, since the fix isn't deployed to Railway/Vercel yet), updated the corresponding `walkthrough.html` caption, removed a now-stale note about the webhook not landing during the original capture window, and fixed the nav bar's `.mark` logo element (was a blank gradient square with no glyph — now uses `favicon.svg` as its background-image so it matches the actual Eventora "E" mark). Nothing has been pushed; deploy and a real production re-capture of the confirmation screenshot are still pending, at the user's discretion.
+
+## Previously — Day 22b (2026-07-15) — Frontend Design Handoff: applied 3 Claude Design mockup exports (Landing, Dashboard, Organizer Dashboard) to the live Next.js frontend. Landing page hero kept its real search form and photo background (explicit instruction) but gained a stats row, a "Become an Organizer" CTA, and three new sections (Feature Strip, Featured Events using real data, For-Organizers teaser); the old category-chip filter + full grid was removed in favor of a small featured-events teaser linking to `/search`. Footer gained Product + Support columns (all real routes, no invented pages). Dashboard and Organizer Dashboard pages got empty-state and visual polish only — no data-fetching logic touched. `npm run build` (the actual Vercel deploy step) succeeds cleanly; `npm run test` 4/4 unchanged; 9 pre-existing lint errors in 6 untouched files confirmed NOT introduced by this work (verified via `git diff`) and confirmed not to block `next build`.
 
 ## Previously — Day 22 (2026-07-15) — Seed Data: 15 real-world-plausible, privately organized Egyptian events added via `V13__seed_egypt_private_events.sql` (Flyway migration, IMMUTABLE), so the live storefront/dashboard have real content instead of empty states. Adds 1 new category (`Conference`), 2 new `ORGANIZER` seed users, 15 `PUBLISHED` events across 8 existing private/commercial venues (Cairo, Alexandria, Hurghada, Sharm El Sheikh, Dahab, El Gouna), and 30 ticket tiers (2 per event). Deliberately excludes museums and government-run cultural/antiquities venues by design. 194/194 tests passing (unchanged), ~83.8% INSTRUCTION coverage (gate-scoped) verified via `./mvnw clean verify`, JaCoCo gate passed.
 
 ## Previously — Day 20 (2026-07-03) — Code Quality + Security Hardening: restricted `/actuator/**` to ADMIN-only (only `/actuator/health` stays public), added Redis-Lua-backed rate limiting on auth/booking endpoints (M-002), added a JWT `jti` + Redis denylist with a new `/logout` endpoint (M-004), fixed a bug where `TicketTier.availableCount` in the database never decremented on reservation and could have permanently leaked inventory if fixed naively (D19-1), and audited/fixed 3 `log.error()` calls that were silently discarding stack traces (CC-1). 191/191 tests passing, 82% INSTRUCTION coverage verified via `./mvnw clean verify`, JaCoCo gate passed.
 
-## Branch: feat/seed-data-frontend-refresh (local — renamed from day-22-seed-egypt-events, created from main, not yet pushed)
+## Branch: feat/github-pages-portfolio-site (local — created from main at the feat/seed-data-frontend-refresh merge, not yet pushed)
 
-## Test Status: 194/194 ALL passing (unchanged from Day 21 baseline — this session only added a data-seed Flyway migration, no Java code changes), ~83.8% INSTRUCTION coverage (gate-scoped) verified via `./mvnw clean verify`
+## Test Status: 196/196 ALL passing (+2 from Day 22b baseline — one new integration test reproducing/proving Bug 1's fix, one new unit test reproducing/proving Bug 2's fix), JaCoCo gate passed, verified via `./mvnw clean verify`
 
 ## 1. NON-NEGOTIABLE RULES (From instructions.txt + Overlay)
 
@@ -383,9 +385,73 @@ This repository has two deployable parts:
 
 ---
 
-## 10. NEXT SESSION START — DAY 23
+## 10. NEXT SESSION START — DAY 24
 
-**Current Branch:** `feat/seed-data-frontend-refresh` (local, renamed from `day-22-seed-egypt-events`, created from `main`, not yet pushed/merged)
+**Current Branch:** `feat/github-pages-portfolio-site` (local, created from `main` at the
+`feat/seed-data-frontend-refresh` merge, not yet pushed/merged)
+
+**Completed in Day 23 (Portfolio Site + 2 Production Bug Fixes, 2026-07-16):**
+
+- While capturing screenshots for the GitHub Pages portfolio site against the live production
+  deployment, a real purchase flow surfaced two independent, reproducible bugs. Both were fixed
+  with a failing test written first, confirmed Red against the pre-fix code, then confirmed Green.
+- **Bug 1 — reservation 500s despite committing:** `BookingService.reserveTickets()`
+  (`BookingService.java`) loaded `Event` via a plain `eventRepository.findById()`, leaving
+  `venue`/`category` lazy. Production's `spring.jpa.open-in-view: false` (local defaults to `true`,
+  which is why this never reproduced locally) closes the Hibernate session when the transactional
+  method returns, so `BookingController`'s read of `booking.getEvent().getVenue()`/`.getCategory()`
+  threw `LazyInitializationException` → 500, even though the booking had already committed. Fixed
+  by switching to the existing `eventRepository.findByIdWithDetails()`, which already carries the
+  right fetch graph. New integration test (`BookingReservationLazyLoadingIntegrationTest`) forces
+  `spring.jpa.open-in-view=false` and drives the real `BookingController` end-to-end via MockMvc.
+- **Bug 2 — webhook silently failing to confirm bookings:** `WebhookService.handlePaymentSuccess()`
+  published a `BookingConfirmedEvent` to RabbitMQ with no error handling, inside the same
+  transaction as the `CONFIRMED` state write and the idempotency-guarding insert. A broker hiccup
+  threw an unchecked `AmqpException`, and Spring's default rollback-on-unchecked-exception undid
+  everything — including the idempotency row — so a Stripe retry hit the identical failure again.
+  Fixed by wrapping the publish call in try/catch and logging at ERROR instead of rethrowing.
+  Trade-off noted in the fix: a failed publish means that booking's ticket-generation/email event
+  isn't retried automatically — a durable outbox pattern would close that gap but is out of scope.
+  New test in `WebhookServiceTest` mocks the publisher to throw and asserts the booking still ends
+  up `CONFIRMED` with no exception propagating.
+- **Frontend:** `bookings/[id]/confirmation/page.tsx` fetched real booking data but never checked
+  `state` before rendering "Booking Confirmed!" — any webhook delay showed false success. Added
+  `state` to the `BookingDetails` interface; the page now branches on it: confirmed/attended shows
+  the existing success UI, a terminal failure state (`PAYMENT_FAILED`/`CANCELLED`/`EXPIRED`) shows
+  an explicit "Payment Not Completed" message, anything else shows "Payment Processing" with a
+  manual refresh button that re-fetches in place (no full page reload).
+- **Docs:** fixed a stale webhook path in `docs/Core/11_stripe_payments.md`
+  (`/api/payments/webhook` → `/api/v1/payments/webhook`, 3 occurrences) that could have caused a
+  future Stripe Dashboard misconfiguration if the endpoint was ever set up by copying from it.
+- Verified: `./mvnw clean verify` → 196/196 tests passing (+2 — one integration test for Bug 1, one
+  unit test for Bug 2), JaCoCo gate passed. Manually verified the frontend fix against a local dev
+  backend running the fixed code (not production): registered a real local test account, made a
+  real reservation, flipped the booking through `PAYMENT_PENDING` → `CONFIRMED` directly in
+  Postgres, and confirmed the confirmation page renders each state correctly, including the
+  refresh button re-fetching without a reload.
+- Along the way, confirmed (by reading the actual source, not guessing) that a "random
+  cancellation" observed during manual testing was `ReservationGuard`'s intentional `pagehide`
+  auto-cancel (releases a held reservation immediately if the user leaves without proceeding to
+  checkout) — triggered by this session's own browser-automation tooling doing a hard page
+  navigation (which fires `pagehide`), not something a real user clicking in-app links would ever
+  trigger. Also confirmed a "wrong user" flash on the dashboard was a hydration-timing artifact
+  (`userEmail` defaulting to a hardcoded placeholder string before the Zustand store rehydrates
+  from localStorage) — cosmetic only, not a session/data bug.
+- **Portfolio site (`site/`):** replaced `assets/img/screenshots/08-booking-detail-qr-ticket.webp`
+  — previously an honest "mid-processing" capture from before the fix — with a real capture of a
+  `CONFIRMED` booking with a genuine QR code and ticket details, captured locally against the fixed
+  code (production hasn't been redeployed yet). Updated the corresponding `walkthrough.html`
+  caption to stop claiming the webhook hadn't landed, and instead names the two bugs this
+  screenshot situation led to finding and fixing. Removed a now-redundant note under the
+  `06-booking-confirmation` screenshot describing the same original issue. Fixed the nav bar's
+  `.mark` logo element (`assets/css/style.css`) — it was rendering as a blank gradient square with
+  no glyph; now uses `favicon.svg` as its background-image so it matches the actual "E" mark.
+- Commits made with plain Conventional Commit messages, no AI-attribution trailer, per explicit
+  instruction (`fix(booking)`, `fix(payment)`, `fix(frontend)`, plus this site/docs update).
+  **Nothing has been pushed.** Deploying these fixes to Railway/Vercel and — if desired — redoing
+  the real production purchase to recapture `06-booking-confirmation` (currently still the original
+  honest mid-processing screenshot, left as-is at the user's call) are both still pending, at the
+  user's discretion, not something to do automatically next session.
 
 **Completed in Day 22b (Frontend Design Handoff, 2026-07-15):**
 
@@ -459,11 +525,14 @@ This repository has two deployable parts:
   `day-22-seed-egypt-events` then renamed) rather than on `main` directly, per this session's
   explicit instruction.
 
-**First task for next session — Day 23:** Day 21's carryover items are still open (frontend must
-send an `Idempotency-Key` header on `POST /api/v1/bookings` before `app.rate-limit.enabled=true`
-reaches production; the 6 browser-based Critical Path smoke tests and Railway/Vercel env var
-audits in `PROGRESS.md`'s Day 21 row are still the user's to complete). Resume there, or pick up
-whatever the next `Plans/session-prompts/day-23-*.md` specifies once written.
+**First task for next session — Day 24:** Push `feat/github-pages-portfolio-site` and let
+Railway/Vercel redeploy the two bug fixes (nothing pushed yet as of Day 23); once live, decide
+whether to redo the real production purchase to recapture `06-booking-confirmation` with the fix
+in effect, or leave its honest pre-fix framing as-is. Day 21's older carryover items are still open
+too (frontend must send an `Idempotency-Key` header on `POST /api/v1/bookings` before
+`app.rate-limit.enabled=true` reaches production; the 6 browser-based Critical Path smoke tests and
+Railway/Vercel env var audits in `PROGRESS.md`'s Day 21 row are still the user's to complete). Pick up
+whatever the next `Plans/session-prompts/day-24-*.md` specifies once written.
 
 ---
 

@@ -18,6 +18,7 @@ interface Ticket {
 interface BookingDetails {
   id: number;
   reference: string;
+  state: string;
   totalPrice: number;
   event: {
     title: string;
@@ -36,8 +37,10 @@ export default function ConfirmationPage() {
   const [isMounted, setIsMounted] = useState(false);
   const [booking, setBooking] = useState<BookingDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [qrsLoaded, setQrsLoaded] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsMounted(true), 0);
@@ -54,6 +57,7 @@ export default function ConfirmationPage() {
       if (!token) {
         setError("You must be logged in to view your booking.");
         setIsLoading(false);
+        setIsRefreshing(false);
         return;
       }
 
@@ -68,11 +72,17 @@ export default function ConfirmationPage() {
         setError((err as any)?.response?.data?.message || "Failed to load booking details.");
       } finally {
         setIsLoading(false);
+        setIsRefreshing(false);
       }
     }
 
     if (bookingId) fetchBooking();
-  }, [bookingId, token, isMounted]);
+  }, [bookingId, token, isMounted, refreshKey]);
+
+  const handleRefreshStatus = () => {
+    setIsRefreshing(true);
+    setRefreshKey((k) => k + 1);
+  };
 
   if (isLoading) {
     return (
@@ -93,18 +103,46 @@ export default function ConfirmationPage() {
     );
   }
 
+  const isConfirmed = booking.state === "CONFIRMED" || booking.state === "ATTENDED";
+  const isFailed = booking.state === "PAYMENT_FAILED" || booking.state === "CANCELLED" || booking.state === "EXPIRED";
+
   return (
     <main className="flex-grow flex flex-col items-center justify-center pt-16 pb-section-gap px-edge-padding w-full min-h-screen">
       <div className="max-w-container-max w-full mx-auto max-w-3xl">
-        {/* Success Header Area */}
+        {/* Status Header Area */}
         <div className="text-center mb-stack-lg">
-          <svg className="success-checkmark" viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg">
-            <circle className="checkmark__circle" cx="26" cy="26" fill="none" r="25"></circle>
-            <path className="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"></path>
-          </svg>
-          <h1 className="font-hero-headline text-hero-headline text-primary mb-stack-sm md:hidden">Booking Confirmed!</h1>
-          <h1 className="font-hero-headline text-hero-headline text-primary mb-stack-sm hidden md:block">Booking Confirmed!</h1>
-          <p className="font-body-lg text-body-lg text-on-surface-variant mb-stack-md">You&apos;re all set for an amazing experience.</p>
+          {isConfirmed ? (
+            <>
+              <svg className="success-checkmark" viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg">
+                <circle className="checkmark__circle" cx="26" cy="26" fill="none" r="25"></circle>
+                <path className="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"></path>
+              </svg>
+              <h1 className="font-hero-headline text-hero-headline text-primary mb-stack-sm">Booking Confirmed!</h1>
+              <p className="font-body-lg text-body-lg text-on-surface-variant mb-stack-md">You&apos;re all set for an amazing experience.</p>
+            </>
+          ) : isFailed ? (
+            <>
+              <h1 className="font-hero-headline text-hero-headline text-error mb-stack-sm">Payment Not Completed</h1>
+              <p className="font-body-lg text-body-lg text-on-surface-variant mb-stack-md">
+                This booking is currently <span className="font-semibold">{booking.state}</span>. If you were charged, contact support with your booking reference below.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="font-hero-headline text-hero-headline text-primary mb-stack-sm">Payment Processing</h1>
+              <p className="font-body-lg text-body-lg text-on-surface-variant mb-stack-md">
+                We&apos;re confirming your payment with Stripe — this can take a few moments.
+              </p>
+              <button
+                onClick={handleRefreshStatus}
+                disabled={isRefreshing}
+                className="inline-flex items-center gap-2 bg-surface-container text-on-surface hover:bg-surface-container-high px-5 py-2 rounded-full font-label-lg transition-colors border border-outline-variant disabled:opacity-60 mb-stack-md"
+              >
+                <span className="material-symbols-outlined text-[18px]">refresh</span>
+                {isRefreshing ? "Checking..." : "Refresh Status"}
+              </button>
+            </>
+          )}
 
           <div className="inline-flex items-center gap-2 bg-surface-container-high px-4 py-2 rounded-full border border-outline-variant">
             <span className="font-label-sm text-label-sm text-on-surface-variant uppercase">Booking Ref:</span>
@@ -151,7 +189,10 @@ export default function ConfirmationPage() {
             </div>
             <div className="mt-4 pt-4 border-t border-white/20">
               <p className="font-caption text-caption flex items-center gap-1">
-                <span className="material-symbols-outlined text-[16px]">check_circle</span> Payment Successful
+                <span className="material-symbols-outlined text-[16px]">
+                  {isConfirmed ? "check_circle" : isFailed ? "error" : "hourglass_top"}
+                </span>
+                {isConfirmed ? "Payment Successful" : isFailed ? "Payment Not Completed" : "Payment Processing"}
               </p>
             </div>
           </div>

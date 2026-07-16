@@ -1,6 +1,9 @@
 package com.ticketing.payment.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -21,6 +24,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import com.stripe.model.Event;
 import com.stripe.model.EventDataObjectDeserializer;
 import com.stripe.model.checkout.Session;
+import org.springframework.amqp.AmqpException;
 import com.ticketing.booking.model.Booking;
 import com.ticketing.booking.model.BookingState;
 import com.ticketing.booking.repository.BookingRepository;
@@ -224,5 +228,37 @@ class WebhookServiceTest {
         webhookService.processEvent(stripeEvent);
 
         verify(bookingRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("processEvent: BookingEventPublisher failure must not roll back the CONFIRMED state (Bug 2 fix)")
+    void processEvent_whenEventPublisherThrows_shouldStillConfirmBookingAndNotPropagate() {
+        Session mockSession = mock(Session.class);
+        when(mockSession.getId()).thenReturn("cs_test_session_abc123");
+        when(mockSession.getMetadata()).thenReturn(java.util.Map.of("bookingId", "42"));
+        when(mockSession.getPaymentIntent()).thenReturn("pi_test_003");
+
+        EventDataObjectDeserializer mockDeserializer = mock(EventDataObjectDeserializer.class);
+        when(mockDeserializer.getObject()).thenReturn(Optional.of(mockSession));
+
+        Event stripeEvent = mock(Event.class);
+        when(stripeEvent.getId()).thenReturn("evt_publish_fails");
+        when(stripeEvent.getType()).thenReturn("checkout.session.completed");
+        when(stripeEvent.getDataObjectDeserializer()).thenReturn(mockDeserializer);
+
+        when(processedStripeEventRepository.save(any(ProcessedStripeEvent.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(bookingRepository.findById(42L)).thenReturn(Optional.of(paymentPendingBooking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        doThrow(new AmqpException("broker unreachable"))
+                .when(bookingEventPublisher).publishBookingConfirmation(any());
+
+        // Act: the RabbitMQ outage must not propagate out of processEvent()
+        assertDoesNotThrow(() -> webhookService.processEvent(stripeEvent));
+
+        // Assert: booking was still transitioned + saved as CONFIRMED before the publish attempt
+        verify(bookingRepository).save(any(Booking.class));
+        assertThat(paymentPendingBooking.getState()).isEqualTo(BookingState.CONFIRMED);
     }
 }
