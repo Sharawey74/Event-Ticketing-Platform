@@ -13,9 +13,12 @@ permissions:
   pages: write
   id-token: write
 
+# One deploy at a time. Do not cancel in progress — a run killed mid-upload can
+# leave a partial artifact behind, and a half-finished deployment is worse than
+# a slightly stale one.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
