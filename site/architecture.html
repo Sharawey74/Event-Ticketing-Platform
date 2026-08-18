@@ -66,43 +66,67 @@
           is the source of truth; Redis holds inventory counters, distributed locks, and the JWT denylist; RabbitMQ
           offloads QR generation and email so the request path never blocks on them.</p>
       </div>
-      <div class="diagram">
-<pre><code>┌───────────────────────┐
-│  Next.js 16 Frontend  │
-│       (Vercel)        │
-└───────────┬───────────┘
-            │ HTTPS + JWT
-            ▼
-┌───────────────────────┐
-│  Spring Boot Backend  │
-│       (Railway)       │
-└───────────┬───────────┘
-            │
-   ┌────────┼─────────────────┐
-   ▼        ▼                 ▼
-┌───────┐ ┌────────────────┐ ┌───────────────┐
-│  REST │ │ Domain Services│ │ Booking State │
-│ API   │ │ event·booking· │ │   Machine     │
-│30 ep, │ │ payment·       │ │  11 states,   │
-│9 ctrl │ │ inventory·     │ │ 1 / request   │
-└───────┘ │ pricing·notif· │ └───────────────┘
-          │ user           │
-          └────────┬───────┘
-                   ▼
-          ┌────────────────┐
-          │     Stripe     │
-          │ checkout +     │
-          │   webhooks     │
-          └────────────────┘
+      <div class="arch">
+        <div class="arch-node">
+          <b>Next.js 16 Frontend</b>
+          <span>(Vercel)</span>
+        </div>
 
-   ┌────────┬─────────────────┐
-   ▼        ▼                 ▼
-┌───────┐ ┌──────────┐ ┌───────────┐
-│Postgres│ │  Redis   │ │ RabbitMQ  │
-│source  │ │inventory,│ │  async    │
-│of truth│ │locks, JWT│ │notif. +   │
-│        │ │denylist  │ │QR gen.    │
-└───────┘ └──────────┘ └───────────┘</code></pre>
+        <div class="arch-link"><span>HTTPS + JWT</span></div>
+
+        <div class="arch-node">
+          <b>Spring Boot Backend</b>
+          <span>(Railway)</span>
+        </div>
+
+        <div class="arch-link"></div>
+
+        <div class="arch-group">
+          <span class="arch-label">Application layer</span>
+          <div class="arch-chain">
+            <div class="arch-node accent">
+              <b>REST API</b>
+              <span>30 ep, 9 ctrl</span>
+            </div>
+            <i class="arch-caret"></i>
+            <div class="arch-node accent">
+              <b>Domain Services</b>
+              <span>event·booking·<br>payment·inventory·<br>pricing·notif·user</span>
+            </div>
+            <i class="arch-caret"></i>
+            <div class="arch-node accent">
+              <b>Booking State Machine</b>
+              <span>11 states,<br>1 / request</span>
+            </div>
+          </div>
+
+          <div class="arch-link"></div>
+
+          <div class="arch-node">
+            <b>Stripe</b>
+            <span>checkout + webhooks</span>
+          </div>
+        </div>
+
+        <div class="arch-link"></div>
+
+        <div class="arch-group is-store">
+          <span class="arch-label">Persistence &amp; messaging</span>
+          <div class="arch-cols">
+            <div class="arch-node store">
+              <b>Postgres</b>
+              <span>source of truth</span>
+            </div>
+            <div class="arch-node store">
+              <b>Redis</b>
+              <span>inventory, locks,<br>JWT denylist</span>
+            </div>
+            <div class="arch-node store">
+              <b>RabbitMQ</b>
+              <span>async notif. +<br>QR gen.</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -112,21 +136,40 @@
       <div class="section-head">
         <h2>Reservation flow — the concurrency-critical path</h2>
       </div>
-      <div class="diagram">
-<pre><code>1. Client          ── POST /api/v1/bookings ──► BookingService
-2. BookingService  ──► Redis     acquire per-user distributed lock
-3. BookingService  ──► Redis     re-check availability (TOCTOU guard)
-4. BookingService  ──► Redis     reserveSeat() — atomic Lua floor guard
+      <div class="arch">
+        <div class="flow">
+          <div class="flow-step"><b>1</b><span><em>Client</em> ── POST /api/v1/bookings ──► <em>BookingService</em></span></div>
+          <div class="flow-step"><b>2</b><span><em>BookingService</em> ──► <em>Redis</em> &nbsp;acquire per-user distributed lock</span></div>
+          <div class="flow-step"><b>3</b><span><em>BookingService</em> ──► <em>Redis</em> &nbsp;re-check availability (TOCTOU guard)</span></div>
+          <div class="flow-step"><b>4</b><span><em>BookingService</em> ──► <em>Redis</em> &nbsp;reserveSeat() — atomic Lua floor guard</span></div>
+        </div>
 
-  SEATS AVAILABLE                       SOLD OUT
-  5. Redis decremented, success         5. Redis rejects (floor guard)
-  6. Postgres atomic conditional        6. Client ◄── 409 Conflict
-     UPDATE (available_count -= n)
-  7. Postgres INSERT Booking
-     (state=RESERVED, expires=+5m)
-  8. Client ◄── 201 Created
+        <div class="arch-link"></div>
 
-9. BookingService  ──► Redis     release lock</code></pre>
+        <div class="flow-branch">
+          <div class="flow-col is-ok">
+            <span class="arch-label">Seats available</span>
+            <div class="flow">
+              <div class="flow-step"><b>5</b><span>Redis decremented, success</span></div>
+              <div class="flow-step"><b>6</b><span>Postgres atomic conditional UPDATE (available_count -= n)</span></div>
+              <div class="flow-step"><b>7</b><span>Postgres INSERT Booking (state=RESERVED, expires=+5m)</span></div>
+              <div class="flow-step"><b>8</b><span><em>Client</em> ◄── 201 Created</span></div>
+            </div>
+          </div>
+          <div class="flow-col is-fail">
+            <span class="arch-label">Sold out</span>
+            <div class="flow">
+              <div class="flow-step"><b>5</b><span>Redis rejects (floor guard)</span></div>
+              <div class="flow-step"><b>6</b><span><em>Client</em> ◄── 409 Conflict</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-link"></div>
+
+        <div class="flow">
+          <div class="flow-step"><b>9</b><span><em>BookingService</em> ──► <em>Redis</em> &nbsp;release lock</span></div>
+        </div>
       </div>
 
       <h3>Concurrency &amp; data integrity</h3>
@@ -176,63 +219,47 @@
         <h2>Tech stack</h2>
       </div>
       <div class="grid grid-3">
-        <div>
+        <div class="spec-card">
           <h4>Backend</h4>
-          <div class="table-scroll">
-            <table class="spec">
-              <tbody>
-                <tr><td>Language / Runtime</td><td>Java 21 (LTS)</td></tr>
-                <tr><td>Framework</td><td>Spring Boot 3.5, Security, Data JPA</td></tr>
-                <tr><td>State management</td><td>Spring State Machine 4.0</td></tr>
-                <tr><td>Payments</td><td>Stripe Java SDK 23.3</td></tr>
-                <tr><td>Auth</td><td>JJWT 0.11</td></tr>
-                <tr><td>QR generation</td><td>ZXing 3.5</td></tr>
-                <tr><td>Coverage</td><td>JaCoCo (80% instruction gate)</td></tr>
-                <tr><td>Testing</td><td>JUnit 5 · Mockito · Testcontainers</td></tr>
-                <tr><td>Load testing</td><td>k6 (Grafana Labs)</td></tr>
-              </tbody>
-            </table>
-          </div>
+          <dl class="spec-list">
+            <div><dt>Language / Runtime</dt><dd>Java 21 (LTS)</dd></div>
+            <div><dt>Framework</dt><dd>Spring Boot 3.5, Security, Data JPA</dd></div>
+            <div><dt>State management</dt><dd>Spring State Machine 4.0</dd></div>
+            <div><dt>Payments</dt><dd>Stripe Java SDK 23.3</dd></div>
+            <div><dt>Auth</dt><dd>JJWT 0.11</dd></div>
+            <div><dt>QR generation</dt><dd>ZXing 3.5</dd></div>
+            <div><dt>Coverage</dt><dd>JaCoCo (80% instruction gate)</dd></div>
+            <div><dt>Testing</dt><dd>JUnit 5 · Mockito · Testcontainers</dd></div>
+            <div><dt>Load testing</dt><dd>k6 (Grafana Labs)</dd></div>
+          </dl>
         </div>
-        <div>
+        <div class="spec-card">
           <h4>Data &amp; messaging</h4>
-          <div class="table-scroll">
-            <table class="spec">
-              <tbody>
-                <tr><td>Primary datastore</td><td>PostgreSQL 17 · Flyway (13 migrations)</td></tr>
-                <tr><td>Cache / locking</td><td>Redis 7 (Lettuce client)</td></tr>
-                <tr><td>Async messaging</td><td>RabbitMQ 4</td></tr>
-              </tbody>
-            </table>
-          </div>
+          <dl class="spec-list">
+            <div><dt>Primary datastore</dt><dd>PostgreSQL 17 · Flyway (13 migrations)</dd></div>
+            <div><dt>Cache / locking</dt><dd>Redis 7 (Lettuce client)</dd></div>
+            <div><dt>Async messaging</dt><dd>RabbitMQ 4</dd></div>
+          </dl>
           <h4>Infrastructure</h4>
-          <div class="table-scroll">
-            <table class="spec">
-              <tbody>
-                <tr><td>Containerization</td><td>Docker, multi-stage build (~619MB)</td></tr>
-                <tr><td>Local orchestration</td><td>Docker Compose, 7 health-gated services</td></tr>
-                <tr><td>Backend hosting</td><td>Railway</td></tr>
-                <tr><td>Frontend hosting</td><td>Vercel</td></tr>
-              </tbody>
-            </table>
-          </div>
+          <dl class="spec-list">
+            <div><dt>Containerization</dt><dd>Docker, multi-stage build (~619MB)</dd></div>
+            <div><dt>Local orchestration</dt><dd>Docker Compose, 7 health-gated services</dd></div>
+            <div><dt>Backend hosting</dt><dd>Railway</dd></div>
+            <div><dt>Frontend hosting</dt><dd>Vercel</dd></div>
+          </dl>
         </div>
-        <div>
+        <div class="spec-card">
           <h4>Frontend</h4>
-          <div class="table-scroll">
-            <table class="spec">
-              <tbody>
-                <tr><td>Framework</td><td>Next.js 16 (App Router, TS strict)</td></tr>
-                <tr><td>UI runtime</td><td>React 19</td></tr>
-                <tr><td>Styling</td><td>Tailwind CSS 4</td></tr>
-                <tr><td>Server state</td><td>TanStack Query 5</td></tr>
-                <tr><td>Client state</td><td>Zustand 5</td></tr>
-                <tr><td>Forms</td><td>React Hook Form 7 · Zod 4</td></tr>
-                <tr><td>Payments</td><td>Stripe.js</td></tr>
-                <tr><td>Testing</td><td>Vitest</td></tr>
-              </tbody>
-            </table>
-          </div>
+          <dl class="spec-list">
+            <div><dt>Framework</dt><dd>Next.js 16 (App Router, TS strict)</dd></div>
+            <div><dt>UI runtime</dt><dd>React 19</dd></div>
+            <div><dt>Styling</dt><dd>Tailwind CSS 4</dd></div>
+            <div><dt>Server state</dt><dd>TanStack Query 5</dd></div>
+            <div><dt>Client state</dt><dd>Zustand 5</dd></div>
+            <div><dt>Forms</dt><dd>React Hook Form 7 · Zod 4</dd></div>
+            <div><dt>Payments</dt><dd>Stripe.js</dd></div>
+            <div><dt>Testing</dt><dd>Vitest</dd></div>
+          </dl>
         </div>
       </div>
     </div>
@@ -243,16 +270,20 @@
       <div class="section-head">
         <h2>Domain &amp; API surface</h2>
       </div>
-      <div class="diagram">
-<pre><code>com.ticketing
-├── event/         Events, venues, categories, search
-├── booking/       Reservation lifecycle, state machine, tickets
-├── payment/       Stripe checkout, webhooks, refunds
-├── inventory/     Redis-backed atomic seat counters
-├── pricing/       Early-bird / group / surge pricing engine
-├── notification/  Async email + QR generation consumers
-├── user/          Authentication, JWT, roles
-└── common/        Security, exceptions, correlation IDs</code></pre>
+      <div class="arch">
+        <div class="arch-group solid">
+          <span class="arch-label">com.ticketing</span>
+          <div class="arch-cols">
+            <div class="arch-node accent"><b>event/</b><span>Events, venues, categories, search</span></div>
+            <div class="arch-node accent"><b>booking/</b><span>Reservation lifecycle, state machine, tickets</span></div>
+            <div class="arch-node accent"><b>payment/</b><span>Stripe checkout, webhooks, refunds</span></div>
+            <div class="arch-node accent"><b>inventory/</b><span>Redis-backed atomic seat counters</span></div>
+            <div class="arch-node accent"><b>pricing/</b><span>Early-bird / group / surge pricing engine</span></div>
+            <div class="arch-node accent"><b>notification/</b><span>Async email + QR generation consumers</span></div>
+            <div class="arch-node accent"><b>user/</b><span>Authentication, JWT, roles</span></div>
+            <div class="arch-node accent"><b>common/</b><span>Security, exceptions, correlation IDs</span></div>
+          </div>
+        </div>
       </div>
       <div class="table-scroll">
         <table>

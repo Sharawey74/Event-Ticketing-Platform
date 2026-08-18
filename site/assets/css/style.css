@@ -686,13 +686,6 @@ td strong {
   color: var(--text);
 }
 
-/* First column of a two-column spec table is the label. */
-table.spec td:first-child {
-  color: var(--text);
-  font-weight: 550;
-  white-space: nowrap;
-}
-
 tr:last-child td {
   border-bottom: none;
 }
@@ -709,40 +702,290 @@ th code {
   font-family: var(--mono);
 }
 
-/* ---------------------------------------------------------------- diagram */
+/* ---------------------------------------------------------------- arch boxes */
 
-/* Monospace ASCII diagrams. Scrolls rather than shrinking below legibility. */
-.diagram {
+/* Box diagrams built from real elements rather than ASCII art: they reflow at
+   any width, re-token with the palette, and do not depend on the reader having
+   a font with connecting box-drawing glyphs. */
+.arch {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 22px;
-  overflow-x: auto;
+  padding: 30px 26px;
   margin-bottom: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-.diagram pre {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  border-radius: 0;
-  overflow: visible;
+.arch-node {
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 13px 18px;
+  text-align: center;
+  min-width: 210px;
+  max-width: 100%;
+  width: fit-content;
+  margin-inline: auto;
 }
 
-.diagram pre code {
-  font-size: 0.79rem;
-  /* Box-drawing glyphs only join up when the line box is close to the glyph's
-     own height. At 1.5 the vertical rules render as a dashed ladder. */
-  line-height: 1.15;
-  color: #cbbcf0;
+.arch-chain .arch-node,
+.arch-cols .arch-node {
+  width: auto;
+  margin-inline: 0;
 }
 
-.diagram svg {
+.arch-node b {
   display: block;
-  min-width: 700px;
+  color: var(--text);
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.arch-node span {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.73rem;
+  color: var(--text-faint);
+  line-height: 1.5;
+  margin-top: 5px;
+}
+
+.arch-node .tag {
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--violet);
+  margin: 0 0 6px;
+}
+
+.arch-node.accent {
+  background: var(--violet-dim);
+  border-color: rgba(184, 164, 245, 0.45);
+}
+
+.arch-node.store {
+  background: var(--green-dim);
+  border-color: rgba(110, 231, 168, 0.35);
+}
+
+/* Vertical connector. The label rides alongside the line rather than breaking
+   it, so the run stays continuous. */
+.arch-link {
+  position: relative;
+  width: 1px;
+  height: 44px;
+  margin-inline: auto;
+  background: var(--line-strong);
+  flex: none;
+}
+
+.arch-link::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 7px solid var(--line-strong);
+}
+
+.arch-link span {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.arch-group {
   width: 100%;
-  height: auto;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.arch-group.solid {
+  border-style: solid;
+}
+
+.arch-group.is-store {
+  border-style: solid;
+  border-color: rgba(110, 231, 168, 0.38);
+}
+
+.arch-label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--violet);
+  margin: 0 0 14px;
+}
+
+.arch-group.is-store .arch-label {
+  color: var(--green);
+}
+
+/* Horizontal run of nodes with carets between. Wraps instead of scrolling. */
+.arch-chain {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.arch-chain .arch-node {
+  flex: 1 1 175px;
+  min-width: 0;
+}
+
+.arch-caret {
+  flex: none;
+  align-self: center;
+  border-left: 7px solid var(--line-strong);
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+}
+
+.arch-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.arch-foot {
+  width: 100%;
+  margin: 18px 0 0;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  line-height: 1.75;
+  color: var(--text-faint);
+}
+
+/* ---------------------------------------------------------------- flow steps */
+
+.flow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.flow-step {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 12px;
+  align-items: baseline;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 11px 15px;
+}
+
+.flow-step b {
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  color: var(--violet);
+}
+
+.flow-step span {
+  font-family: var(--mono);
+  font-size: 0.79rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+.flow-step em {
+  font-style: normal;
+  color: var(--text);
+}
+
+.flow-branch {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+
+.flow-col {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px;
+}
+
+/* Green is the path that succeeds, amber the one that is turned away — the
+   rejection is correct behaviour, not an error, so it is not red. */
+.flow-col.is-ok {
+  border-color: rgba(110, 231, 168, 0.35);
+}
+
+.flow-col.is-ok .arch-label {
+  color: var(--green);
+}
+
+.flow-col.is-fail {
+  border-color: rgba(245, 194, 107, 0.35);
+}
+
+.flow-col.is-fail .arch-label {
+  color: var(--amber);
+}
+
+/* ---------------------------------------------------------------- spec list */
+
+/* Label-over-value beats a two-column table in a ~340px grid cell: the value
+   gets the full width, so nothing has to scroll sideways to be read. */
+.spec-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px 24px;
+}
+
+.spec-card h4 {
+  margin: 0 0 4px;
+  color: var(--text);
+}
+
+.spec-card .spec-list + h4 {
+  margin-top: 26px;
+}
+
+.spec-list {
+  margin: 0;
+}
+
+.spec-list > div {
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+}
+
+.spec-list > div:first-child {
+  border-top: none;
+}
+
+.spec-list dt {
+  margin: 0 0 3px;
+  font-family: var(--mono);
+  font-size: 0.71rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.spec-list dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 /* ---------------------------------------------------------------- browser frame */
@@ -1162,6 +1405,28 @@ th code {
 }
 
 @media (max-width: 720px) {
+  .arch-chain {
+    flex-direction: column;
+  }
+
+  /* flex-basis follows the main axis, so the 175px that set node width in a
+     row would set node height in a column. */
+  .arch-chain .arch-node {
+    flex: 0 0 auto;
+  }
+
+  .arch-chain .arch-caret {
+    transform: rotate(90deg);
+  }
+
+  .arch {
+    padding: 22px 16px;
+  }
+
+  .arch-group {
+    padding: 16px 14px;
+  }
+
   section {
     padding: 56px 0;
   }
@@ -1242,7 +1507,9 @@ th code {
   .card,
   .table-scroll,
   .shot,
-  .diagram,
+  .arch,
+  .arch-group,
+  .flow-col,
   .panel,
   pre {
     border-color: #bbb;
@@ -1261,7 +1528,9 @@ th code {
   .lede,
   .list li,
   pre code,
-  .diagram pre code {
+  .arch-node span,
+  .flow-step span,
+  .spec-list dd {
     color: #222;
   }
 
