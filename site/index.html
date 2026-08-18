@@ -5,33 +5,39 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Eventora — High-Concurrency Event Ticketing Platform</title>
 <meta name="description" content="A production-grade event ticketing platform engineered around one invariant: a ticket tier can never sell more seats than its capacity, even under concurrent load.">
+
 <meta property="og:title" content="Eventora — High-Concurrency Event Ticketing Platform">
 <meta property="og:description" content="Modular monolith, Redis-atomic inventory guard, real Stripe checkout, instant QR tickets. 194/194 tests passing, 0 oversold under load.">
-<meta property="og:image" content="assets/img/screenshots/01-landing-hero.webp">
 <meta property="og:type" content="website">
+<meta property="og:url" content="https://sharawey74.github.io/Event-Ticketing-Platform/">
+<meta property="og:image" content="https://sharawey74.github.io/Event-Ticketing-Platform/assets/img/screenshots/01-landing-hero.webp">
+<meta name="twitter:card" content="summary_large_image">
+
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
 
-<header class="nav">
-  <div class="container">
-    <a href="index.html" class="nav-logo"><span class="mark"></span>Eventora</a>
-    <nav class="nav-links">
-      <a href="index.html" class="active">Overview</a>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="index.html">
+      <img src="favicon.svg" alt="" width="30" height="30">
+      <span>Eventora</span>
+    </a>
+    <nav class="nav" aria-label="Primary">
+      <a href="index.html">Overview</a>
       <a href="architecture.html">Architecture</a>
       <a href="walkthrough.html">Walkthrough</a>
     </nav>
-    <div class="nav-cta">
-      <a class="btn btn-outline" href="https://github.com/Sharawey74/Event-Ticketing-Platform" target="_blank" rel="noopener">Source</a>
-      <a class="btn btn-gradient" href="https://event-ticketing-platform-nu.vercel.app/" target="_blank" rel="noopener">Live App</a>
+    <div class="header-actions">
+      <a class="btn btn-sm" href="https://github.com/Sharawey74/Event-Ticketing-Platform" target="_blank" rel="noopener">Source</a>
+      <a class="btn btn-sm btn-primary" href="https://event-ticketing-platform-nu.vercel.app/" target="_blank" rel="noopener">Live App</a>
     </div>
-    <button class="nav-toggle" aria-label="Menu"><span></span><span></span><span></span></button>
+    <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-mobile"><i></i><i></i><i></i></button>
   </div>
-  <div class="nav-mobile-menu">
+  <div class="nav-mobile" id="nav-mobile">
     <a href="index.html">Overview</a>
     <a href="architecture.html">Architecture</a>
     <a href="walkthrough.html">Walkthrough</a>
@@ -40,161 +46,195 @@
   </div>
 </header>
 
-<section class="hero">
-  <div class="container">
-    <span class="eyebrow">Full-Stack Engineering Showcase</span>
-    <h1 class="hero-headline">A ticket tier can never oversell.<br>Even under adversarial concurrent load.</h1>
-    <p class="body-lg">Eventora is a production-grade event ticketing platform built around that one non-negotiable
-      invariant — a Redis-atomic inventory guard, a modular-monolith backend, real Stripe checkout, and instant
-      QR tickets, deployed live on Railway and Vercel.</p>
-    <div class="hero-ctas">
-      <a class="btn btn-white" href="walkthrough.html">See the product walkthrough</a>
-      <a class="btn btn-ghost" href="architecture.html">Read the engineering deep-dive</a>
-    </div>
-    <div class="stat-row">
-      <div class="stat"><span class="value">194/194</span><span class="label">Tests passing · 83% coverage</span></div>
-      <div class="stat"><span class="value">0 oversold</span><span class="label">100 threads vs. a 50-seat tier</span></div>
-      <div class="stat"><span class="value">32,577 reqs</span><span class="label">0 failed — live Railway load test</span></div>
-    </div>
-  </div>
-</section>
+<main id="main">
 
-<section class="page-section">
-  <div class="container">
-    <h2 class="section-heading">What this project demonstrates</h2>
-    <p class="muted" style="max-width:640px">Three engineering problems that are easy to get wrong at scale — solved
-      with atomic operations instead of bigger locks.</p>
-    <div class="feature-strip">
-      <a class="feature" href="architecture.html#concurrency" style="text-decoration:none;color:inherit">
-        <span class="feature-icon">&#9889;</span>
-        <h3>Concurrency-safe by design</h3>
-        <p>A Redis Lua script performs the availability check and decrement as one atomic operation — proven by a
-          100-thread test against a 50-seat tier: exactly 50 succeed, 0 oversold.</p>
-      </a>
-      <a class="feature" href="architecture.html#reliability" style="text-decoration:none;color:inherit">
-        <span class="feature-icon">&#128737;&#65039;</span>
-        <h3>Production-grade reliability</h3>
-        <p>An 11-state booking lifecycle, multi-replica-safe scheduled jobs, correlation-ID traced logging, and
-          async QR/email delivery via RabbitMQ dead-letter queues.</p>
-      </a>
-      <a class="feature" href="architecture.html#security" style="text-decoration:none;color:inherit">
-        <span class="feature-icon">&#128274;</span>
-        <h3>Real payments &amp; security</h3>
-        <p>Genuine Stripe test-mode checkout with idempotent webhook handling, RBAC plus object-level authorization,
-          JWT denylisting, and Redis-backed rate limiting.</p>
-      </a>
-    </div>
-  </div>
-</section>
+  <section class="hero">
+    <div class="wrap">
+      <p class="eyebrow">Full-Stack Engineering Showcase</p>
+      <h1>A ticket tier can never oversell.<br>Even under adversarial concurrent load.</h1>
+      <p class="lede">Eventora is a production-grade event ticketing platform built around that one non-negotiable
+        invariant — a Redis-atomic inventory guard, a modular-monolith backend, real Stripe checkout, and instant
+        QR tickets, deployed live on Railway and Vercel.</p>
 
-<section class="page-section" style="padding-top:0">
-  <div class="container">
-    <h2 class="section-heading">Built with</h2>
-    <div class="chip-row">
-      <span class="chip">Java 21</span>
-      <span class="chip">Spring Boot 3.5</span>
-      <span class="chip">Spring State Machine</span>
-      <span class="chip">PostgreSQL 17</span>
-      <span class="chip">Redis 7</span>
-      <span class="chip">RabbitMQ 4</span>
-      <span class="chip">Stripe</span>
-      <span class="chip">Next.js 16</span>
-      <span class="chip">TanStack Query</span>
-      <span class="chip">Docker</span>
-      <span class="chip">Railway</span>
-      <span class="chip">Vercel</span>
-    </div>
-  </div>
-</section>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="walkthrough.html">See the product walkthrough</a>
+        <a class="btn" href="architecture.html">Read the engineering deep-dive</a>
+      </div>
 
-<section class="page-section">
-  <div class="container">
-    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px">
-      <div>
-        <h2 class="section-heading">See it in action</h2>
-        <p class="muted" style="margin:0">A real user + organizer journey, captured live on production.</p>
-      </div>
-      <a href="walkthrough.html" style="font-weight:700;color:var(--color-primary)">Full walkthrough &rarr;</a>
-    </div>
-    <div class="teaser-grid">
-      <div class="browser-frame">
-        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">event-ticketing-platform-nu.vercel.app</span></div>
-        <img src="assets/img/screenshots/01-landing-hero.webp" alt="Eventora landing page hero" loading="lazy">
-      </div>
-      <div class="browser-frame">
-        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">…/bookings/2/confirmation</span></div>
-        <img src="assets/img/screenshots/06-booking-confirmation.webp" alt="Booking confirmation page" loading="lazy">
-      </div>
-      <div class="browser-frame">
-        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">…/organizer/events</span></div>
-        <img src="assets/img/screenshots/09-organizer-dashboard.webp" alt="Organizer sales dashboard" loading="lazy">
+      <div class="stat-strip">
+        <div class="stat"><b>194/194</b><span>Tests passing · 83% coverage</span></div>
+        <div class="stat"><b>0 oversold</b><span>100 threads vs. a 50-seat tier</span></div>
+        <div class="stat"><b>32,577 reqs</b><span>0 failed — live Railway load test</span></div>
       </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<section class="organizers" id="organizers">
-  <div class="container">
-    <div>
-      <span class="eyebrow">For Organizers</span>
-      <h2 class="hero-headline" style="font-size:clamp(26px,3.4vw,38px);margin-top:14px">Host with confidence, get paid fast.</h2>
-      <p class="muted" style="color:rgba(255,255,255,0.72);max-width:480px">Set up an event page in minutes, track
-        sales with a live dashboard, and receive real Stripe payouts — no spreadsheets, no guesswork.</p>
-      <ul>
-        <li>Real-time sales dashboard, updated as tickets sell</li>
-        <li>Atomic inventory — never oversells a tier, ever</li>
-        <li>Built-in check-in flow for event day</li>
-      </ul>
-      <a class="btn btn-gradient" href="https://event-ticketing-platform-nu.vercel.app/auth/register" target="_blank" rel="noopener">Explore the organizer flow &rarr;</a>
+  <section class="reveal" id="demonstrates">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>What this project demonstrates</h2>
+        <p class="lede">Three engineering problems that are easy to get wrong at scale — solved
+          with atomic operations instead of bigger locks.</p>
+      </div>
+
+      <div class="grid grid-3">
+        <a class="card" href="architecture.html#concurrency">
+          <span class="card-icon">&#9889;</span>
+          <h3>Concurrency-safe by design</h3>
+          <p>A Redis Lua script performs the availability check and decrement as one atomic operation — proven by a
+            100-thread test against a 50-seat tier: exactly 50 succeed, 0 oversold.</p>
+        </a>
+        <a class="card" href="architecture.html#reliability">
+          <span class="card-icon">&#128737;&#65039;</span>
+          <h3>Production-grade reliability</h3>
+          <p>An 11-state booking lifecycle, multi-replica-safe scheduled jobs, correlation-ID traced logging, and
+            async QR/email delivery via RabbitMQ dead-letter queues.</p>
+        </a>
+        <a class="card" href="architecture.html#security">
+          <span class="card-icon">&#128274;</span>
+          <h3>Real payments &amp; security</h3>
+          <p>Genuine Stripe test-mode checkout with idempotent webhook handling, RBAC plus object-level authorization,
+            JWT denylisting, and Redis-backed rate limiting.</p>
+        </a>
+      </div>
     </div>
-    <div class="mock-panel">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-        <span style="font-weight:700;font-size:14px">Organizer Dashboard</span>
-        <span style="font-size:12px;color:rgba(255,255,255,0.5)">Live data</span>
+  </section>
+
+  <section class="reveal">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Built with</h2>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
-        <div class="mock-stat"><span style="font-size:12px;color:rgba(255,255,255,0.55)">Sales Progress</span><div class="num">0 / 2250</div></div>
-        <div class="mock-stat"><span style="font-size:12px;color:rgba(255,255,255,0.55)">Gross Revenue</span><div class="num">EGP 0.00</div></div>
+      <div class="chips">
+        <span class="chip"><b>Java 21</b></span>
+        <span class="chip"><b>Spring Boot 3.5</b></span>
+        <span class="chip"><b>Spring State Machine</b></span>
+        <span class="chip"><b>PostgreSQL 17</b></span>
+        <span class="chip"><b>Redis 7</b></span>
+        <span class="chip"><b>RabbitMQ 4</b></span>
+        <span class="chip"><b>Stripe</b></span>
+        <span class="chip"><b>Next.js 16</b></span>
+        <span class="chip"><b>TanStack Query</b></span>
+        <span class="chip"><b>Docker</b></span>
+        <span class="chip"><b>Railway</b></span>
+        <span class="chip"><b>Vercel</b></span>
       </div>
-      <div class="mock-stat">
-        <span style="font-size:12px;color:rgba(255,255,255,0.55)">Sales this week</span>
-        <div class="mock-bars">
-          <div style="height:35%"></div><div style="height:52%"></div><div style="height:40%"></div>
-          <div style="height:70%"></div><div style="height:58%"></div><div style="height:88%"></div><div style="height:100%"></div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>See it in action</h2>
+        <p class="lede">A real user + organizer journey, captured live on production.</p>
+      </div>
+
+      <div class="grid grid-3">
+        <figure class="shot is-teaser">
+          <div class="shot-bar">
+            <span class="dots"><i></i><i></i><i></i></span>
+            <span class="shot-url">event-ticketing-platform-nu.vercel.app</span>
+          </div>
+          <img src="assets/img/screenshots/01-landing-hero.webp" alt="Eventora landing page hero"
+               width="1440" height="900" loading="lazy" decoding="async">
+        </figure>
+        <figure class="shot is-teaser">
+          <div class="shot-bar">
+            <span class="dots"><i></i><i></i><i></i></span>
+            <span class="shot-url">…/bookings/2/confirmation</span>
+          </div>
+          <img src="assets/img/screenshots/06-booking-confirmation.webp" alt="Booking confirmation page"
+               width="1440" height="1110" loading="lazy" decoding="async">
+        </figure>
+        <figure class="shot is-teaser">
+          <div class="shot-bar">
+            <span class="dots"><i></i><i></i><i></i></span>
+            <span class="shot-url">…/organizer/events</span>
+          </div>
+          <img src="assets/img/screenshots/09-organizer-dashboard.webp" alt="Organizer sales dashboard"
+               width="1440" height="1190" loading="lazy" decoding="async">
+        </figure>
+      </div>
+
+      <div class="hero-actions">
+        <a class="btn" href="walkthrough.html">Full walkthrough &rarr;</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal" id="organizers">
+    <div class="wrap">
+      <div class="split">
+        <div>
+          <p class="eyebrow">For Organizers</p>
+          <h2>Host with confidence, get paid fast.</h2>
+          <p>Set up an event page in minutes, track
+            sales with a live dashboard, and receive real Stripe payouts — no spreadsheets, no guesswork.</p>
+          <ul class="list">
+            <li>Real-time sales dashboard, updated as tickets sell</li>
+            <li>Atomic inventory — never oversells a tier, ever</li>
+            <li>Built-in check-in flow for event day</li>
+          </ul>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="https://event-ticketing-platform-nu.vercel.app/auth/register" target="_blank" rel="noopener">Explore the organizer flow &rarr;</a>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <b>Organizer Dashboard</b>
+            <span>Live data</span>
+          </div>
+          <div class="panel-grid">
+            <div class="panel-stat"><span>Sales Progress</span><div class="num">0 / 2250</div></div>
+            <div class="panel-stat"><span>Gross Revenue</span><div class="num">EGP 0.00</div></div>
+          </div>
+          <div class="panel-stat">
+            <span>Sales this week</span>
+            <div class="bars" role="img" aria-label="Bar chart of ticket sales across the last seven days, trending upward">
+              <i style="height:35%"></i><i style="height:52%"></i><i style="height:40%"></i>
+              <i style="height:70%"></i><i style="height:58%"></i><i style="height:88%"></i><i style="height:100%"></i>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-</section>
+  </section>
+
+</main>
 
 <footer class="site-footer">
-  <div class="container">
-    <div>
-      <div class="nav-logo" style="color:#fff"><span class="mark"></span>Eventora</div>
-      <p style="margin-top:12px;font-size:14px">A portfolio-grade showcase of production concurrency, reliability,
-        and security patterns for a real ticketing platform.</p>
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-about">
+        <div class="brand footer-brand"><img src="favicon.svg" alt="" width="30" height="30"><span>Eventora</span></div>
+        <p>A portfolio-grade showcase of production concurrency, reliability,
+          and security patterns for a real ticketing platform.</p>
+      </div>
+      <div>
+        <h4>Project</h4>
+        <ul>
+          <li><a href="index.html">Overview</a></li>
+          <li><a href="architecture.html">Architecture</a></li>
+          <li><a href="walkthrough.html">Walkthrough</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Links</h4>
+        <ul>
+          <li><a href="https://event-ticketing-platform-nu.vercel.app/" target="_blank" rel="noopener">Live App</a></li>
+          <li><a href="https://backend-production-8daea.up.railway.app/swagger-ui/index.html" target="_blank" rel="noopener">API Docs</a></li>
+          <li><a href="https://github.com/Sharawey74/Event-Ticketing-Platform" target="_blank" rel="noopener">Source (GitHub)</a></li>
+        </ul>
+      </div>
     </div>
-    <div>
-      <h4>Project</h4>
-      <a href="index.html">Overview</a>
-      <a href="architecture.html">Architecture</a>
-      <a href="walkthrough.html">Walkthrough</a>
-    </div>
-    <div>
-      <h4>Links</h4>
-      <a href="https://event-ticketing-platform-nu.vercel.app/" target="_blank" rel="noopener">Live App</a>
-      <a href="https://backend-production-8daea.up.railway.app/swagger-ui/index.html" target="_blank" rel="noopener">API Docs</a>
-      <a href="https://github.com/Sharawey74/Event-Ticketing-Platform" target="_blank" rel="noopener">Source (GitHub)</a>
-    </div>
-  </div>
-  <div class="footer-bottom">
-    <div class="container">
+    <div class="footer-bottom">
       <span>MIT License</span>
       <span>Built by Abdelrhman Mohamed</span>
     </div>
   </div>
 </footer>
 
-<script src="assets/js/main.js"></script>
+<script src="assets/js/main.js" defer></script>
 </body>
 </html>
