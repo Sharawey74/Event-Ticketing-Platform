@@ -125,21 +125,21 @@ export function Navbar() {
   const isAuthPage = pathname.startsWith("/auth");
 
   const navLinkBase =
-    "font-label-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded px-1";
+    "link-underline font-label-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded px-1 transition-colors duration-200";
 
   return (
     <>
       <header className="sticky top-0 z-30 h-20 bg-surface/80 backdrop-blur-md shadow-md border-b border-outline-variant flex items-center">
         <div className="mx-auto flex w-full max-w-container-max items-center justify-between gap-4 px-edge-padding">
-          <Link href="/" className="inline-flex items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded">
-            <span className="text-section-heading font-bold text-primary tracking-tighter">
+          <Link href="/" className="group/brand inline-flex items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded transition-transform duration-300 hover:scale-[1.03]">
+            <span className="text-section-heading font-bold text-primary tracking-tighter transition-all duration-300 group-hover/brand:bg-linear-to-r group-hover/brand:from-primary group-hover/brand:to-secondary group-hover/brand:bg-clip-text group-hover/brand:text-transparent">
               Eventora
             </span>
           </Link>
 
           <div ref={searchContainerRef} className="hidden md:flex relative w-full max-w-md">
             <form
-              className="w-full flex items-center gap-2 rounded-full border border-outline-variant bg-surface-bright px-3 py-2"
+              className="w-full flex items-center gap-2 rounded-full border border-outline-variant bg-surface-bright px-3 py-2 transition-all duration-300 focus-within:border-primary focus-within:bg-surface-container-lowest focus-within:shadow-md focus-within:shadow-primary/10"
               onSubmit={submitSearch}
             >
               <Search className="h-4 w-4 text-outline shrink-0" />
@@ -175,39 +175,45 @@ export function Navbar() {
             )}
           </div>
 
-          <div className="flex items-center gap-6">
-            <Link
-              className={`${navLinkBase} ${pathname === "/" ? "font-bold text-primary border-b-2 border-primary" : "text-on-surface-variant hover:text-primary"}`}
-              href="/"
-            >
-              Discover
-            </Link>
-            <Link
-              className={`${navLinkBase} ${pathname.startsWith("/dashboard") ? "font-bold text-primary border-b-2 border-primary" : "text-on-surface-variant hover:text-primary"}`}
-              href="/dashboard/bookings"
-            >
-              Dashboard
-            </Link>
-            {isClient && userRole === "ORGANIZER" && (
+          <div className="flex items-center gap-3 sm:gap-6">
+            {/* Text links collapse below md, where they pushed the cart and
+                account controls off-screen. Both destinations stay reachable:
+                the logo goes to Discover, and the account menu carries
+                Dashboard and My Events. */}
+            <div className="hidden items-center gap-6 md:flex">
               <Link
-                className={`${navLinkBase} ${pathname.startsWith("/organizer") ? "font-bold text-primary border-b-2 border-primary" : "text-on-surface-variant hover:text-primary"}`}
-                href="/organizer/events"
+                className={`${navLinkBase} ${pathname === "/" ? "font-bold text-primary" : "text-on-surface-variant hover:text-primary"}`}
+                href="/"
               >
-                Organizer
+                Discover
               </Link>
-            )}
+              <Link
+                className={`${navLinkBase} ${pathname.startsWith("/dashboard") ? "font-bold text-primary" : "text-on-surface-variant hover:text-primary"}`}
+                href="/dashboard/bookings"
+              >
+                Dashboard
+              </Link>
+              {isClient && userRole === "ORGANIZER" && (
+                <Link
+                  className={`${navLinkBase} ${pathname.startsWith("/organizer") ? "font-bold text-primary" : "text-on-surface-variant hover:text-primary"}`}
+                  href="/organizer/events"
+                >
+                  Organizer
+                </Link>
+              )}
+            </div>
 
             {/* Cart button — hidden on auth pages */}
             {!isAuthPage && (
               <button
                 type="button"
                 onClick={() => setCartOpen(true)}
-                className="relative inline-flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded"
+                className="group/cart relative inline-flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded"
                 aria-label="Open cart"
               >
-                <ShoppingCart className="h-6 w-6" />
+                <ShoppingCart className="h-6 w-6 transition-transform duration-300 group-hover/cart:scale-110 group-hover/cart:-rotate-6" />
                 {cartCount > 0 && (
-                  <span className="absolute -right-2 -top-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-error text-on-error font-caption font-bold text-[10px]">
+                  <span className="animate-scale-in absolute -right-2 -top-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-error text-on-error font-caption font-bold text-[10px] shadow-md shadow-error/40">
                     {cartCount}
                   </span>
                 )}
@@ -219,11 +225,11 @@ export function Navbar() {
                 <button
                   type="button"
                   onClick={() => setDropdownOpen((o) => !o)}
-                  className="flex items-center gap-1.5 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded"
+                  className="group/user flex items-center gap-1.5 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded"
                   aria-haspopup="true"
                   aria-expanded={dropdownOpen}
                 >
-                  <span className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0">
+                  <span className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0 transition-all duration-300 group-hover/user:bg-primary group-hover/user:text-on-primary group-hover/user:scale-105">
                     {userEmail ? userEmail.charAt(0).toUpperCase() : <User className="h-4 w-4" />}
                   </span>
                   <ChevronDown
@@ -232,7 +238,7 @@ export function Navbar() {
                 </button>
 
                 {dropdownOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-outline-variant bg-surface shadow-xl z-50 py-1 overflow-hidden">
+                  <div className="animate-scale-in absolute right-0 top-full mt-2 w-56 rounded-xl border border-outline-variant bg-surface shadow-xl z-50 py-1 overflow-hidden origin-top-right">
                     <div className="px-4 py-3 border-b border-outline-variant">
                       <p className="text-xs text-on-surface-variant truncate">{userEmail}</p>
                       <span className="mt-1 inline-block rounded-full bg-primary/10 text-primary text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5">
@@ -275,7 +281,7 @@ export function Navbar() {
               </div>
             ) : !isAuthPage ? (
               <Link
-                className="bg-linear-to-r from-primary to-secondary text-on-primary rounded-full px-6 py-2 font-label-sm hover:shadow-lg hover:scale-105 transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                className="interactive sheen bg-linear-to-r from-primary to-secondary text-on-primary rounded-full px-6 py-2 font-label-sm hover:shadow-lg hover:shadow-primary/30 outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                 href="/auth/login"
               >
                 Sign in
