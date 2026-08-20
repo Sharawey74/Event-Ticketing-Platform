@@ -1,12 +1,15 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { api } from "@/lib/api";
+import { SalesChart } from "@/components/organizer/SalesChart";
+import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
+import { Reveal } from "@/components/ui/Reveal";
 
 interface OrganizerEvent {
   id: number;
@@ -23,6 +26,7 @@ export default function OrganizerDashboardPage() {
   const router = useRouter();
   const { token, userRole } = useAuthStore();
   const [isClient, setIsClient] = useState(false);
+  const [mountedAt, setMountedAt] = useState(0);
 
   const { data: eventsData, isLoading } = useQuery({
     queryKey: ["organizerEvents"],
@@ -33,10 +37,25 @@ export default function OrganizerDashboardPage() {
     enabled: isClient && !!token && userRole === "ORGANIZER",
   });
 
-  const events = (eventsData as OrganizerEvent[]) || [];
+  const events = useMemo(() => (eventsData as OrganizerEvent[]) || [], [eventsData]);
+
+  // Derived from the events the API already returns — no invented figures.
+  // `now` is captured once on mount rather than read during render: Date.now()
+  // is impure, so calling it here would make the memo non-deterministic.
+  const summary = useMemo(() => {
+    const now = mountedAt;
+    return {
+      totalBookings: events.reduce((sum, e) => sum + (e.sold || 0), 0),
+      upcoming: events.filter((e) => new Date(e.date).getTime() > now).length,
+      grossRevenue: events.reduce((sum, e) => sum + (e.grossRevenue || 0), 0),
+      nextEvent: events
+        .filter((e) => new Date(e.date).getTime() > now)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0],
+    };
+  }, [events, mountedAt]);
 
   // Mark client ready after first render so Zustand can finish rehydrating from localStorage
-  useEffect(() => { setIsClient(true); }, []);
+  useEffect(() => { setIsClient(true); setMountedAt(Date.now()); }, []);
 
   useEffect(() => {
     if (!isClient) return;
@@ -70,17 +89,54 @@ export default function OrganizerDashboardPage() {
           <h1 className="font-hero-headline text-hero-headline text-on-surface">My Events</h1>
           <p className="font-body text-body text-on-surface-variant mt-2">Manage your upcoming venues and track performance.</p>
         </div>
-        <Link 
-          href="/organizer/events/new" 
-          className="bg-primary text-on-primary rounded-full px-6 py-3 shadow-md hover:shadow-xl transition-shadow flex items-center justify-center gap-2 font-label-sm w-fit"
+        <Link
+          href="/organizer/events/new"
+          className="interactive sheen group bg-primary text-on-primary rounded-full px-6 py-3 shadow-md hover:shadow-xl hover:shadow-primary/30 flex items-center justify-center gap-2 font-label-sm w-fit"
         >
-          <span className="material-symbols-outlined text-[20px]">add</span>
+          <span className="material-symbols-outlined text-[20px] transition-transform duration-300 group-hover:rotate-90">add</span>
           Create New Event
         </Link>
       </div>
 
+      {/* Summary Cards — all three derived from the events list, not invented */}
+      <div className="grid gap-stack-md sm:grid-cols-2 lg:grid-cols-3 mb-stack-lg">
+        {[
+          {
+            label: "Total Bookings",
+            icon: "confirmation_number",
+            node: <AnimatedCounter value={summary.totalBookings} />,
+            sub: `${events.length} event${events.length === 1 ? "" : "s"} total`,
+          },
+          {
+            label: "Upcoming Events",
+            icon: "event_upcoming",
+            node: <AnimatedCounter value={summary.upcoming} />,
+            sub: summary.nextEvent ? `Next: ${summary.nextEvent.title}` : "None scheduled",
+          },
+          {
+            label: "Gross Revenue",
+            icon: "payments",
+            node: <AnimatedCounter value={summary.grossRevenue} prefix="EGP " decimals={2} />,
+            sub: "Across all events",
+          },
+        ].map((card, i) => (
+          <Reveal key={card.label} delay={i * 90}>
+            <div className="interactive group bg-surface-container-lowest rounded-xl shadow-md p-stack-md border border-outline-variant/30 hover:shadow-xl hover:border-primary/40 h-full">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <span className="font-label-sm text-on-surface-variant uppercase">{card.label}</span>
+                <span className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 transition-all duration-300 group-hover:bg-primary group-hover:text-on-primary group-hover:scale-110">
+                  <span className="material-symbols-outlined text-[20px]">{card.icon}</span>
+                </span>
+              </div>
+              <p className="font-hero-headline text-[32px] leading-tight text-on-surface">{card.node}</p>
+              <p className="font-caption text-on-surface-variant mt-1 line-clamp-1">{card.sub}</p>
+            </div>
+          </Reveal>
+        ))}
+      </div>
+
       {/* Sales Chart Card */}
-      <div className="bg-surface-container-lowest rounded-xl shadow-md p-stack-lg mb-stack-lg border border-outline-variant/30">
+      <div className="bg-surface-container-lowest rounded-xl shadow-md p-stack-lg mb-stack-lg border border-outline-variant/30 transition-shadow hover:shadow-xl">
         <div className="flex justify-between items-center mb-stack-lg flex-wrap gap-3">
           <div className="flex items-center gap-3">
             <h2 className="font-section-heading text-section-heading text-on-surface">Sales Over Time</h2>
@@ -95,50 +151,7 @@ export default function OrganizerDashboardPage() {
           </button>
         </div>
         
-        {/* SVG Line Chart Mock */}
-        <div className="w-full h-[300px] relative mt-4">
-          <svg viewBox="0 0 800 300" className="w-full h-full preserve-aspect-ratio-none">
-            <defs>
-              <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#630ed4" stopOpacity="0.2" />
-                <stop offset="100%" stopColor="#630ed4" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            
-            {/* Grid Lines */}
-            <path d="M 50 50 L 800 50" stroke="#e0e3e5" strokeWidth="1" strokeDasharray="4,4" />
-            <path d="M 50 125 L 800 125" stroke="#e0e3e5" strokeWidth="1" strokeDasharray="4,4" />
-            <path d="M 50 200 L 800 200" stroke="#e0e3e5" strokeWidth="1" strokeDasharray="4,4" />
-            <path d="M 50 275 L 800 275" stroke="#e0e3e5" strokeWidth="1" />
-            
-            {/* Y-Axis Labels */}
-            <text x="40" y="55" fontSize="12" fill="#7b7487" textAnchor="end" className="font-caption">EGP 10k</text>
-            <text x="40" y="130" fontSize="12" fill="#7b7487" textAnchor="end" className="font-caption">EGP 5k</text>
-            <text x="40" y="205" fontSize="12" fill="#7b7487" textAnchor="end" className="font-caption">EGP 2.5k</text>
-            <text x="40" y="280" fontSize="12" fill="#7b7487" textAnchor="end" className="font-caption">EGP 0</text>
-            
-            {/* X-Axis Labels */}
-            <text x="100" y="295" fontSize="12" fill="#7b7487" textAnchor="middle" className="font-caption">Oct 1</text>
-            <text x="300" y="295" fontSize="12" fill="#7b7487" textAnchor="middle" className="font-caption">Oct 10</text>
-            <text x="500" y="295" fontSize="12" fill="#7b7487" textAnchor="middle" className="font-caption">Oct 20</text>
-            <text x="700" y="295" fontSize="12" fill="#7b7487" textAnchor="middle" className="font-caption">Oct 29</text>
-            
-            {/* Area Fill */}
-            <path d="M 100 220 L 200 180 L 300 200 L 400 110 L 500 130 L 600 60 L 700 80 L 700 275 L 100 275 Z" fill="url(#areaFill)" />
-            
-            {/* Line Path */}
-            <path d="M 100 220 L 200 180 L 300 200 L 400 110 L 500 130 L 600 60 L 700 80" fill="none" stroke="#630ed4" strokeWidth="4" />
-            
-            {/* Data Points */}
-            <circle cx="100" cy="220" r="6" fill="#ffffff" stroke="#630ed4" strokeWidth="3" />
-            <circle cx="200" cy="180" r="6" fill="#ffffff" stroke="#630ed4" strokeWidth="3" />
-            <circle cx="300" cy="200" r="6" fill="#ffffff" stroke="#630ed4" strokeWidth="3" />
-            <circle cx="400" cy="110" r="6" fill="#ffffff" stroke="#630ed4" strokeWidth="3" />
-            <circle cx="500" cy="130" r="6" fill="#ffffff" stroke="#630ed4" strokeWidth="3" />
-            <circle cx="600" cy="60" r="6" fill="#ffffff" stroke="#630ed4" strokeWidth="3" />
-            <circle cx="700" cy="80" r="6" fill="#ffffff" stroke="#630ed4" strokeWidth="3" />
-          </svg>
-        </div>
+        <SalesChart events={events} />
       </div>
 
       {/* Events List Section */}
@@ -157,24 +170,36 @@ export default function OrganizerDashboardPage() {
 
         <div className="space-y-stack-md">
           {events.length > 0 ? (
-            events.map(event => (
-              <div key={event.id} className="bg-surface-container-lowest rounded-xl shadow-md p-stack-md border border-outline-variant/30 flex flex-col lg:flex-row lg:items-center gap-stack-md hover:shadow-xl transition-shadow cursor-pointer" onClick={() => router.push(`/organizer/events/${event.id}/attendees`)}>
-                
+            events.map((event, index) => (
+              <Reveal key={event.id} delay={index * 70}>
+              <div className="interactive group bg-surface-container-lowest rounded-xl shadow-md p-stack-md border border-outline-variant/30 flex flex-col lg:flex-row lg:items-center gap-stack-md hover:shadow-xl hover:border-primary/40 cursor-pointer" onClick={() => router.push(`/organizer/events/${event.id}/attendees`)}>
+
                 {/* Part 1 - Event Info */}
                 <div className="flex-1 flex items-center gap-4 min-w-[300px]">
                   <div className="w-32 h-20 rounded-lg overflow-hidden bg-surface-container-high shrink-0">
                     {event.thumbnailUrl ? (
-                      <img src={event.thumbnailUrl} alt={event.title} className="w-full h-full object-cover" />
+                      <img src={event.thumbnailUrl} alt={event.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                     ) : (
-                      <div className="w-full h-full bg-linear-to-br from-primary-container to-secondary-container" />
+                      <div className="w-full h-full bg-linear-to-br from-primary-container to-secondary-container transition-transform duration-500 group-hover:scale-110" />
                     )}
                   </div>
                   <div>
-                    <h3 className="font-body-lg font-bold text-on-surface line-clamp-1">{event.title}</h3>
+                    <h3 className="font-body-lg font-bold text-on-surface line-clamp-1 transition-colors group-hover:text-primary">{event.title}</h3>
                     <p className="font-caption text-on-surface-variant mb-2">
                       {new Date(event.date).toLocaleDateString()}
                     </p>
-                    <span className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase ${event.status === 'ACTIVE' ? 'bg-primary-fixed text-on-primary-fixed' : 'bg-surface-container-high text-on-surface-variant'}`}>
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase transition-colors ${
+                        event.status === "ACTIVE"
+                          ? "bg-success-container text-on-success-container"
+                          : "bg-surface-container-high text-on-surface-variant"
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          event.status === "ACTIVE" ? "bg-success animate-pulse" : "bg-outline"
+                        }`}
+                      />
                       {event.status}
                     </span>
                   </div>
@@ -186,10 +211,12 @@ export default function OrganizerDashboardPage() {
                     <span className="font-caption text-on-surface-variant">Sales Progress</span>
                     <span className="font-label-sm text-on-surface">{event.sold} <span className="font-caption text-on-surface-variant font-normal">/ {event.capacity}</span></span>
                   </div>
-                  <div className="w-full bg-surface-container-high rounded-full h-2 overflow-hidden">
-                    <div 
-                      className="bg-primary h-full rounded-full transition-all duration-500 ease-out" 
-                      style={{ width: `${Math.min(100, Math.max(0, (event.sold / event.capacity) * 100))}%` }}
+                  <div className="w-full bg-surface-container-high rounded-full h-2.5 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-primary to-secondary transition-[width] duration-1000 ease-out"
+                      style={{
+                        width: `${Math.min(100, Math.max(0, (event.sold / event.capacity) * 100))}%`,
+                      }}
                     />
                   </div>
                 </div>
@@ -201,15 +228,15 @@ export default function OrganizerDashboardPage() {
                     <p className="font-label-sm text-body-lg font-bold text-on-surface">EGP {(event.grossRevenue || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button 
-                      className="w-10 h-10 rounded-full border border-outline-variant hover:text-primary hover:border-primary flex items-center justify-center transition-colors text-on-surface-variant"
+                    <button
+                      className="interactive w-10 h-10 rounded-full border border-outline-variant hover:text-on-primary hover:border-primary hover:bg-primary flex items-center justify-center text-on-surface-variant"
                       title="View Attendees"
                       onClick={(e) => { e.stopPropagation(); router.push(`/organizer/events/${event.id}/attendees`); }}
                     >
                       <span className="material-symbols-outlined text-[20px]">group</span>
                     </button>
-                    <button 
-                      className="w-10 h-10 rounded-full border border-outline-variant hover:text-primary hover:border-primary flex items-center justify-center transition-colors text-on-surface-variant"
+                    <button
+                      className="interactive w-10 h-10 rounded-full border border-outline-variant hover:text-on-primary hover:border-primary hover:bg-primary flex items-center justify-center text-on-surface-variant"
                       title="Edit Event"
                       onClick={(e) => { e.stopPropagation(); router.push(`/organizer/events/${event.id}/edit`); }}
                     >
@@ -219,6 +246,7 @@ export default function OrganizerDashboardPage() {
                 </div>
 
               </div>
+              </Reveal>
             ))
           ) : (
             <div className="bg-surface-container-lowest rounded-xl border border-surface-container-high p-14 text-center flex flex-col items-center justify-center">
