@@ -27,9 +27,9 @@ export function EventCard({ event, venueCity, categoryName }: EventCardProps) {
     "bg-surface-container-high text-on-surface-variant";
 
   return (
-    <Link href={`/events/${event.id}`} className="group overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-md transition-shadow duration-300 hover:shadow-xl cursor-pointer block">
+    <Link href={`/events/${event.id}`} className="interactive group block h-full overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-md hover:shadow-xl hover:border-primary/40 cursor-pointer">
       <article>
-        <div className="relative h-40 bg-surface-dim">
+        <div className="relative h-40 overflow-hidden bg-surface-dim">
           {event.coverImageUrl ? (
             <img src={event.coverImageUrl} alt={event.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
           ) : (
@@ -71,9 +71,7 @@ export function EventCard({ event, venueCity, categoryName }: EventCardProps) {
                 : <span className="text-on-surface-variant">Price TBA</span>
               }
             </p>
-            <span
-              className="inline-block rounded-full bg-linear-to-r from-primary to-secondary px-5 py-2 text-sm font-label-sm text-on-primary transition-all hover:scale-105 hover:shadow-lg"
-            >
+            <span className="sheen inline-block rounded-full bg-linear-to-r from-primary to-secondary px-5 py-2 text-sm font-label-sm text-on-primary transition-all duration-300 group-hover:scale-105 group-hover:shadow-lg group-hover:shadow-primary/30">
               Book Now
             </span>
           </div>

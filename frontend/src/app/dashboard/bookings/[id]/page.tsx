@@ -13,8 +13,8 @@ function BookingStatusBadge({ state }: { state: string }) {
   const styleMap: Record<string, string> = {
     RESERVED: "bg-secondary-fixed text-on-secondary-fixed",
     PAYMENT_PENDING: "bg-tertiary-fixed text-on-tertiary-fixed",
-    CONFIRMED: "bg-[#e6f4ea] text-[#137333]",
-    ATTENDED: "bg-[#e6f4ea] text-[#137333]",
+    CONFIRMED: "bg-success-container text-on-success-container",
+    ATTENDED: "bg-success-container text-on-success-container",
     EXPIRED: "bg-error-container text-on-error-container",
     CANCELLED: "bg-error-container text-on-error-container",
     REFUND_REQUESTED: "bg-primary-fixed text-on-primary-fixed",
