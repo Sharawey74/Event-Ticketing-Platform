@@ -134,12 +134,12 @@ export function Navbar() {
         <div className="mx-auto flex w-full max-w-container-max items-center justify-between gap-4 px-edge-padding">
           <Link href="/" className="group/brand inline-flex items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded transition-transform duration-300 hover:scale-[1.03]">
             <Image
-              src="/eventora-mark.png"
+              src="/eventora-mark-v2.png"
               alt=""
               width={32}
               height={32}
               priority
-              className="h-8 w-8 shrink-0 transition-transform duration-500 group-hover/brand:rotate-[-8deg] group-hover/brand:scale-110"
+              className="h-8 w-8 shrink-0"
             />
             <span className="text-section-heading font-bold text-primary tracking-tighter transition-all duration-300 group-hover/brand:bg-linear-to-r group-hover/brand:from-primary group-hover/brand:to-secondary group-hover/brand:bg-clip-text group-hover/brand:text-transparent">
               Eventora

@@ -272,11 +272,11 @@ export default function Home() {
             <span className="relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-linear-to-br from-primary/15 to-secondary/10 ring-1 ring-primary/15">
               <span className="animate-pulse-glow absolute inset-0 rounded-2xl bg-primary/20 blur-md" />
               <Image
-                src="/eventora-mark.png"
+                src="/eventora-mark-v2.png"
                 alt=""
                 width={30}
                 height={30}
-                className="animate-float relative h-[30px] w-[30px]"
+                className="relative h-[30px] w-[30px]"
               />
             </span>
             <div>
