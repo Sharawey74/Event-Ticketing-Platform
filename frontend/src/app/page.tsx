@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { useQuery } from "@tanstack/react-query";
 import { Calendar, MapPin, QrCode, Search, ShieldCheck, Sparkles } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -265,13 +266,27 @@ export default function Home() {
       {/* ── Featured Events ── */}
       <section className="mx-auto w-full max-w-6xl px-4 pb-16 md:px-6">
         <Reveal className="mb-6 flex items-end justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-on-surface">
-              Featured events
-            </h2>
-            <p className="text-sm text-on-surface-variant">
-              Handpicked and going fast this season.
-            </p>
+          <div className="flex items-center gap-3.5">
+            {/* Brand mark sits in a tinted, glowing tile so it reads as an
+                emblem rather than a stray image dropped beside the heading. */}
+            <span className="relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-linear-to-br from-primary/15 to-secondary/10 ring-1 ring-primary/15">
+              <span className="animate-pulse-glow absolute inset-0 rounded-2xl bg-primary/20 blur-md" />
+              <Image
+                src="/eventora-mark.png"
+                alt=""
+                width={30}
+                height={30}
+                className="animate-float relative h-[30px] w-[30px]"
+              />
+            </span>
+            <div>
+              <h2 className="bg-linear-to-r from-on-surface via-primary to-secondary bg-clip-text text-2xl font-bold text-transparent">
+                Featured events
+              </h2>
+              <p className="text-sm text-on-surface-variant">
+                Handpicked and going fast this season.
+              </p>
+            </div>
           </div>
           <Link
             href="/search"
@@ -308,7 +323,8 @@ export default function Home() {
 
         {!isLoading && !isError ? (
           events.length > 0 ? (
-            <div className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-2 md:-mx-6 md:px-6">
+            <div className="rail-mask -mx-4 md:-mx-6">
+              <div className="scroll-rail flex gap-4 px-4 md:px-6">
               {events.map((event, index) => (
                 <Reveal
                   key={event.id}
@@ -330,6 +346,7 @@ export default function Home() {
                   />
                 </Reveal>
               ))}
+              </div>
             </div>
           ) : (
             <p className="rounded-2xl border border-outline-variant bg-surface-container-low p-8 text-center text-sm text-on-surface-variant">

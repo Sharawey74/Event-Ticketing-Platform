@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { FormEvent, useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -132,6 +133,14 @@ export function Navbar() {
       <header className="sticky top-0 z-30 h-20 bg-surface/80 backdrop-blur-md shadow-md border-b border-outline-variant flex items-center">
         <div className="mx-auto flex w-full max-w-container-max items-center justify-between gap-4 px-edge-padding">
           <Link href="/" className="group/brand inline-flex items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded transition-transform duration-300 hover:scale-[1.03]">
+            <Image
+              src="/eventora-mark.png"
+              alt=""
+              width={32}
+              height={32}
+              priority
+              className="h-8 w-8 shrink-0 transition-transform duration-500 group-hover/brand:rotate-[-8deg] group-hover/brand:scale-110"
+            />
             <span className="text-section-heading font-bold text-primary tracking-tighter transition-all duration-300 group-hover/brand:bg-linear-to-r group-hover/brand:from-primary group-hover/brand:to-secondary group-hover/brand:bg-clip-text group-hover/brand:text-transparent">
               Eventora
             </span>
@@ -281,7 +290,7 @@ export function Navbar() {
               </div>
             ) : !isAuthPage ? (
               <Link
-                className="interactive sheen bg-linear-to-r from-primary to-secondary text-on-primary rounded-full px-6 py-2 font-label-sm hover:shadow-lg hover:shadow-primary/30 outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                className="btn-glass text-on-primary px-6 py-2 font-label-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                 href="/auth/login"
               >
                 Sign in

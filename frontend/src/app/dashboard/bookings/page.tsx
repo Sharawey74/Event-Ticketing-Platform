@@ -9,6 +9,7 @@ import { TrendingUp } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useReservationStore } from "@/store/reservationStore";
 import { api } from "@/lib/api";
+import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
 
 // Terminal states have no further action and are de-emphasised in the history table.
 const TERMINAL_STATES = new Set(["CANCELLED", "EXPIRED", "PAYMENT_FAILED", "REFUND_APPROVED", "REFUND_DENIED"]);
@@ -157,7 +158,7 @@ export default function DashboardBookingsPage() {
       {/* Profile + Stats Section */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
         {/* Profile Card */}
-        <div className="lg:col-span-4 bg-surface-container-lowest rounded-xl shadow-md border border-surface-container-high flex flex-col items-center justify-center text-center relative overflow-hidden">
+        <div className="interactive lg:col-span-4 bg-surface-container-lowest rounded-xl shadow-md border border-surface-container-high hover:shadow-xl flex flex-col items-center justify-center text-center relative overflow-hidden">
           <div className="absolute top-0 w-full bg-linear-to-br from-primary-fixed via-primary-container to-secondary-container h-20"></div>
           <div className="w-24 h-24 rounded-full border-4 border-surface-container-lowest shadow-md bg-surface-container-high flex items-center justify-center relative z-10 overflow-hidden mt-10 mb-4">
              <span className="font-hero-headline-mobile text-primary">{userEmail ? userEmail.charAt(0).toUpperCase() : "U"}</span>
@@ -168,29 +169,29 @@ export default function DashboardBookingsPage() {
 
         {/* Stats Grid */}
         <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-gutter">
-          <div className="bg-surface-container-lowest rounded-xl p-stack-lg shadow-md border border-surface-container-high hover:shadow-xl transition-shadow duration-300 flex flex-col items-start">
-            <div className="w-12 h-12 rounded-xl bg-primary-container/20 text-primary flex items-center justify-center mb-4">
+          <div className="interactive group bg-surface-container-lowest rounded-xl p-stack-lg shadow-md border border-surface-container-high hover:shadow-xl hover:border-primary/40 flex flex-col items-start h-full">
+            <div className="w-12 h-12 rounded-xl bg-primary-container/20 text-primary flex items-center justify-center mb-4 transition-all duration-300 group-hover:scale-110 group-hover:bg-primary group-hover:text-on-primary">
               <span className="material-symbols-outlined">confirmation_number</span>
             </div>
             <div className="flex items-end gap-2">
-              <p className="text-4xl font-black text-on-surface leading-tight">{totalBookings}</p>
+              <p className="text-4xl font-black text-on-surface leading-tight"><AnimatedCounter value={totalBookings} /></p>
               <TrendingUp className="h-4 w-4 text-emerald-500 mb-1" />
             </div>
             <p className="font-body text-on-surface-variant">Total Bookings</p>
           </div>
-          <div className="bg-surface-container-lowest rounded-xl p-stack-lg shadow-md border border-surface-container-high hover:shadow-xl transition-shadow duration-300 flex flex-col items-start">
-            <div className="w-12 h-12 rounded-xl bg-secondary-container/20 text-secondary flex items-center justify-center mb-4">
+          <div className="interactive group bg-surface-container-lowest rounded-xl p-stack-lg shadow-md border border-surface-container-high hover:shadow-xl hover:border-primary/40 flex flex-col items-start h-full">
+            <div className="w-12 h-12 rounded-xl bg-secondary-container/20 text-secondary flex items-center justify-center mb-4 transition-all duration-300 group-hover:scale-110 group-hover:bg-secondary group-hover:text-on-secondary">
               <span className="material-symbols-outlined">event_upcoming</span>
             </div>
-            <p className="text-4xl font-black text-on-surface leading-tight">{upcomingEvents.length}</p>
+            <p className="text-4xl font-black text-on-surface leading-tight"><AnimatedCounter value={upcomingEvents.length} /></p>
             <p className="font-body text-on-surface-variant">Upcoming Events</p>
             <p className="text-xs text-on-surface-variant mt-0.5">Next 30 days: {upcomingNext30}</p>
           </div>
-          <div className="bg-surface-container-lowest rounded-xl p-stack-lg shadow-md border border-surface-container-high hover:shadow-xl transition-shadow duration-300 flex flex-col items-start">
-            <div className="w-12 h-12 rounded-xl bg-tertiary-container/20 text-tertiary flex items-center justify-center mb-4">
+          <div className="interactive group bg-surface-container-lowest rounded-xl p-stack-lg shadow-md border border-surface-container-high hover:shadow-xl hover:border-primary/40 flex flex-col items-start h-full">
+            <div className="w-12 h-12 rounded-xl bg-tertiary-container/20 text-tertiary flex items-center justify-center mb-4 transition-all duration-300 group-hover:scale-110 group-hover:bg-tertiary group-hover:text-on-tertiary">
               <span className="material-symbols-outlined">account_balance_wallet</span>
             </div>
-            <p className="text-4xl font-black text-on-surface leading-tight">EGP {totalSpent.toFixed(0)}</p>
+            <p className="text-4xl font-black text-on-surface leading-tight"><AnimatedCounter value={totalSpent} prefix="EGP " /></p>
             <p className="font-body text-on-surface-variant">Total Spent</p>
           </div>
         </div>
@@ -203,7 +204,7 @@ export default function DashboardBookingsPage() {
         {upcomingEvents.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
             {upcomingEvents.map(booking => (
-              <div key={booking.id} className="bg-surface-container-lowest rounded-xl overflow-hidden shadow-md group hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col" onClick={() => router.push(`/dashboard/bookings/${booking.id}`)}>
+              <div key={booking.id} className="interactive bg-surface-container-lowest rounded-xl overflow-hidden shadow-md group hover:shadow-xl hover:border-primary/40 border border-transparent cursor-pointer flex flex-col h-full" onClick={() => router.push(`/dashboard/bookings/${booking.id}`)}>
                 <div className="h-48 relative overflow-hidden bg-surface-container-high">
                   {booking.coverImageUrl ? (
                     <img src={booking.coverImageUrl} alt={booking.eventTitle} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />

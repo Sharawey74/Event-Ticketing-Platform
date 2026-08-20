@@ -312,6 +312,90 @@ body {
   will-change: transform;
 }
 
+/* --- scroll containers ------------------------------------------------ */
+
+/* Referenced by the featured-events rail but never defined, so the browser was
+   painting its default bar. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* A slim branded bar for horizontal rails.
+   overflow-y is pinned to hidden because per spec a container that is not
+   `visible` on one axis computes to `auto` on the other — so the reveal
+   transform and the hover lift on the cards were producing a stray vertical
+   scrollbar next to the horizontal one. */
+.scroll-rail {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99, 14, 212, 0.35) transparent;
+  scroll-behavior: smooth;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+  /* Room for the card lift so it is not clipped by the scroll box. */
+  padding-bottom: 14px;
+}
+
+.scroll-rail > * {
+  scroll-snap-align: start;
+}
+
+.scroll-rail::-webkit-scrollbar {
+  height: 8px;
+}
+
+.scroll-rail::-webkit-scrollbar-track {
+  background: var(--color-surface-container-high);
+  border-radius: 999px;
+  margin-inline: 4px;
+}
+
+.scroll-rail::-webkit-scrollbar-thumb {
+  background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+  border-radius: 999px;
+  opacity: 0.5;
+  transition: background 0.2s ease;
+}
+
+.scroll-rail::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(90deg, var(--color-primary-container), var(--color-secondary-container));
+}
+
+/* Fades at both edges signal that the rail continues past the viewport.
+   Sits on a wrapper, not the scroller, so it does not travel with the content. */
+.rail-mask {
+  position: relative;
+}
+
+/* Sized to roughly the rail's own gutter. Wider than this and the fade washes
+   the first and last card instead of the space beside them. */
+.rail-mask::before,
+.rail-mask::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 14px;
+  width: 30px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.rail-mask::before {
+  left: 0;
+  background: linear-gradient(to right, var(--color-surface), transparent);
+}
+
+.rail-mask::after {
+  right: 0;
+  background: linear-gradient(to left, var(--color-surface), transparent);
+}
+
 /* --- scroll reveal --------------------------------------------------- */
 
 .reveal {
@@ -393,6 +477,96 @@ body {
 
 .sheen:hover::after {
   animation: ev-sheen 0.85s ease-out;
+}
+
+/* --- glass gradient button -------------------------------------------- */
+
+/* Animated gradient behind a frosted pane. The gradient is 300% wide and slides
+   under the glass, so the colour moves without the element itself animating —
+   background-position is cheap next to re-painting a gradient every frame. */
+@keyframes ev-gradient-pan {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.btn-glass {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 999px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow:
+    0 4px 18px -4px rgba(99, 14, 212, 0.45),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.35);
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+
+/* The moving colour. Kept on a pseudo-element and dimmed, so the frosted
+   quality survives — a fully opaque gradient just looks like a solid button. */
+.btn-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    115deg,
+    var(--color-primary),
+    var(--color-secondary-container),
+    #a855f7,
+    var(--color-primary)
+  );
+  background-size: 300% 300%;
+  animation: ev-gradient-pan 9s ease infinite;
+  opacity: 0.9;
+}
+
+/* Specular highlight along the top edge. */
+.btn-glass::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 45%;
+  z-index: -1;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3), transparent);
+  pointer-events: none;
+}
+
+.btn-glass:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 10px 26px -6px rgba(99, 14, 212, 0.6),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.5);
+}
+
+.btn-glass:hover::before {
+  animation-duration: 3.5s;
+}
+
+.btn-glass:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Outline variant for a secondary action on a light header. */
+.btn-glass-ghost {
+  background: rgba(255, 255, 255, 0.55);
+  border-color: var(--color-outline-variant);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.6);
+}
+
+.btn-glass-ghost::before {
+  opacity: 0;
+  transition: opacity 0.28s ease;
+}
+
+.btn-glass-ghost:hover::before {
+  opacity: 0.85;
 }
 
 /* Underline that grows from the left on hover — used in the nav. */
@@ -489,6 +663,20 @@ body {
 
   .sheen:hover::after {
     animation: none !important;
+  }
+
+  /* Freeze the panning gradient — the glass and colour stay, the motion goes. */
+  .btn-glass::before {
+    animation: none !important;
+  }
+
+  .btn-glass:hover,
+  .btn-glass:active {
+    transform: none !important;
+  }
+
+  .scroll-rail {
+    scroll-behavior: auto !important;
   }
 
   .shimmer {
