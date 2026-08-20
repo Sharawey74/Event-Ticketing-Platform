@@ -1,4 +1,3 @@
-/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useMemo, useState } from "react";
@@ -11,6 +10,9 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 
 import { EventCard } from "@/components/events/event-card";
+import { HeroBackdrop } from "@/components/home/HeroBackdrop";
+import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
+import { Reveal } from "@/components/ui/Reveal";
 import { fetchCategories, fetchVenues } from "@/lib/catalog";
 import { fetchPublishedEvents } from "@/lib/events";
 import { buildSearchHref } from "@/lib/search";
@@ -27,10 +29,12 @@ const fallbackCategories = [
 
 const FEATURED_EVENTS_LIMIT = 6;
 
+// Decorative marketing figures, not queries against the database — same as they
+// have always been. Split into number + suffix so they can be counted up.
 const HERO_STATS = [
-  { label: "Events hosted", value: "12,400+" },
-  { label: "Tickets sold", value: "2.1M" },
-  { label: "On-time check-ins", value: "98%" },
+  { label: "Events hosted", value: 12400, suffix: "+", decimals: 0 },
+  { label: "Tickets sold", value: 2.1, suffix: "M", decimals: 1 },
+  { label: "On-time check-ins", value: 98, suffix: "%", decimals: 0 },
 ] as const;
 
 const FEATURE_STRIP = [
@@ -119,50 +123,49 @@ export default function Home() {
     <div className="bg-surface">
       {/* ── Hero ── */}
       <section className="relative overflow-hidden bg-zinc-950 text-white">
-        {/* Concert background with purple overlay */}
-        <div className="absolute inset-0">
-          <img
-            src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=1600&q=80"
-            alt=""
-            aria-hidden="true"
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-zinc-950/70" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(99,14,212,0.65),transparent_55%),radial-gradient(ellipse_at_bottom_right,rgba(75,65,225,0.45),transparent_50%)]" />
-        </div>
+        <HeroBackdrop />
 
         <div className="relative mx-auto w-full max-w-6xl px-4 py-16 md:px-6 md:py-24">
           <div className="max-w-3xl space-y-4">
-            <p className="text-sm uppercase tracking-[0.2em] text-violet-300 font-semibold">
+            <p className="animate-fade-up text-sm uppercase tracking-[0.2em] text-violet-300 font-semibold">
               Live in your city
             </p>
-            <h1 className="text-4xl font-bold tracking-tight md:text-6xl leading-tight">
+            <h1
+              className="animate-fade-up text-4xl font-bold tracking-tight md:text-6xl leading-tight"
+              style={{ animationDelay: "90ms" }}
+            >
               Find events worth leaving the house for.
             </h1>
-            <p className="text-base text-zinc-300 md:text-lg max-w-xl">
+            <p
+              className="animate-fade-up text-base text-zinc-300 md:text-lg max-w-xl"
+              style={{ animationDelay: "180ms" }}
+            >
               Search published events, filter by city and category, and reserve
               your seat in seconds.
             </p>
 
             {/* Secondary CTA glass buttons */}
-            <div className="flex flex-wrap gap-3 pt-2">
+            <div
+              className="animate-fade-up flex flex-wrap gap-3 pt-2"
+              style={{ animationDelay: "270ms" }}
+            >
               <Link
                 href="/search"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/15 border border-white/30 backdrop-blur-sm text-white text-sm font-medium hover:bg-white/25 transition-all"
+                className="interactive sheen inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/15 border border-white/30 backdrop-blur-sm text-white text-sm font-medium hover:bg-white/25 hover:border-white/50"
               >
-                <Search className="h-4 w-4" />
+                <Search className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
                 Browse Events
               </Link>
               <a
                 href="#organizers"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-primary text-sm font-semibold hover:bg-white/90 transition-all"
+                className="interactive sheen inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-primary text-sm font-semibold hover:bg-white/90 hover:shadow-lg hover:shadow-primary/20"
               >
                 Become an Organizer
               </a>
               {!isLoggedIn && (
                 <Link
                   href="/auth/login"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm text-white/80 text-sm font-medium hover:bg-white/20 transition-all"
+                  className="interactive inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm text-white/80 text-sm font-medium hover:bg-white/20 hover:text-white"
                 >
                   Sign In
                 </Link>
@@ -171,7 +174,10 @@ export default function Home() {
           </div>
 
           {/* Search Bar */}
-          <div className="mt-10 grid gap-3 rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-md md:grid-cols-[1.3fr_1fr_1fr_auto]">
+          <div
+            className="animate-fade-up mt-10 grid gap-3 rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-md transition-colors duration-300 focus-within:border-white/45 focus-within:bg-white/15 md:grid-cols-[1.3fr_1fr_1fr_auto]"
+            style={{ animationDelay: "360ms" }}
+          >
             <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-zinc-900">
               <Search className="h-4 w-4 shrink-0 text-zinc-400" />
               <input
@@ -207,7 +213,7 @@ export default function Home() {
             </label>
 
             <button
-              className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-container hover:shadow-lg"
+              className="interactive sheen rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-container hover:shadow-lg hover:shadow-primary/30"
               onClick={applySearch}
               type="button"
             >
@@ -216,12 +222,18 @@ export default function Home() {
           </div>
 
           {/* Trust stats */}
-          <div className="mt-8 flex flex-wrap gap-8 border-t border-white/15 pt-6">
+          <div
+            className="animate-fade-up mt-8 flex flex-wrap gap-8 border-t border-white/15 pt-6"
+            style={{ animationDelay: "450ms" }}
+          >
             {HERO_STATS.map((stat) => (
-              <div key={stat.label} className="flex flex-col gap-0.5">
-                <span className="text-2xl font-extrabold text-white">
-                  {stat.value}
-                </span>
+              <div key={stat.label} className="group flex flex-col gap-0.5">
+                <AnimatedCounter
+                  value={stat.value}
+                  suffix={stat.suffix}
+                  decimals={stat.decimals}
+                  className="text-2xl font-extrabold text-white transition-colors duration-300 group-hover:text-violet-300"
+                />
                 <span className="text-xs text-white/65">{stat.label}</span>
               </div>
             ))}
@@ -232,25 +244,27 @@ export default function Home() {
       {/* ── Feature Strip ── */}
       <section className="mx-auto w-full max-w-6xl px-4 py-14 md:px-6 md:py-20">
         <div className="grid gap-8 sm:grid-cols-3">
-          {FEATURE_STRIP.map((feature) => (
-            <div key={feature.title} className="flex flex-col gap-4">
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <feature.icon className="h-5 w-5" />
-              </span>
-              <h3 className="text-lg font-bold text-on-surface">
-                {feature.title}
-              </h3>
-              <p className="text-sm leading-relaxed text-on-surface-variant">
-                {feature.description}
-              </p>
-            </div>
+          {FEATURE_STRIP.map((feature, index) => (
+            <Reveal key={feature.title} delay={index * 110}>
+              <div className="interactive group h-full rounded-2xl border border-transparent p-5 hover:border-outline-variant/60 hover:bg-surface-container-lowest hover:shadow-lg">
+                <span className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:scale-110 group-hover:bg-primary group-hover:text-on-primary group-hover:shadow-lg group-hover:shadow-primary/30">
+                  <feature.icon className="h-5 w-5" />
+                </span>
+                <h3 className="mb-2 text-lg font-bold text-on-surface">
+                  {feature.title}
+                </h3>
+                <p className="text-sm leading-relaxed text-on-surface-variant">
+                  {feature.description}
+                </p>
+              </div>
+            </Reveal>
           ))}
         </div>
       </section>
 
       {/* ── Featured Events ── */}
       <section className="mx-auto w-full max-w-6xl px-4 pb-16 md:px-6">
-        <div className="mb-6 flex items-end justify-between gap-4">
+        <Reveal className="mb-6 flex items-end justify-between gap-4">
           <div>
             <h2 className="text-2xl font-bold text-on-surface">
               Featured events
@@ -261,11 +275,14 @@ export default function Home() {
           </div>
           <Link
             href="/search"
-            className="whitespace-nowrap text-sm font-bold text-primary hover:text-primary-container"
+            className="group whitespace-nowrap text-sm font-bold text-primary transition-colors hover:text-primary-container"
           >
-            See all events →
+            See all events{" "}
+            <span className="inline-block transition-transform duration-300 group-hover:translate-x-1">
+              →
+            </span>
           </Link>
-        </div>
+        </Reveal>
 
         {isLoading ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -292,8 +309,12 @@ export default function Home() {
         {!isLoading && !isError ? (
           events.length > 0 ? (
             <div className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-2 md:-mx-6 md:px-6">
-              {events.map((event) => (
-                <div key={event.id} className="w-[280px] shrink-0">
+              {events.map((event, index) => (
+                <Reveal
+                  key={event.id}
+                  delay={index * 80}
+                  className="w-[280px] shrink-0"
+                >
                   <EventCard
                     event={event}
                     venueCity={
@@ -307,7 +328,7 @@ export default function Home() {
                         : ""
                     }
                   />
-                </div>
+                </Reveal>
               ))}
             </div>
           ) : (
