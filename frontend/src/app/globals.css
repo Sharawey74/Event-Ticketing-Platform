@@ -41,6 +41,13 @@
   --color-error-container: #ffdad6;
   --color-on-error-container: #93000a;
 
+  /* Success — the counterpart to `error`, which was missing. Its absence is why
+     #137333 / #e6f4ea ended up hardcoded in three separate files. */
+  --color-success: #137333;
+  --color-on-success: #ffffff;
+  --color-success-container: #e6f4ea;
+  --color-on-success-container: #0b5222;
+
   --color-background: #f7f9fb;
   --color-on-background: #191c1e;
 
@@ -223,6 +230,376 @@ body {
 @keyframes fill {
   100% { box-shadow: inset 0px 0px 0px 40px var(--color-primary); }
 }
+/* ===================================================================
+   Motion system
+   -------------------------------------------------------------------
+   Every animation below is disabled wholesale by the prefers-reduced-
+   motion block at the bottom of this file. Nothing here may be the only
+   thing that makes content visible — reveals start hidden but are forced
+   visible both by .is-revealed (IntersectionObserver) and by the
+   reduced-motion guard, so content can never be trapped invisible.
+   =================================================================== */
+
+@keyframes ev-fade-up {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes ev-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes ev-scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Slow drift on the hero backdrop — gives a still image a sense of motion
+   while a real video loads, and stands in for it entirely if none is set. */
+@keyframes ev-ken-burns {
+  0%   { transform: scale(1.08) translate3d(0, 0, 0); }
+  50%  { transform: scale(1.16) translate3d(-1.5%, -1.5%, 0); }
+  100% { transform: scale(1.08) translate3d(0, 0, 0); }
+}
+
+@keyframes ev-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+
+@keyframes ev-pulse-glow {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 0.9;  transform: scale(1.06); }
+}
+
+/* Draws an SVG path on. Pair with pathLength="1" so one set of dash values
+   works for any path geometry. */
+@keyframes ev-draw {
+  from { stroke-dashoffset: 1; }
+  to   { stroke-dashoffset: 0; }
+}
+
+@keyframes ev-grow-y {
+  from { transform: scaleY(0); }
+  to   { transform: scaleY(1); }
+}
+
+@keyframes ev-sheen {
+  from { transform: translateX(-120%) skewX(-18deg); }
+  to   { transform: translateX(220%)  skewX(-18deg); }
+}
+
+/* --- falling ticket field -------------------------------------------- */
+
+/* Travels past 100% of the hero so tickets clear the bottom edge before
+   looping. Translate + rotate only — both compositor-friendly, so a field of
+   16 of these costs no layout work. */
+@keyframes ev-ticket-fall {
+  from {
+    transform: translate3d(0, -12vh, 0) rotate(0deg) scale(var(--ticket-scale, 1));
+  }
+  to {
+    transform: translate3d(0, 112vh, 0) rotate(var(--ticket-spin, 180deg))
+      scale(var(--ticket-scale, 1));
+  }
+}
+
+.ticket-fall {
+  animation-name: ev-ticket-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+/* --- scroll containers ------------------------------------------------ */
+
+/* Referenced by the featured-events rail but never defined, so the browser was
+   painting its default bar. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* A slim branded bar for horizontal rails.
+   overflow-y is pinned to hidden because per spec a container that is not
+   `visible` on one axis computes to `auto` on the other — so the reveal
+   transform and the hover lift on the cards were producing a stray vertical
+   scrollbar next to the horizontal one. */
+.scroll-rail {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99, 14, 212, 0.35) transparent;
+  scroll-behavior: smooth;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+  /* Room for the card lift so it is not clipped by the scroll box. */
+  padding-bottom: 14px;
+}
+
+.scroll-rail > * {
+  scroll-snap-align: start;
+}
+
+.scroll-rail::-webkit-scrollbar {
+  height: 8px;
+}
+
+.scroll-rail::-webkit-scrollbar-track {
+  background: var(--color-surface-container-high);
+  border-radius: 999px;
+  margin-inline: 4px;
+}
+
+.scroll-rail::-webkit-scrollbar-thumb {
+  background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+  border-radius: 999px;
+  opacity: 0.5;
+  transition: background 0.2s ease;
+}
+
+.scroll-rail::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(90deg, var(--color-primary-container), var(--color-secondary-container));
+}
+
+/* Fades at both edges signal that the rail continues past the viewport.
+   Sits on a wrapper, not the scroller, so it does not travel with the content. */
+.rail-mask {
+  position: relative;
+}
+
+/* Sized to roughly the rail's own gutter. Wider than this and the fade washes
+   the first and last card instead of the space beside them. */
+.rail-mask::before,
+.rail-mask::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 14px;
+  width: 30px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.rail-mask::before {
+  left: 0;
+  background: linear-gradient(to right, var(--color-surface), transparent);
+}
+
+.rail-mask::after {
+  right: 0;
+  background: linear-gradient(to left, var(--color-surface), transparent);
+}
+
+/* --- scroll reveal --------------------------------------------------- */
+
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+.reveal.is-revealed {
+  opacity: 1;
+  transform: none;
+}
+
+/* --- utility animations ---------------------------------------------- */
+
+.animate-fade-up   { animation: ev-fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-fade-in   { animation: ev-fade-in 0.5s ease-out both; }
+.animate-scale-in  { animation: ev-scale-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-ken-burns { animation: ev-ken-burns 28s ease-in-out infinite; }
+.animate-float     { animation: ev-float 5s ease-in-out infinite; }
+.animate-pulse-glow{ animation: ev-pulse-glow 7s ease-in-out infinite; }
+
+.animate-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: ev-draw 1.6s cubic-bezier(0.4, 0, 0.2, 1) 0.15s forwards;
+}
+
+.animate-grow-y {
+  transform-origin: bottom;
+  animation: ev-grow-y 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* --- interactive affordances ----------------------------------------- */
+
+/* One consistent lift for anything clickable that sits on a card. */
+.interactive {
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.22s ease,
+    background-color 0.22s ease;
+}
+
+.interactive:hover {
+  transform: translateY(-3px);
+}
+
+.interactive:active {
+  transform: translateY(-1px) scale(0.995);
+}
+
+/* A light sweep across a button on hover. The pseudo-element is clipped by
+   the host's overflow, so the host needs `relative overflow-hidden`. */
+.sheen {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.35),
+    transparent
+  );
+  transform: translateX(-120%) skewX(-18deg);
+  pointer-events: none;
+}
+
+.sheen:hover::after {
+  animation: ev-sheen 0.85s ease-out;
+}
+
+/* --- glass gradient button -------------------------------------------- */
+
+/* Animated gradient behind a frosted pane. The gradient is 300% wide and slides
+   under the glass, so the colour moves without the element itself animating —
+   background-position is cheap next to re-painting a gradient every frame. */
+@keyframes ev-gradient-pan {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.btn-glass {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 999px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow:
+    0 4px 18px -4px rgba(99, 14, 212, 0.45),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.35);
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+
+/* The moving colour. Kept on a pseudo-element and dimmed, so the frosted
+   quality survives — a fully opaque gradient just looks like a solid button. */
+.btn-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    115deg,
+    var(--color-primary),
+    var(--color-secondary-container),
+    #a855f7,
+    var(--color-primary)
+  );
+  background-size: 300% 300%;
+  animation: ev-gradient-pan 9s ease infinite;
+  opacity: 0.9;
+}
+
+/* Specular highlight along the top edge. */
+.btn-glass::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 45%;
+  z-index: -1;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3), transparent);
+  pointer-events: none;
+}
+
+.btn-glass:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 10px 26px -6px rgba(99, 14, 212, 0.6),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.5);
+}
+
+.btn-glass:hover::before {
+  animation-duration: 3.5s;
+}
+
+.btn-glass:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Outline variant for a secondary action on a light header. */
+.btn-glass-ghost {
+  background: rgba(255, 255, 255, 0.55);
+  border-color: var(--color-outline-variant);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.6);
+}
+
+.btn-glass-ghost::before {
+  opacity: 0;
+  transition: opacity 0.28s ease;
+}
+
+.btn-glass-ghost:hover::before {
+  opacity: 0.85;
+}
+
+/* Underline that grows from the left on hover — used in the nav. */
+.link-underline {
+  position: relative;
+}
+
+.link-underline::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -4px;
+  height: 2px;
+  width: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.link-underline:hover::after,
+.link-underline[data-active="true"]::after {
+  transform: scaleX(1);
+}
+
+/* Focus ring that matches the brand rather than the UA default. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
 .shimmer {
   background: #f6f7f8;
   background-image: linear-gradient(to right, #f6f7f8 0%, #edeef1 20%, #f6f7f8 40%, #f6f7f8 100%);
@@ -237,4 +614,82 @@ body {
 @keyframes placeholderShimmer {
   0% { background-position: -468px 0; }
   100% { background-position: 468px 0; }
+}
+
+/* ===================================================================
+   Reduced motion
+   -------------------------------------------------------------------
+   Content must never depend on an animation having run. .reveal is
+   forced visible here, so a reader with motion disabled sees everything
+   immediately rather than a page of invisible sections.
+   =================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .animate-draw {
+    stroke-dashoffset: 0 !important;
+    animation: none !important;
+  }
+
+  .animate-fade-up,
+  .animate-fade-in,
+  .animate-scale-in,
+  .animate-grow-y {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .animate-ken-burns,
+  .animate-float,
+  .animate-pulse-glow {
+    animation: none !important;
+  }
+
+  /* Hide the field rather than freezing it — 16 tickets stopped mid-air read as
+     a rendering fault, where absent they simply are not part of the design. */
+  .ticket-field {
+    display: none !important;
+  }
+
+  .interactive:hover,
+  .interactive:active {
+    transform: none !important;
+  }
+
+  .sheen:hover::after {
+    animation: none !important;
+  }
+
+  /* Freeze the panning gradient — the glass and colour stay, the motion goes. */
+  .btn-glass::before {
+    animation: none !important;
+  }
+
+  .btn-glass:hover,
+  .btn-glass:active {
+    transform: none !important;
+  }
+
+  .scroll-rail {
+    scroll-behavior: auto !important;
+  }
+
+  .shimmer {
+    animation: none !important;
+  }
+
+  .link-underline::after {
+    transition: none !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
 }

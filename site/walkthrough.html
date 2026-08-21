@@ -5,29 +5,39 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Product Walkthrough — Eventora</title>
 <meta name="description" content="A real user and organizer journey through Eventora, captured live on the production deployment — discover, book, and manage.">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<meta property="og:title" content="Product Walkthrough — Eventora">
+<meta property="og:description" content="A real user and organizer journey through Eventora, captured live on the production deployment — discover, book, and manage.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sharawey74.github.io/Event-Ticketing-Platform/walkthrough.html">
+<meta property="og:image" content="https://sharawey74.github.io/Event-Ticketing-Platform/assets/img/screenshots/01-landing-hero.webp">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="favicon.png" type="image/png">
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
 
-<header class="nav">
-  <div class="container">
-    <a href="index.html" class="nav-logo"><span class="mark"></span>Eventora</a>
-    <nav class="nav-links">
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="index.html">
+      <img src="favicon.png" alt="" width="30" height="30">
+      <span>Eventora</span>
+    </a>
+    <nav class="nav" aria-label="Primary">
       <a href="index.html">Overview</a>
       <a href="architecture.html">Architecture</a>
-      <a href="walkthrough.html" class="active">Walkthrough</a>
+      <a href="walkthrough.html">Walkthrough</a>
     </nav>
-    <div class="nav-cta">
-      <a class="btn btn-outline" href="https://github.com/Sharawey74/Event-Ticketing-Platform" target="_blank" rel="noopener">Source</a>
-      <a class="btn btn-gradient" href="https://event-ticketing-platform-nu.vercel.app/" target="_blank" rel="noopener">Live App</a>
+    <div class="header-actions">
+      <a class="btn btn-sm" href="https://github.com/Sharawey74/Event-Ticketing-Platform" target="_blank" rel="noopener">Source</a>
+      <a class="btn btn-sm btn-primary" href="https://event-ticketing-platform-nu.vercel.app/" target="_blank" rel="noopener">Live App</a>
     </div>
-    <button class="nav-toggle" aria-label="Menu"><span></span><span></span><span></span></button>
+    <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-mobile"><i></i><i></i><i></i></button>
   </div>
-  <div class="nav-mobile-menu">
+  <div class="nav-mobile" id="nav-mobile">
     <a href="index.html">Overview</a>
     <a href="architecture.html">Architecture</a>
     <a href="walkthrough.html">Walkthrough</a>
@@ -36,203 +46,336 @@
   </div>
 </header>
 
-<section class="page-hero">
-  <div class="container">
-    <span class="eyebrow">Product Walkthrough</span>
-    <h1 class="hero-headline" style="font-size:clamp(28px,4vw,42px)">A real journey, captured live on production.</h1>
-    <p class="body-lg" style="color:rgba(255,255,255,0.75);max-width:640px">Every screenshot below is the actual
-      <a href="https://event-ticketing-platform-nu.vercel.app/" target="_blank" rel="noopener" style="color:#c9a6f7">live deployment</a>
-      — real seeded Egyptian events, a real Stripe test-mode purchase, and a real organizer account. Click any image to zoom.</p>
-  </div>
-</section>
+<main id="main">
 
-<div class="container">
-
-  <section class="walk-section">
-    <h2 class="section-heading"><span class="walk-badge">Discover</span></h2>
-
-    <div class="walk-row">
-      <div class="walk-media browser-frame">
-        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">event-ticketing-platform-nu.vercel.app</span></div>
-        <img src="assets/img/screenshots/01-landing-hero.webp" alt="Landing page hero with search" loading="lazy">
-      </div>
-      <div class="walk-copy">
-        <h3>Landing page</h3>
-        <p>The real photo-backed hero with a functional search bar (query, city, date), a trust-stat row, and a
-          featured-events strip backed by real published event data — not placeholder cards.</p>
-      </div>
+  <section class="page-hero">
+    <div class="wrap">
+      <p class="eyebrow">Product Walkthrough</p>
+      <h1>A real journey, captured live on production.</h1>
+      <p class="lede">Every screenshot below is the actual
+        <a href="https://event-ticketing-platform-nu.vercel.app/" target="_blank" rel="noopener">live deployment</a>
+        — real seeded Egyptian events, a real Stripe test-mode purchase, and a real organizer account. Click any image to zoom.</p>
     </div>
+  </section>
 
-    <div class="walk-row reverse">
-      <div class="walk-media browser-frame">
-        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">…/search?categoryId=1</span></div>
-        <img src="assets/img/screenshots/02-search-results.webp" alt="Search results filtered by category" loading="lazy">
+  <section class="reveal" id="discover">
+    <div class="wrap">
+      <div class="stage">
+        <h2><span class="badge badge-violet">Discover</span></h2>
       </div>
-      <div class="walk-copy">
-        <h3>Search &amp; filter</h3>
-        <p>Filtering by category, city, text, and date against real seeded Egyptian venues and events — Cairo,
-          Alexandria, Hurghada, Sharm El Sheikh, Dahab, and El Gouna.</p>
-      </div>
-    </div>
 
-    <div class="walk-row">
-      <div class="walk-media browser-frame">
-        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">…/events/1</span></div>
-        <img src="assets/img/screenshots/03-event-detail.webp" alt="Event detail page" loading="lazy">
+      <div class="step">
+        <div class="step-media">
+          <figure class="shot">
+            <div class="shot-bar">
+              <span class="dots"><i></i><i></i><i></i></span>
+              <span class="shot-url">event-ticketing-platform-nu.vercel.app</span>
+            </div>
+            <img src="assets/img/screenshots/01-landing-hero.webp" alt="Landing page hero with search"
+                 width="1440" height="900" loading="lazy" decoding="async">
+          </figure>
+        </div>
+        <div class="step-copy">
+          <h3>Landing page</h3>
+          <p>The real photo-backed hero with a functional search bar (query, city, date), a trust-stat row, and a
+            featured-events strip backed by real published event data — not placeholder cards.</p>
+        </div>
       </div>
-      <div class="walk-copy">
-        <h3>Event detail</h3>
-        <p>Full venue, schedule, and organizer info, with live ticket tiers pulled straight from PostgreSQL —
-          <code>availableCount</code> decremented atomically on every reservation.</p>
+
+      <div class="step reverse">
+        <div class="step-media">
+          <figure class="shot">
+            <div class="shot-bar">
+              <span class="dots"><i></i><i></i><i></i></span>
+              <span class="shot-url">…/search?categoryId=1</span>
+            </div>
+            <img src="assets/img/screenshots/02-search-results.webp" alt="Search results filtered by category"
+                 width="1440" height="900" loading="lazy" decoding="async">
+          </figure>
+        </div>
+        <div class="step-copy">
+          <h3>Search &amp; filter</h3>
+          <p>Filtering by category, city, text, and date against real seeded Egyptian venues and events — Cairo,
+            Alexandria, Hurghada, Sharm El Sheikh, Dahab, and El Gouna.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-media">
+          <figure class="shot">
+            <div class="shot-bar">
+              <span class="dots"><i></i><i></i><i></i></span>
+              <span class="shot-url">…/events/1</span>
+            </div>
+            <img src="assets/img/screenshots/03-event-detail.webp" alt="Event detail page"
+                 width="1440" height="1361" loading="lazy" decoding="async">
+          </figure>
+        </div>
+        <div class="step-copy">
+          <h3>Event detail</h3>
+          <p>Full venue, schedule, and organizer info, with live ticket tiers pulled straight from PostgreSQL —
+            <code>availableCount</code> decremented atomically on every reservation.</p>
+        </div>
       </div>
     </div>
   </section>
 
-  <section class="walk-section">
-    <h2 class="section-heading"><span class="walk-badge">Book</span></h2>
+  <section class="reveal" id="book">
+    <div class="wrap">
+      <div class="stage">
+        <h2><span class="badge badge-violet">Book</span></h2>
+      </div>
 
-    <div class="walk-row">
-      <div class="walk-media browser-frame">
-        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">…/events/1</span></div>
-        <img src="assets/img/screenshots/04-ticket-selection-cart.webp" alt="Ticket tier selection" loading="lazy">
+      <div class="step">
+        <div class="step-media">
+          <figure class="shot">
+            <div class="shot-bar">
+              <span class="dots"><i></i><i></i><i></i></span>
+              <span class="shot-url">…/events/1</span>
+            </div>
+            <img src="assets/img/screenshots/04-ticket-selection-cart.webp" alt="Ticket tier selection"
+                 width="1440" height="1361" loading="lazy" decoding="async">
+          </figure>
+        </div>
+        <div class="step-copy">
+          <h3>Ticket selection</h3>
+          <p>Tier selection with live quantity controls and a running total, calculated client-side and re-verified
+            server-side at reservation time.</p>
+        </div>
       </div>
-      <div class="walk-copy">
-        <h3>Ticket selection</h3>
-        <p>Tier selection with live quantity controls and a running total, calculated client-side and re-verified
-          server-side at reservation time.</p>
-      </div>
-    </div>
 
-    <div class="walk-row reverse">
-      <div class="walk-media browser-frame">
-        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">checkout.stripe.com</span></div>
-        <img src="assets/img/screenshots/05-stripe-checkout.webp" alt="Stripe hosted checkout page" loading="lazy">
+      <div class="step reverse">
+        <div class="step-media">
+          <figure class="shot">
+            <div class="shot-bar">
+              <span class="dots"><i></i><i></i><i></i></span>
+              <span class="shot-url">checkout.stripe.com</span>
+            </div>
+            <img src="assets/img/screenshots/05-stripe-checkout.webp" alt="Stripe hosted checkout page"
+                 width="1440" height="908" loading="lazy" decoding="async">
+          </figure>
+        </div>
+        <div class="step-copy">
+          <h3>Stripe checkout <em style="color:var(--text-faint);font-weight:400">(test mode)</em></h3>
+          <p>A genuine Stripe-hosted checkout session — not a mock. Filled here with Stripe's own test card
+            (<code>4242 4242 4242 4242</code>) to prove the integration is real, end to end.</p>
+        </div>
       </div>
-      <div class="walk-copy">
-        <h3>Stripe checkout <em style="color:var(--color-on-surface-variant);font-weight:400">(test mode)</em></h3>
-        <p>A genuine Stripe-hosted checkout session — not a mock. Filled here with Stripe's own test card
-          (<code>4242 4242 4242 4242</code>) to prove the integration is real, end to end.</p>
-      </div>
-    </div>
 
-    <div class="walk-row">
-      <div class="walk-media browser-frame">
-        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">…/bookings/2/confirmation</span></div>
-        <img src="assets/img/screenshots/06-booking-confirmation.webp" alt="Booking confirmation page" loading="lazy">
-      </div>
-      <div class="walk-copy">
-        <h3>Payment confirmation</h3>
-        <p>Stripe's own redirect confirms the charge succeeded immediately after payment.</p>
-      </div>
-    </div>
-  </section>
-
-  <section class="walk-section">
-    <h2 class="section-heading"><span class="walk-badge">Manage</span></h2>
-
-    <div class="walk-row">
-      <div class="walk-media browser-frame">
-        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">…/dashboard/bookings</span></div>
-        <img src="assets/img/screenshots/07-dashboard-bookings-list.webp" alt="Attendee dashboard bookings list" loading="lazy">
-      </div>
-      <div class="walk-copy">
-        <h3>Attendee dashboard</h3>
-        <p>Booking history with live countdown timers on held reservations, and one-click resume for an
-          in-progress checkout.</p>
-      </div>
-    </div>
-
-    <div class="walk-row reverse">
-      <div class="walk-media browser-frame">
-        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">…/dashboard/bookings/559</span></div>
-        <img src="assets/img/screenshots/08-booking-detail-qr-ticket.webp" alt="Booking detail page with confirmed QR ticket" loading="lazy">
-      </div>
-      <div class="walk-copy">
-        <h3>Booking detail &amp; QR ticket</h3>
-        <p>Once a webhook confirms payment, this page renders the ticket's QR code for check-in.</p>
-        <p class="walk-note">The mid-processing state shown in the confirmation screenshot above led to root-causing
-          two real bugs: a lazy-loading crash on reservation, and a webhook whose confirmation could be rolled back
-          by a messaging hiccup. Both are fixed; this ticket reflects the corrected flow.</p>
-      </div>
-    </div>
-
-    <div class="walk-row">
-      <div class="walk-media browser-frame">
-        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">…/organizer/events</span></div>
-        <img src="assets/img/screenshots/09-organizer-dashboard.webp" alt="Organizer sales dashboard" loading="lazy">
-      </div>
-      <div class="walk-copy">
-        <h3>Organizer dashboard</h3>
-        <p>Sales-over-time chart and per-event sales progress, revenue, and quick actions — logged in as a real
-          seeded organizer account.</p>
-      </div>
-    </div>
-
-    <div class="walk-row reverse">
-      <div class="walk-media browser-frame">
-        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">…/organizer/events/15/attendees</span></div>
-        <img src="assets/img/screenshots/10-organizer-attendees-checkin.webp" alt="Organizer attendee check-in list" loading="lazy">
-      </div>
-      <div class="walk-copy">
-        <h3>Attendee check-in</h3>
-        <p>The organizer-side attendee list, searchable by name, email, or booking reference — this is where
-          day-of check-in happens.</p>
+      <div class="step">
+        <div class="step-media">
+          <figure class="shot">
+            <div class="shot-bar">
+              <span class="dots"><i></i><i></i><i></i></span>
+              <span class="shot-url">…/bookings/2/confirmation</span>
+            </div>
+            <img src="assets/img/screenshots/06-booking-confirmation.webp" alt="Booking confirmation page"
+                 width="1440" height="1110" loading="lazy" decoding="async">
+          </figure>
+        </div>
+        <div class="step-copy">
+          <h3>Payment confirmation</h3>
+          <p>Stripe's own redirect confirms the charge succeeded immediately after payment.</p>
+        </div>
       </div>
     </div>
   </section>
 
-  <section class="walk-section">
-    <h2 class="section-heading"><span class="walk-badge">Responsive</span></h2>
-    <div class="walk-row">
-      <div class="walk-media browser-frame" style="max-width:320px">
-        <div class="chrome-bar"><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-dot"></span><span class="chrome-url">mobile · 390px</span></div>
-        <img src="assets/img/screenshots/11-responsive-mobile-landing.webp" alt="Mobile landing page" loading="lazy">
+  <section class="reveal" id="manage">
+    <div class="wrap">
+      <div class="stage">
+        <h2><span class="badge badge-violet">Manage</span></h2>
       </div>
-      <div class="walk-copy">
-        <h3>Mobile layout</h3>
-        <p>The same landing page at a 390px mobile viewport — single-column stack, full-width cards, no
-          horizontal scroll.</p>
+
+      <div class="step">
+        <div class="step-media">
+          <figure class="shot">
+            <div class="shot-bar">
+              <span class="dots"><i></i><i></i><i></i></span>
+              <span class="shot-url">…/dashboard/bookings</span>
+            </div>
+            <img src="assets/img/screenshots/07-dashboard-bookings-list.webp" alt="Attendee dashboard bookings list"
+                 width="1440" height="1499" loading="lazy" decoding="async">
+          </figure>
+        </div>
+        <div class="step-copy">
+          <h3>Attendee dashboard</h3>
+          <p>Booking history with live countdown timers on held reservations, and one-click resume for an
+            in-progress checkout.</p>
+        </div>
+      </div>
+
+      <div class="step reverse">
+        <div class="step-media">
+          <figure class="shot">
+            <div class="shot-bar">
+              <span class="dots"><i></i><i></i><i></i></span>
+              <span class="shot-url">…/dashboard/bookings/559</span>
+            </div>
+            <img src="assets/img/screenshots/08-booking-detail-qr-ticket.webp" alt="Booking detail page with confirmed QR ticket"
+                 width="1440" height="1290" loading="lazy" decoding="async">
+          </figure>
+        </div>
+        <div class="step-copy">
+          <h3>Booking detail &amp; QR ticket</h3>
+          <p>Once a webhook confirms payment, this page renders the ticket's QR code for check-in.</p>
+          <div class="note">
+            <p>The mid-processing state shown in the confirmation screenshot above led to root-causing
+              two real bugs: a lazy-loading crash on reservation, and a webhook whose confirmation could be rolled back
+              by a messaging hiccup. Both are fixed; this ticket reflects the corrected flow.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-media">
+          <figure class="shot">
+            <div class="shot-bar">
+              <span class="dots"><i></i><i></i><i></i></span>
+              <span class="shot-url">…/dashboard/bookings/561</span>
+            </div>
+            <img src="assets/img/screenshots/13-refund-request.webp" alt="Refund request panel on a confirmed booking"
+                 width="1440" height="900" loading="lazy" decoding="async">
+          </figure>
+        </div>
+        <div class="step-copy">
+          <h3>Refund request</h3>
+          <p>Refunds run on a three-tier window enforced server-side: a full refund up to 7 days before the
+            event, 50% between 3 and 6 days, and denied inside 3 days — with the denial reason stored on the
+            booking rather than silently swallowed.</p>
+          <p>The panel only appears while the booking is still refundable, so the action is never offered when
+            the server would reject it.</p>
+        </div>
+      </div>
+
+      <div class="step reverse">
+        <div class="step-media">
+          <figure class="shot">
+            <div class="shot-bar">
+              <span class="dots"><i></i><i></i><i></i></span>
+              <span class="shot-url">…/dashboard/bookings/561</span>
+            </div>
+            <img src="assets/img/screenshots/14-refund-result.webp" alt="Booking showing refund approved after a full refund"
+                 width="1440" height="850" loading="lazy" decoding="async">
+          </figure>
+        </div>
+        <div class="step-copy">
+          <h3>Refund approved</h3>
+          <p>The same booking after the request. This event was 15 days out, so the full EGP 650.00 came back
+            through Stripe — refund <code>re_3U6rVU…</code>, status <code>succeeded</code>.</p>
+          <p>The booking moves to <code>REFUND_APPROVED</code> and its ticket is revoked, so the QR that was
+            here a moment ago is gone and the count reads zero. Money and access are released together, not
+            in two independent steps.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-media">
+          <figure class="shot">
+            <div class="shot-bar">
+              <span class="dots"><i></i><i></i><i></i></span>
+              <span class="shot-url">…/organizer/events</span>
+            </div>
+            <img src="assets/img/screenshots/09-organizer-dashboard.webp" alt="Organizer sales dashboard"
+                 width="1440" height="1190" loading="lazy" decoding="async">
+          </figure>
+        </div>
+        <div class="step-copy">
+          <h3>Organizer dashboard</h3>
+          <p>Sales-over-time chart and per-event sales progress, revenue, and quick actions — logged in as a real
+            seeded organizer account.</p>
+        </div>
+      </div>
+
+      <div class="step reverse">
+        <div class="step-media">
+          <figure class="shot">
+            <div class="shot-bar">
+              <span class="dots"><i></i><i></i><i></i></span>
+              <span class="shot-url">…/organizer/events/11/attendees</span>
+            </div>
+            <img src="assets/img/screenshots/10-organizer-attendees-checkin.webp" alt="Organizer attendee check-in list"
+                 width="1440" height="560" loading="lazy" decoding="async">
+          </figure>
+        </div>
+        <div class="step-copy">
+          <h3>Attendee check-in</h3>
+          <p>The organizer-side attendee list, searchable by name, email, or booking reference — this is where
+            day-of check-in happens.</p>
+        </div>
       </div>
     </div>
   </section>
 
-</div>
+  <section class="reveal" id="responsive">
+    <div class="wrap">
+      <div class="stage">
+        <h2><span class="badge badge-violet">Responsive</span></h2>
+      </div>
 
-<section class="page-section" style="text-align:center">
-  <div class="container">
-    <h2 class="section-heading">Try it yourself</h2>
-    <a class="btn btn-gradient" href="https://event-ticketing-platform-nu.vercel.app/" target="_blank" rel="noopener">Open the live app &rarr;</a>
-  </div>
-</section>
+      <div class="step">
+        <div class="step-media">
+          <figure class="shot is-mobile">
+            <div class="shot-bar">
+              <span class="dots"><i></i><i></i><i></i></span>
+              <span class="shot-url">mobile · 390px</span>
+            </div>
+            <img src="assets/img/screenshots/11-responsive-mobile-landing.webp" alt="Mobile landing page"
+                 width="390" height="844" loading="lazy" decoding="async">
+          </figure>
+        </div>
+        <div class="step-copy">
+          <h3>Mobile layout</h3>
+          <p>The same landing page at a 390px mobile viewport — single-column stack, full-width cards, no
+            horizontal scroll.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="wrap" style="text-align:center">
+      <h2>Try it yourself</h2>
+      <div class="hero-actions" style="justify-content:center">
+        <a class="btn btn-primary" href="https://event-ticketing-platform-nu.vercel.app/" target="_blank" rel="noopener">Open the live app &rarr;</a>
+      </div>
+    </div>
+  </section>
+
+</main>
 
 <footer class="site-footer">
-  <div class="container">
-    <div>
-      <div class="nav-logo" style="color:#fff"><span class="mark"></span>Eventora</div>
-      <p style="margin-top:12px;font-size:14px">A portfolio-grade showcase of production concurrency, reliability,
-        and security patterns for a real ticketing platform.</p>
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-about">
+        <div class="brand footer-brand"><img src="favicon.png" alt="" width="30" height="30"><span>Eventora</span></div>
+        <p>A portfolio-grade showcase of production concurrency, reliability,
+          and security patterns for a real ticketing platform.</p>
+      </div>
+      <div>
+        <h4>Project</h4>
+        <ul>
+          <li><a href="index.html">Overview</a></li>
+          <li><a href="architecture.html">Architecture</a></li>
+          <li><a href="walkthrough.html">Walkthrough</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Links</h4>
+        <ul>
+          <li><a href="https://event-ticketing-platform-nu.vercel.app/" target="_blank" rel="noopener">Live App</a></li>
+          <li><a href="https://backend-production-8daea.up.railway.app/swagger-ui/index.html" target="_blank" rel="noopener">API Docs</a></li>
+          <li><a href="https://github.com/Sharawey74/Event-Ticketing-Platform" target="_blank" rel="noopener">Source (GitHub)</a></li>
+        </ul>
+      </div>
     </div>
-    <div>
-      <h4>Project</h4>
-      <a href="index.html">Overview</a>
-      <a href="architecture.html">Architecture</a>
-      <a href="walkthrough.html">Walkthrough</a>
-    </div>
-    <div>
-      <h4>Links</h4>
-      <a href="https://event-ticketing-platform-nu.vercel.app/" target="_blank" rel="noopener">Live App</a>
-      <a href="https://backend-production-8daea.up.railway.app/swagger-ui/index.html" target="_blank" rel="noopener">API Docs</a>
-      <a href="https://github.com/Sharawey74/Event-Ticketing-Platform" target="_blank" rel="noopener">Source (GitHub)</a>
-    </div>
-  </div>
-  <div class="footer-bottom">
-    <div class="container">
+    <div class="footer-bottom">
       <span>MIT License</span>
       <span>Built by Abdelrhman Mohamed</span>
     </div>
   </div>
 </footer>
 
-<script src="assets/js/main.js"></script>
+<script src="assets/js/main.js" defer></script>
 </body>
 </html>

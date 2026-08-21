@@ -98,10 +98,10 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             {/* Title & Badges */}
             <div>
               <div className="flex flex-wrap gap-2 mb-stack-sm">
-                <span className="px-4 py-1 bg-[#F5F3FF] text-primary rounded-full font-label-sm text-label-sm">
+                <span className="px-4 py-1 bg-primary/10 text-primary rounded-full font-label-sm text-label-sm">
                   {event.category?.name || "Event"}
                 </span>
-                <span className="px-4 py-1 bg-[#F5F3FF] text-primary rounded-full font-label-sm text-label-sm">
+                <span className="px-4 py-1 bg-primary/10 text-primary rounded-full font-label-sm text-label-sm">
                   {event.status}
                 </span>
               </div>

@@ -14,10 +14,18 @@ const SUPPORT_LINKS = [
 
 export function Footer() {
   return (
-    <footer className="bg-surface-container-lowest border-t border-surface-container-high mt-auto">
+    <footer className="relative overflow-hidden bg-surface-container-lowest border-t border-surface-container-high mt-auto">
+      {/* Hairline of brand colour along the top edge. */}
+      <div className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-primary/40 to-transparent" />
+
       <div className="mx-auto grid w-full max-w-container-max grid-cols-1 gap-8 px-edge-padding py-stack-lg sm:grid-cols-3">
         <div className="flex flex-col gap-2 sm:col-span-1">
-          <p className="text-section-heading text-primary font-bold tracking-tighter">Eventora</p>
+          <Link
+            href="/"
+            className="text-section-heading text-primary font-bold tracking-tighter w-fit transition-all duration-300 hover:bg-linear-to-r hover:from-primary hover:to-secondary hover:bg-clip-text hover:text-transparent"
+          >
+            Eventora
+          </Link>
           <p className="text-on-surface-variant font-caption max-w-xs">
             Discover events, reserve your seats, and manage bookings from one place.
           </p>
@@ -31,8 +39,9 @@ export function Footer() {
             <Link
               key={link.label}
               href={link.href}
-              className="text-on-surface-variant font-caption hover:text-primary transition-colors w-fit"
+              className="group/fl inline-flex items-center gap-1.5 text-on-surface-variant font-caption hover:text-primary transition-colors w-fit"
             >
+              <span className="h-px w-0 bg-primary transition-all duration-300 group-hover/fl:w-3" />
               {link.label}
             </Link>
           ))}
@@ -46,8 +55,9 @@ export function Footer() {
             <Link
               key={link.label}
               href={link.href}
-              className="text-on-surface-variant font-caption hover:text-primary transition-colors w-fit"
+              className="group/fl inline-flex items-center gap-1.5 text-on-surface-variant font-caption hover:text-primary transition-colors w-fit"
             >
+              <span className="h-px w-0 bg-primary transition-all duration-300 group-hover/fl:w-3" />
               {link.label}
             </Link>
           ))}
