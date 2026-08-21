@@ -7,6 +7,7 @@ target/
 Artifacts/
 frontend/Images
 frontend/NEW.DESIGN
+frontend/stitch
 Docs/
 docs/
 R/
@@ -79,9 +80,8 @@ logging-pretty.json
 !/CONTEXT.md
 !/PROGRESS.md
 !/PERFORMANCE.md
-!/TASKS.md
 !/instructions.md
-!/PHASE1A_ADJUSTMENTS_AND_FIXES.md
+!/ADJUSTMENTS_AND_FIXES.md
 !/frontend/README.md
 !/frontend/ARCHITECTURE.md
 !/frontend/DESIGN.md
