@@ -887,7 +887,20 @@ The plan assumes on Day 9 that a Stripe test account and Railway account exist. 
 **Exact Fix:**  
 On Day 1 evening (during the 1-hour TDD/git block), take 20 minutes to:
 1. Create a Stripe account at stripe.com → get `sk_test_` and `pk_test_` keys → save to `application-local.yml`
-2. Install the Stripe CLI: `stripe login` → `stripe listen --forward-to localhost:8080/api/webhooks/stripe` (for local webhook testing)
+2. Install the Stripe CLI: `stripe login` then
+   `stripe listen --forward-to localhost:8088/api/v1/payments/webhook`
+   (for local webhook testing). Put the `whsec_` it prints into `.env` as
+   `STRIPE_WEBHOOK_SECRET`.
+
+   > **Corrected Day 24.** This step previously named
+   > `localhost:8080/api/webhooks/stripe` — wrong port *and* wrong path. The
+   > real endpoint is `:8088` and `/api/v1/payments/webhook`. Following the old
+   > line would silently deliver nothing, which is precisely the failure mode in
+   > Fix 24-webhook.
+   >
+   > **Status: NOT DONE.** The CLI is not installed and the Stripe account has
+   > zero webhook endpoints registered. This fix was marked applied in
+   > `PROGRESS.md` while neither half of it was true.
 3. Create a Railway account at railway.app → create a new project (empty) → note the project ID
 4. Add all environment variable names (empty values) to Railway now so they're ready to fill on Day 18
 
@@ -1130,6 +1143,173 @@ Before tagging `v1.0.0`, verify all critical fixes were applied:
 - [ ] Rate limit counter is atomic Lua script, not two-step INCR+EXPIRE (BUG-D20-2)
 - [ ] `status().isNot(429)` replaced with valid MockMvc assertion (BUG-D20-3)
 - [ ] Actuator `permitAll()` replaced with health-only public access (BUG-D20-6)
+
+---
+
+---
+
+**Day 24 — payment reliability (applied):**
+- [x] Reconciliation fallback confirms a paid booking from the success redirect (Fix 24-webhook)
+- [x] `confirmPaidBooking` extracted so webhook and reconciliation cannot drift (Fix 24-webhook)
+- [x] `@MockitoBean` added for the new controller collaborator (Fix 24-slice)
+- [x] `.no-scrollbar` defined; stray vertical scrollbar on the rail removed (Fix 24-scrollbar)
+- [x] `--color-success` token family added; raw hex 41 to 1 (Fix 24-trackA)
+- [x] Sales chart derives from real data instead of hardcoded coordinates (Fix 24-trackA)
+- [x] Fix PW3-1 corrected — CLI not installed, and its command named the wrong endpoint (Fix 24-clidoc)
+
+**Still outstanding — environment, not code:**
+- [ ] Install the Stripe CLI and run `stripe listen --forward-to localhost:8088/api/v1/payments/webhook`
+- [ ] Set `STRIPE_WEBHOOK_SECRET` in `.env` (currently unset, so compose falls back to `whsec_placeholder`)
+- [ ] Register a webhook endpoint in the Stripe Dashboard for production — the account has zero
+- [ ] Refund the two duplicate charges on the twice-paid booking (`pi_3U6rvL`, `pi_3U6ruj`)
+- [ ] Frontend must send `Idempotency-Key` on `POST /api/v1/bookings` before `app.rate-limit.enabled=true` reaches production (carried from Day 20)
+
+## DAY 24 — Payment Reliability + UI Enhancement (Discovered in Use)
+
+Found by the user during an ordinary booking, not by a checklist. Documented here
+because the payment one is a design gap that survives redeployment, not a one-off
+environment glitch.
+
+---
+
+### Fix 24-webhook — Paid Bookings Stranded at `PAYMENT_PENDING`
+**Severity:** CRITICAL (money taken, booking still fails)
+**Day:** Day 24
+**Files:** `PaymentReconciliationService.java` (new), `WebhookService.java`,
+`BookingController.java`, `frontend/src/app/bookings/[id]/confirmation/page.tsx`
+
+**Symptom:** A booking paid for through Stripe stayed `PAYMENT_PENDING` on the
+dashboard. Stripe reported the session `paid` with a real payment intent; the
+application never advanced the booking.
+
+**Why:** `WebhookService.handlePaymentSuccess` is the *only* exit from
+`PAYMENT_PENDING`, and it fires solely on Stripe's asynchronous
+`checkout.session.completed`. The Stripe account had **zero webhook endpoints
+registered**, and Stripe cannot reach `localhost:8088` in any case, so that event
+had never once been delivered.
+
+This is worse than a stuck status. `ReservationExpirationJob` sweeps stale
+`PAYMENT_PENDING` to `PAYMENT_FAILED` and releases the seats — so the card is
+charged and the booking still fails. It also compounds: the stuck state leaves a
+*Resume* action in the UI which opens a **new** checkout session for the same
+booking. One booking was charged twice (EGP 1,500 x 2) and ended `CANCELLED`
+with two live payments.
+
+**Root cause classification:** the proximate cause is environmental (no endpoint
+registered). The durable defect is that confirmation depends on **one**
+asynchronous signal with **no fallback** — which fails identically in production
+whenever a webhook is delayed or lost. Fix 23-bug2 had already shown webhooks can
+be lost in this system.
+
+**Exact Fix:** Stripe returns `session_id` on the success redirect precisely so
+the application can verify synchronously. The confirmation page was receiving it
+and ignoring it.
+
+- Extract the confirmation body of `handlePaymentSuccess` into
+  `WebhookService.confirmPaidBooking(Session, correlationId)`. Extracted, **not
+  reimplemented** — two copies of "mark this booking paid" would drift, and the
+  difference would only surface once a webhook went missing.
+- `PaymentReconciliationService.reconcile(bookingId, userId)` retrieves the
+  session and, when `payment_status == "paid"`, delegates to that same method.
+- `POST /api/v1/bookings/{id}/sync-payment` exposes it; the confirmation page
+  calls it whenever the booking reads `PAYMENT_PENDING`, then re-reads.
+
+**Properties that matter:**
+- **Idempotent** — the `PAYMENT_PENDING` guard makes a second call a no-op, which
+  is what keeps a webhook-and-reconciliation race harmless.
+- **Cheap on the common path** — anything already settled returns without
+  contacting Stripe, and this runs on every confirmation-page visit.
+- **Ownership enforced object-level**, independent of endpoint authorization.
+- **Fails soft** — a Stripe outage is logged and swallowed, never fails the page.
+- **Logs at WARN when it steps in**, so a missing webhook stays visible in
+  operations instead of being silently papered over.
+
+The webhook remains the primary path. Reconciliation only closes the gap when it
+does not arrive, and cannot replace it: `checkout.session.expired` and async
+payment failures have no redirect to piggyback on.
+
+**Verification:** a real Stripe test-mode purchase with **no webhook relayed at
+all** reached the confirmation page as `CONFIRMED` with its QR ticket issued
+(booking 564, intent `pi_3U6sjI`), with the WARN line present in the backend log.
+
+---
+
+### Fix 24-slice — New Controller Dependency Breaks the `@WebMvcTest` Slice
+**Severity:** IMPORTANT (13 tests fail to load context)
+**Day:** Day 24
+**File:** `src/test/java/com/ticketing/booking/controller/BookingControllerTest.java`
+
+**Why:** `@WebMvcTest` still constructs the controller bean, so a constructor
+dependency with no corresponding `@MockitoBean` fails context load — and takes
+every test in the slice with it, reported as errors rather than failures.
+
+**Exact Fix:** add `@MockitoBean PaymentReconciliationService` alongside the
+existing mocks. This is the same trap as the `JwtService` mock already documented
+in the test-security section: **any** collaborator added to a controller needs a
+matching mock in its slice.
+
+---
+
+### Fix 24-clidoc — Fix PW3-1 Claimed the Stripe CLI Was Installed
+**Severity:** GOOD PRACTICE (but it cost real debugging time)
+**Day:** Day 24
+**File:** `instructions.md`
+
+**Why:** Fix PW3-1 was marked applied: "Stripe account + CLI installed". The CLI
+is not installed, and that stale entry is what made the undelivered webhook look
+impossible — the local setup appeared to already satisfy webhook delivery.
+
+**Exact Fix:** `instructions.md` now records the CLI as NOT installed, with the
+command it is needed for and the consequence of running without it:
+
+    stripe listen --forward-to localhost:8088/api/v1/payments/webhook
+
+Without it, `checkout.session.completed` never arrives and paid bookings stay
+`PAYMENT_PENDING` until the expiry job marks them `PAYMENT_FAILED`.
+
+Production needs a webhook endpoint registered in the Stripe Dashboard. The
+account currently has none, so live checkout would fail exactly this way.
+
+---
+
+### Fix 24-scrollbar — `.no-scrollbar` Referenced but Never Defined
+**Severity:** IMPORTANT (visible defect on the landing page)
+**Day:** Day 24
+**Files:** `frontend/src/app/globals.css`, `frontend/src/app/page.tsx`
+
+**Why:** The featured-events rail carried `className="no-scrollbar"`, but that
+utility was **never defined anywhere**, so the browser painted its default bar.
+A second, stray vertical scrollbar appeared alongside it because per CSS spec a
+container that is not `visible` on one axis computes to `auto` on the other — the
+reveal transform and card hover-lift then overflowed vertically.
+
+**Exact Fix:** define `.no-scrollbar`, and add `.scroll-rail` which pins
+`overflow-y: hidden`, adds a slim gradient thumb, scroll snapping, and padding for
+the hover lift. Edge fades sized to the gutter so they do not wash the first and
+last card.
+
+---
+
+### Fix 24-trackA — Design Tokens and a Chart That Ignored Its Data
+**Severity:** GOOD PRACTICE
+**Day:** Day 24
+**Files:** `globals.css`, `src/lib/chart-theme.ts`, `components/organizer/SalesChart.tsx`
+
+**Why:** There was a `--color-error` but **no `--color-success`**, which is why a
+success green (`#137333` / `#e6f4ea`) was hardcoded in three separate files. Raw
+hex in the frontend totalled 41 occurrences — most of them literal duplicates of
+tokens that already existed (`#630ed4` is `--color-primary`).
+
+Separately: the organizer "Sales Over Time" chart was **not a chart**. Its SVG
+path coordinates were hardcoded, so it drew the same rising curve regardless of
+the data.
+
+**Exact Fix:** add the `--color-success` token family; replace token-duplicate
+literals (41 to 1, the survivor being a `-webkit-autofill` shadow that needs a
+literal); extract chart colours to `chart-theme.ts`; rebuild the chart as
+`SalesChart.tsx` derived from real events, with an explicit empty state so a
+zero-revenue organizer sees "No sales yet" rather than a flat line that reads as
+broken.
 
 ---
 
