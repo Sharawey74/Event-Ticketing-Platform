@@ -62,6 +62,11 @@ class BookingControllerTest {
     @MockitoBean
     private RefundService refundService;
 
+    // BookingController constructor-injects this, and @WebMvcTest still builds the
+    // controller bean — without a mock the whole slice fails to load.
+    @MockitoBean
+    private com.ticketing.payment.service.PaymentReconciliationService paymentReconciliationService;
+
     @MockitoBean
     private JwtService jwtService;
 

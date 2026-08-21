@@ -62,7 +62,27 @@ export default function ConfirmationPage() {
       }
 
       try {
-        const res = await api.get(`/api/v1/bookings/${bookingId}`);
+        let res = await api.get(`/api/v1/bookings/${bookingId}`);
+
+        // Confirmation depends on Stripe's asynchronous webhook. If it has not
+        // arrived — no endpoint registered, an unreachable host, or a delivery
+        // that was simply lost — the booking sits at PAYMENT_PENDING while the
+        // card has already been charged, and the expiry job eventually marks it
+        // PAYMENT_FAILED.
+        //
+        // Stripe returns session_id on this redirect precisely so we can verify
+        // directly. Ask the server to reconcile, then re-read. Idempotent, and a
+        // no-op for any booking that is already settled.
+        if (res.data?.data?.state === "PAYMENT_PENDING") {
+          try {
+            await api.post(`/api/v1/bookings/${bookingId}/sync-payment`);
+            res = await api.get(`/api/v1/bookings/${bookingId}`);
+          } catch {
+            // Reconciliation is best-effort: the webhook may still land, and the
+            // Refresh Status button retries. Never block rendering on it.
+          }
+        }
+
         setBooking(res.data?.data);
 
         // Simulate QR loading for the shimmer effect

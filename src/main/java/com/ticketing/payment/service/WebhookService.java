@@ -108,7 +108,22 @@ public class WebhookService {
     private void handlePaymentSuccess(com.stripe.model.Event stripeEvent, String correlationId) {
         Session session = deserializeSession(stripeEvent);
         if (session == null) return;
+        confirmPaidBooking(session, correlationId);
+    }
 
+    /**
+     * Confirms the booking behind an already-paid Stripe session.
+     *
+     * Extracted so the synchronous reconciliation path
+     * ({@link PaymentReconciliationService}) confirms through exactly the same code
+     * as the webhook. Two separate implementations of "mark this booking paid" would
+     * drift, and the difference would only surface once a webhook went missing.
+     *
+     * Safe to call more than once: the PAYMENT_PENDING guard below makes a second
+     * call a no-op, which is what makes webhook-plus-reconciliation races harmless.
+     */
+    @Transactional
+    public void confirmPaidBooking(Session session, String correlationId) {
         String bookingIdStr = session.getMetadata().get("bookingId");
         if (bookingIdStr == null) {
             log.error("[{}] [webhook] checkout.session.completed missing bookingId in metadata. Session: {}",
