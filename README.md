@@ -250,8 +250,8 @@ com.ticketing
 
 | Metric | Result |
 | :--- | :--- |
-| Backend test suite | **194 / 194 passing** |
-| Instruction coverage (JaCoCo) | **83%** (gate: 80% minimum) |
+| Backend test suite | **202 / 202 passing** |
+| Instruction coverage (JaCoCo) | **83.5%** gate-scoped (gate: 80% minimum) |
 | Dedicated concurrency tests | 2 — a 100-thread/50-seat Redis floor-guard proof, and a second end-to-end test through the full reservation path (DB write included) |
 | Integration tests | Real PostgreSQL, Redis, and RabbitMQ via Testcontainers — no mocked infrastructure in integration suites |
 | `@WebMvcTest` security coverage | Every slice runs the real Spring Security filter chain (`addFilters=false` is never used, so `@PreAuthorize` is always exercised) |
@@ -378,7 +378,7 @@ Full fix-by-fix security and reliability audit trail: [`PROGRESS.md`](PROGRESS.m
 
 If this project was useful or interesting, a star ⭐ helps others find it.
 
-**[Live Frontend](https://event-ticketing-platform-nu.vercel.app)** · **[Live API](https://backend-production-8daea.up.railway.app)** · **[API Docs](https://backend-production-8daea.up.railway.app/swagger-ui/index.html)** · **[Showcase](https://sharawey74.github.io/Event-Ticketing-Platform/)**
+**[Live Frontend](https://event-ticketing-platform-nu.vercel.app)** · **[Live API](https://backend-production-8daea.up.railway.app)** · **[API Docs](https://backend-production-8daea.up.railway.app/swagger-ui/index.html)** · **[Source](https://github.com/Sharawey74/Event-Ticketing-Platform)**
 
 Licensed under the [MIT License](LICENSE).
 

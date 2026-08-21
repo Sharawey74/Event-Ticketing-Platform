@@ -41,6 +41,7 @@ import lombok.extern.slf4j.Slf4j;
  *   GET  /api/v1/bookings/{id}                  — Get booking detail — tickets/QR gated by state
  *   POST /api/v1/bookings/{bookingId}/check-in  — Check in attendee (ORGANIZER/ADMIN)
  *   POST /api/v1/bookings/{id}/refunds          — Request refund (authenticated, ownership enforced in service)
+ *   POST /api/v1/bookings/{id}/sync-payment     — Reconcile a pending payment against Stripe (webhook fallback)
  */
 @RestController
 @RequestMapping("/api/v1/bookings")
@@ -52,6 +53,7 @@ public class BookingController {
     private final BookingService bookingService;
     private final BookingQueryService bookingQueryService;
     private final RefundService refundService;
+    private final com.ticketing.payment.service.PaymentReconciliationService paymentReconciliationService;
 
     /**
      * Fix 8.2: Two guards — @PreAuthorize for role (HTTP layer) + CheckInGuard in state machine (domain layer).
@@ -117,6 +119,35 @@ public class BookingController {
 
         RefundResponse response = refundService.requestRefund(id, userDetails.getId());
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * Reconciles a booking against Stripe when the confirmation webhook has not arrived.
+     *
+     * The success redirect carries `session_id`, so the client can ask us to verify
+     * directly rather than waiting on an asynchronous signal that may never come.
+     * Idempotent and safe to poll: anything already settled returns immediately
+     * without touching Stripe.
+     */
+    @Operation(summary = "Reconcile a pending payment",
+            description = "Checks the booking's Stripe session and confirms it if Stripe reports the session paid. "
+                    + "Fallback for a missing or delayed checkout.session.completed webhook.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Current booking state after reconciliation")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Not authenticated")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Caller does not own this booking")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Booking not found")
+    @PostMapping("/{id}/sync-payment")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<String>> syncPayment(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+
+        String correlationId = MDC.get("correlationId");
+        log.info("[{}] [booking] Payment reconciliation requested for booking {} by user {}",
+                correlationId, id, userDetails.getId());
+
+        var state = paymentReconciliationService.reconcile(id, userDetails.getId());
+        return ResponseEntity.ok(ApiResponse.success(state.name()));
     }
 
     @Operation(summary = "Reserve tickets", description = "Creates a RESERVED booking and decrements inventory atomically via a Redis Lua floor guard. Hold expires after RESERVATION_TTL_SECONDS.")

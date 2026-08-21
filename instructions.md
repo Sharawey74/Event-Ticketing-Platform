@@ -5,7 +5,7 @@ DOCUMENT 1 - The Original Plan (Sections 2-16):
 Contains the full day-by-day execution map, architecture, implementation guides, testing
 strategy, and all technical specifications. This is the primary source of truth for WHAT to build.
 
-DOCUMENT 2 - Phase1A_Adjustments_and_Fixes.md (the companion overlay):
+DOCUMENT 2 - ADJUSTMENTS_AND_FIXES.md (the companion overlay):
 Contains corrections, additions, and improvements that must be applied ON TOP of the original
 plan. This document does NOT replace the original plan - it supplements it with fixes that were
 identified after deep analysis.
@@ -109,6 +109,10 @@ TECH STACK - Exact Versions (no deviations):
 - Cache + Lock    : Redis 7.0.15 (local: runs in WSL2/Ubuntu; prod: Railway managed)
 - Messaging       : RabbitMQ 4.2.5 (local Windows install + Railway managed in prod)
 - Payment         : Stripe Java SDK 23.3.0
+- Stripe CLI      : NOT installed. Required locally for webhook delivery —
+                    `stripe listen --forward-to localhost:8088/api/v1/payments/webhook`.
+                    Without it `checkout.session.completed` never arrives and paid bookings
+                    stay PAYMENT_PENDING until the expiry job marks them PAYMENT_FAILED.
 - State Machine   : Spring State Machine 3.2.0
 - JWT             : JJWT 0.11.5
 - QR Code         : com.google.zxing:core:3.5.2 + com.google.zxing:javase:3.5.2
