@@ -250,8 +250,8 @@ com.ticketing
 
 | Metric | Result |
 | :--- | :--- |
-| Backend test suite | **194 / 194 passing** |
-| Instruction coverage (JaCoCo) | **83%** (gate: 80% minimum) |
+| Backend test suite | **202 / 202 passing** |
+| Instruction coverage (JaCoCo) | **83.5%** gate-scoped (gate: 80% minimum) |
 | Dedicated concurrency tests | 2 — a 100-thread/50-seat Redis floor-guard proof, and a second end-to-end test through the full reservation path (DB write included) |
 | Integration tests | Real PostgreSQL, Redis, and RabbitMQ via Testcontainers — no mocked infrastructure in integration suites |
 | `@WebMvcTest` security coverage | Every slice runs the real Spring Security filter chain (`addFilters=false` is never used, so `@PreAuthorize` is always exercised) |

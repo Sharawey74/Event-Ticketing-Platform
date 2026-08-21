@@ -5,10 +5,12 @@ KNOWN_ISSUES.md
 ticketing-platform.postman_collection.json
 target/
 Artifacts/
+frontend/Images
+frontend/NEW.DESIGN
 Docs/
 docs/
 R/
-
+DESIGN_TASKS.md
 Images/
 Plans/
 Tools/
@@ -64,3 +66,22 @@ logs/
 logging.json
 logging-*.json
 logging-pretty.json
+
+### Markdown notes — keep new scratch docs out of the repo ###
+# Ignores any NEW .md at the repo root or anywhere under frontend/.
+# Files already committed are unaffected: .gitignore never untracks something
+# git is already following, so every doc listed below stays versioned. The
+# negations are here so that intent is explicit rather than incidental.
+# To commit a genuinely new doc anyway: git add -f <file>
+/*.md
+/frontend/**/*.md
+!/README.md
+!/CONTEXT.md
+!/PROGRESS.md
+!/PERFORMANCE.md
+!/TASKS.md
+!/instructions.md
+!/PHASE1A_ADJUSTMENTS_AND_FIXES.md
+!/frontend/README.md
+!/frontend/ARCHITECTURE.md
+!/frontend/DESIGN.md

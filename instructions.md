@@ -5,7 +5,7 @@ DOCUMENT 1 - The Original Plan (Sections 2-16):
 Contains the full day-by-day execution map, architecture, implementation guides, testing
 strategy, and all technical specifications. This is the primary source of truth for WHAT to build.
 
-DOCUMENT 2 - Phase1A_Adjustments_and_Fixes.md (the companion overlay):
+DOCUMENT 2 - PHASE1A_ADJUSTMENTS_AND_FIXES.md (the companion overlay):
 Contains corrections, additions, and improvements that must be applied ON TOP of the original
 plan. This document does NOT replace the original plan - it supplements it with fixes that were
 identified after deep analysis.
