@@ -31,12 +31,15 @@
   --violet-200: #d2bbff;
   --violet-100: #ede0ff;
   --violet-050: #f6f0ff;
+  --violet-900: #2b0052;
 
   /* indigo — secondary */
   --indigo-600: #4b41e1;
   --indigo-500: #645efb;
   --indigo-100: #dee5ff;
   --indigo-050: #fffbff;
+  --slate-100: #dde3f0;
+  --navy-900: #131b2e;
 
   /* ink — foreground greys */
   --ink-900: #191c1e;
@@ -142,6 +145,18 @@
   --sem-warning-container: var(--amber-100);
   --sem-on-warning-container: var(--amber-800);
 
+  /* Material 3 "fixed" roles: a light tone that stays the same in light and
+     dark, for chips and badges that must not flip with the theme. The set was
+     referenced in markup from the start but never defined, so bg-primary-fixed
+     and friends rendered as nothing — 29 usages, including four of the ten
+     booking status chips. */
+  --sem-primary-fixed: var(--violet-100);
+  --sem-on-primary-fixed: var(--violet-900);
+  --sem-secondary-fixed: var(--indigo-100);
+  --sem-on-secondary-fixed: var(--navy-900);
+  --sem-tertiary-fixed: var(--slate-100);
+  --sem-on-tertiary-fixed: var(--navy-900);
+
   --sem-background: var(--paper-050);
   --sem-on-background: var(--ink-900);
 }
@@ -238,6 +253,13 @@
   --color-on-warning: var(--sem-on-warning);
   --color-warning-container: var(--sem-warning-container);
   --color-on-warning-container: var(--sem-on-warning-container);
+
+  --color-primary-fixed: var(--sem-primary-fixed);
+  --color-on-primary-fixed: var(--sem-on-primary-fixed);
+  --color-secondary-fixed: var(--sem-secondary-fixed);
+  --color-on-secondary-fixed: var(--sem-on-secondary-fixed);
+  --color-tertiary-fixed: var(--sem-tertiary-fixed);
+  --color-on-tertiary-fixed: var(--sem-on-tertiary-fixed);
 
   --color-background: var(--sem-background);
   --color-on-background: var(--sem-on-background);
