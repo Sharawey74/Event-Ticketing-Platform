@@ -6,28 +6,8 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/store/authStore";
 import { api } from "@/lib/api";
+import { BookingStatusBadge } from "@/components/bookings/BookingStatusBadge";
 
-function BookingStatusBadge({ state }: { state: string }) {
-  const styleMap: Record<string, string> = {
-    RESERVED: "bg-secondary-fixed text-on-secondary-fixed",
-    PAYMENT_PENDING: "bg-tertiary-fixed text-on-tertiary-fixed",
-    CONFIRMED: "bg-success-container text-on-success-container",
-    ATTENDED: "bg-success-container text-on-success-container",
-    EXPIRED: "bg-error-container text-on-error-container",
-    CANCELLED: "bg-error-container text-on-error-container",
-    REFUND_REQUESTED: "bg-primary-fixed text-on-primary-fixed",
-    REFUND_APPROVED: "bg-primary-fixed text-on-primary-fixed",
-    REFUND_DENIED: "bg-surface-container-high text-on-surface-variant",
-    PAYMENT_FAILED: "bg-error-container text-on-error-container",
-  };
-  const cls = styleMap[state] ?? "bg-surface-container text-on-surface-variant";
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${cls}`}>
-      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
-      {state.replace("_", " ")}
-    </span>
-  );
-}
 
 interface Attendee {
   bookingId: number;
@@ -90,11 +70,11 @@ export default function EventAttendeesPage() {
   );
 
   if (isLoading) {
-    return <main className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen flex items-center justify-center"><p>Loading attendees...</p></main>;
+    return <div className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen flex items-center justify-center"><p>Loading attendees...</p></div>;
   }
 
   return (
-    <main className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen">
+    <div className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen">
       
       {/* Back button */}
       <nav className="mb-stack-md">
@@ -184,6 +164,6 @@ export default function EventAttendeesPage() {
         </table>
       </div>
 
-    </main>
+    </div>
   );
 }
