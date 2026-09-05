@@ -6,7 +6,16 @@ import { useRouter, usePathname } from "next/navigation";
 import { FormEvent, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { Search, ShoppingCart, LogOut, User, ChevronDown, LayoutDashboard } from "lucide-react";
+import {
+  Search,
+  ShoppingCart,
+  LogOut,
+  User,
+  ChevronDown,
+  LayoutDashboard,
+  CalendarDays,
+  X,
+} from "lucide-react";
 
 import { buildSearchHref } from "@/lib/search";
 import { useAuthStore } from "@/store/authStore";
@@ -125,6 +134,46 @@ export function Navbar() {
 
   const isAuthPage = pathname.startsWith("/auth");
 
+  // Three shell states, per the redesign: signed out, attendee, organizer.
+  // Gated on isClient because token and role rehydrate from localStorage after
+  // mount — rendering the signed-in set on the server would mismatch.
+  const isSignedIn = isClient && Boolean(token);
+  const isOrganizer = isSignedIn && userRole === "ORGANIZER";
+
+  // Every destination is an existing route. "Categories" from the mockup is
+  // deliberately absent: there is no /categories page, and category filtering
+  // already lives on /search.
+  const navLinks: { href: string; label: string; active: boolean }[] = [
+    { href: "/search", label: "Browse", active: pathname.startsWith("/search") },
+  ];
+  if (isOrganizer) {
+    navLinks.push(
+      {
+        href: "/organizer/events",
+        label: "My events",
+        // Not startsWith, or "New event" would light up here too.
+        active: pathname === "/organizer/events",
+      },
+      {
+        href: "/organizer/events/new",
+        label: "New event",
+        active: pathname === "/organizer/events/new",
+      }
+    );
+  } else if (isSignedIn) {
+    navLinks.push({
+      href: "/dashboard/bookings",
+      label: "My bookings",
+      active: pathname.startsWith("/dashboard"),
+    });
+  } else {
+    navLinks.push({
+      href: "/#organizers",
+      label: "For organizers",
+      active: false,
+    });
+  }
+
   const navLinkBase =
     "link-underline font-label-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded px-1 transition-colors duration-200";
 
@@ -168,7 +217,7 @@ export function Navbar() {
                   className="text-on-surface-variant hover:text-on-surface"
                   aria-label="Clear search"
                 >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
+                  <X className="h-4 w-4" />
                 </button>
               )}
             </form>
@@ -190,26 +239,20 @@ export function Navbar() {
                 the logo goes to Discover, and the account menu carries
                 Dashboard and My Events. */}
             <div className="hidden items-center gap-6 md:flex">
-              <Link
-                className={`${navLinkBase} ${pathname === "/" ? "font-bold text-primary" : "text-on-surface-variant hover:text-primary"}`}
-                href="/"
-              >
-                Discover
-              </Link>
-              <Link
-                className={`${navLinkBase} ${pathname.startsWith("/dashboard") ? "font-bold text-primary" : "text-on-surface-variant hover:text-primary"}`}
-                href="/dashboard/bookings"
-              >
-                Dashboard
-              </Link>
-              {isClient && userRole === "ORGANIZER" && (
+              {navLinks.map((link) => (
                 <Link
-                  className={`${navLinkBase} ${pathname.startsWith("/organizer") ? "font-bold text-primary" : "text-on-surface-variant hover:text-primary"}`}
-                  href="/organizer/events"
+                  key={link.href}
+                  className={`${navLinkBase} ${
+                    link.active
+                      ? "font-bold text-primary"
+                      : "text-on-surface-variant hover:text-primary"
+                  }`}
+                  href={link.href}
+                  aria-current={link.active ? "page" : undefined}
                 >
-                  Organizer
+                  {link.label}
                 </Link>
-              )}
+              ))}
             </div>
 
             {/* Cart button — hidden on auth pages */}
@@ -217,7 +260,7 @@ export function Navbar() {
               <button
                 type="button"
                 onClick={() => setCartOpen(true)}
-                className="group/cart relative inline-flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded"
+                className="group/cart relative inline-flex min-h-11 min-w-11 items-center justify-center rounded text-on-surface-variant outline-none transition-colors hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/50"
                 aria-label="Open cart"
               >
                 <ShoppingCart className="h-6 w-6 transition-transform duration-300 group-hover/cart:scale-110 group-hover/cart:-rotate-6" />
@@ -270,7 +313,7 @@ export function Navbar() {
                         onClick={() => setDropdownOpen(false)}
                         className="flex items-center gap-2 px-4 py-2.5 text-sm text-on-surface hover:bg-surface-container-low transition-colors"
                       >
-                        <span className="material-symbols-outlined text-[16px] text-outline">event</span>
+                        <CalendarDays className="h-4 w-4 text-outline" />
                         Organizer Panel
                       </Link>
                     )}
@@ -289,12 +332,25 @@ export function Navbar() {
                 )}
               </div>
             ) : !isAuthPage ? (
-              <Link
-                className="btn-glass text-on-primary px-6 py-2 font-label-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-                href="/auth/login"
-              >
-                Sign in
-              </Link>
+              <div className="flex items-center gap-2 sm:gap-3">
+                {/* Both shown at every width: measured at 375 the whole row is
+                    312px, so there is room, and a returning user needs a login
+                    affordance in the shell on pages that have no hero.
+                    whitespace-nowrap because the tight mobile row otherwise
+                    breaks these two-word labels across lines. */}
+                <Link
+                  className={`${navLinkBase} inline-flex min-h-11 items-center whitespace-nowrap text-on-surface-variant hover:text-primary`}
+                  href="/auth/login"
+                >
+                  Log in
+                </Link>
+                <Link
+                  className="btn-glass inline-flex min-h-11 items-center whitespace-nowrap px-5 py-2 font-label-sm text-on-primary outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                  href="/auth/register"
+                >
+                  Sign up
+                </Link>
+              </div>
             ) : null}
           </div>
         </div>
