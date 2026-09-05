@@ -70,18 +70,18 @@ export default function OrganizerDashboardPage() {
   }, [isClient, token, userRole, router]);
 
   if (!isClient) {
-    return <main className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen flex items-center justify-center"><p>Loading dashboard...</p></main>;
+    return <div className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen flex items-center justify-center"><p>Loading dashboard...</p></div>;
   }
   // Redirect in flight — render nothing to avoid a flash of empty content
   if (!token || userRole !== "ORGANIZER") {
     return null;
   }
   if (isLoading) {
-    return <main className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen flex items-center justify-center"><p>Loading dashboard...</p></main>;
+    return <div className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen flex items-center justify-center"><p>Loading dashboard...</p></div>;
   }
 
   return (
-    <main className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen">
+    <div className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen">
       
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-stack-md mb-stack-lg">
@@ -137,18 +137,18 @@ export default function OrganizerDashboardPage() {
 
       {/* Sales Chart Card */}
       <div className="bg-surface-container-lowest rounded-xl shadow-md p-stack-lg mb-stack-lg border border-outline-variant/30 transition-shadow hover:shadow-xl">
-        <div className="flex justify-between items-center mb-stack-lg flex-wrap gap-3">
-          <div className="flex items-center gap-3">
-            <h2 className="font-section-heading text-section-heading text-on-surface">Sales Over Time</h2>
-            <span className="inline-flex items-center gap-1.5 bg-surface-container-low rounded-full px-2.5 py-1">
-              <span className="w-2 h-2 rounded-full bg-primary" />
-              <span className="font-caption text-on-surface-variant">Revenue (EGP)</span>
-            </span>
-          </div>
-          <button className="text-on-surface-variant hover:text-primary font-label-sm flex items-center gap-1 transition-colors">
-            Last 30 Days
-            <span className="material-symbols-outlined text-[18px]">keyboard_arrow_down</span>
-          </button>
+        {/* "Sales Over Time" and a "Last 30 Days" picker both promised a time
+            dimension the API does not have — and the picker was inert, with no
+            handler behind it. A control that does nothing is worse than no
+            control: it implies the data could be filtered. */}
+        <div className="mb-stack-lg flex flex-wrap items-center gap-3">
+          <h2 className="font-section-heading text-section-heading text-on-surface">
+            Revenue by event
+          </h2>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-container-low px-2.5 py-1">
+            <span className="h-2 w-2 rounded-full bg-primary" />
+            <span className="font-caption text-on-surface-variant">Gross (EGP)</span>
+          </span>
         </div>
         
         <SalesChart events={events} />
@@ -264,6 +264,6 @@ export default function OrganizerDashboardPage() {
           )}
         </div>
       </div>
-    </main>
+    </div>
   );
 }

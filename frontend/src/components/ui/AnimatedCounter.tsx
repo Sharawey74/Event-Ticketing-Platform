@@ -82,10 +82,15 @@ export function AnimatedCounter({
   useEffect(() => {
     const node = ref.current;
     if (!node || skipAnimation) return;
+    // "already finished counting to this value", not "already started".
     if (animatedToRef.current === value) return;
 
     const animate = (from: number) => {
-      animatedToRef.current = value;
+      // Marked on COMPLETION, never here. Setting it at the start meant that if
+      // the effect was torn down mid-flight — React re-invokes effects in dev,
+      // and any dep change does the same — the cleanup cancelled the frame and
+      // the re-run then saw the guard already satisfied and returned early. The
+      // counter froze at whatever partial value it had reached.
       const start = performance.now();
       const tick = (now: number) => {
         // Clamp low as well as high: the first rAF callback can carry the
@@ -99,6 +104,7 @@ export function AnimatedCounter({
           frameRef.current = requestAnimationFrame(tick);
         } else {
           displayRef.current = value;
+          animatedToRef.current = value;
           setDisplay(value);
         }
       };

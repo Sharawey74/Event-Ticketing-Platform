@@ -168,9 +168,9 @@ export default function EditEventPage() {
 
   if (!isClient || isLoadingEvent) {
     return (
-      <main className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen flex items-center justify-center">
+      <div className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen flex items-center justify-center">
         <p className="text-on-surface-variant">Loading event...</p>
-      </main>
+      </div>
     );
   }
 
@@ -180,7 +180,7 @@ export default function EditEventPage() {
 
   if (submitSuccess) {
     return (
-      <main className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen flex items-center justify-center">
+      <div className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
           <CheckCircle className="h-16 w-16 text-emerald-500 mx-auto" />
           <h2 className="font-hero-headline-mobile text-on-surface">Event Updated!</h2>
@@ -188,12 +188,12 @@ export default function EditEventPage() {
             &ldquo;{eventTitle}&rdquo; has been saved. Redirecting to your events&hellip;
           </p>
         </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen">
+    <div className="grow pt-[104px] pb-section-gap px-edge-padding max-w-container-max mx-auto w-full min-h-screen">
       {/* Back nav */}
       <nav className="mb-stack-md">
         <Link
@@ -372,6 +372,6 @@ export default function EditEventPage() {
           </Link>
         </div>
       </form>
-    </main>
+    </div>
   );
 }

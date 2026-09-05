@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function TermsPage() {
   return (
-    <main className="pt-32 pb-section-gap px-edge-padding max-w-3xl mx-auto min-h-screen">
+    <div className="pt-32 pb-section-gap px-edge-padding max-w-3xl mx-auto min-h-screen">
       <nav className="mb-8">
         <Link href="/" className="inline-flex items-center gap-1 text-primary hover:underline font-label-sm">
           <span className="material-symbols-outlined text-[18px]">arrow_back</span>
@@ -54,6 +54,6 @@ export default function TermsPage() {
           <p>For questions about these terms, please contact us at <span className="text-primary">support@eventora.com</span>.</p>
         </section>
       </div>
-    </main>
+    </div>
   );
 }
