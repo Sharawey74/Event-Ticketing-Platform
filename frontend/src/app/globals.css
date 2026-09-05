@@ -886,3 +886,171 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* ======================================================================
+   AURORA HERO
+   ----------------------------------------------------------------------
+   A drifting mesh gradient built from four blurred radial blobs.
+
+   Pure CSS on purpose. The CSP is `default-src 'self'` with no media-src, so
+   an external video is blocked outright; and a self-hosted one costs megabytes
+   on the LCP path for decoration. This is a few hundred bytes and re-tokens
+   with the palette instead of baking colours into pixels.
+
+   Rules that keep it cheap:
+   - Blur is applied ONCE on the container, never per blob. Four separate
+     filters would be four composited passes.
+   - Blobs animate transform only. Never filter, width, height or background —
+     those relayout or repaint every frame.
+   - Durations are prime-ish (37 / 41 / 43 / 53s) so the four never re-sync
+     into a visible loop.
+   ====================================================================== */
+
+.aurora {
+  position: absolute;
+  inset: -20%;
+  filter: blur(64px);
+  pointer-events: none;
+  contain: strict;
+}
+
+.aurora-blob {
+  position: absolute;
+  border-radius: 9999px;
+  will-change: transform;
+}
+
+@keyframes ev-aurora-a {
+  0%,
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(8%, 6%, 0) scale(1.18); }
+}
+@keyframes ev-aurora-b {
+  0%,
+  100% { transform: translate3d(0, 0, 0) scale(1.1); }
+  50%  { transform: translate3d(-10%, 8%, 0) scale(0.9); }
+}
+@keyframes ev-aurora-c {
+  0%,
+  100% { transform: translate3d(0, 0, 0) scale(0.95); }
+  50%  { transform: translate3d(6%, -9%, 0) scale(1.22); }
+}
+@keyframes ev-aurora-d {
+  0%,
+  100% { transform: translate3d(0, 0, 0) scale(1.05); }
+  50%  { transform: translate3d(-7%, -5%, 0) scale(0.92); }
+}
+
+.aurora-a { animation: ev-aurora-a 37s ease-in-out infinite; }
+.aurora-b { animation: ev-aurora-b 41s ease-in-out infinite; }
+.aurora-c { animation: ev-aurora-c 43s ease-in-out infinite; }
+.aurora-d { animation: ev-aurora-d 53s ease-in-out infinite; }
+
+/* Pointer highlight.
+   --hx/--hy are registered so the browser interpolates them, which keeps the
+   glow smooth even when pointermove fires sparsely. Unregistered custom
+   properties are strings and would jump between positions. */
+@property --hx {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 50%;
+}
+@property --hy {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 50%;
+}
+@property --h-alpha {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+.aurora-pointer {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    38rem 38rem at var(--hx) var(--hy),
+    color-mix(in oklab, var(--violet-400) calc(var(--h-alpha) * 100%), transparent),
+    transparent 70%
+  );
+  transition:
+    --hx 260ms ease-out,
+    --hy 260ms ease-out,
+    --h-alpha 420ms ease-out;
+}
+
+/* Touch devices never get a pointer glow, so they never pay for the listener
+   or the extra paint layer. */
+@media (hover: none), (pointer: coarse) {
+  .aurora-pointer { display: none; }
+}
+
+/* --- hero headline word stagger --------------------------------------- */
+
+@keyframes ev-word-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.5em);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.word-rise > span {
+  display: inline-block;
+  animation: ev-word-rise 0.62s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--word-index, 0) * 60ms);
+}
+
+/* --- scroll-driven reveal --------------------------------------------
+   Where the browser supports it this replaces the IntersectionObserver in
+   Reveal.tsx: no JavaScript, no observer, and it runs on the compositor.
+   Reveal.tsx keeps its observer as the fallback for everything else, so the
+   two must not both animate — hence the marker class below, which the
+   component reads to decide whether to bother observing.
+   -------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: no-preference) {
+  @supports ((animation-timeline: view()) and (animation-range: entry)) {
+    :root {
+      --supports-scroll-timeline: 1;
+    }
+
+    .reveal {
+      /* Override the observer-driven transition; the timeline owns it now. */
+      opacity: 1;
+      transform: none;
+      transition: none;
+      animation: ev-fade-up 1ms linear both;
+      animation-timeline: view();
+      animation-range: entry 8% cover 30%;
+    }
+  }
+}
+
+/* --- reduced motion ---------------------------------------------------
+   Stop, do not shorten. A frozen aurora is still a good-looking hero.
+   -------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora-blob,
+  .aurora-a,
+  .aurora-b,
+  .aurora-c,
+  .aurora-d {
+    animation: none !important;
+  }
+
+  .aurora-pointer {
+    display: none !important;
+  }
+
+  .word-rise > span {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

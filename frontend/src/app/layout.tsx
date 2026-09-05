@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { Footer } from "@/components/layout/footer";
+import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Navbar } from "@/components/layout/navbar";
 import { ReservationGuard } from "@/components/layout/ReservationGuard";
 import { AppProviders } from "@/components/providers/app-providers";
@@ -44,7 +44,7 @@ export default function RootLayout({
           <div className="flex min-h-full flex-col">
             <Navbar />
             <main className="flex-1">{children}</main>
-            <Footer />
+            <SiteFooter />
           </div>
         </AppProviders>
       </body>

@@ -16,7 +16,11 @@ interface AnimatedCounterProps {
 
 const EASE_OUT_CUBIC = (t: number) => 1 - Math.pow(1 - t, 3);
 
-function prefersReducedMotion(): boolean {
+function shouldSkipAnimation(): boolean {
+  // True during SSR too: IntersectionObserver is undefined on the server, so
+  // the real figure lands in the markup rather than a zero placeholder that
+  // only becomes correct once JS runs.
+  if (typeof IntersectionObserver === "undefined") return true;
   return (
     typeof window !== "undefined" &&
     typeof window.matchMedia === "function" &&
@@ -25,12 +29,13 @@ function prefersReducedMotion(): boolean {
 }
 
 /**
- * Counts up to `value` the first time it scrolls into view.
+ * Counts up to `value` when it scrolls into view, and again whenever `value`
+ * itself changes.
  *
- * The final value is rendered immediately — not zero — whenever animating would
- * be wrong or impossible: reduced motion, no IntersectionObserver, or during
- * SSR. That keeps the real figure in the markup rather than a placeholder that
- * only becomes correct once JS runs.
+ * That second case is the whole reason this is not a one-shot: hero figures
+ * come from the API after mount, so a counter that latched on its first render
+ * would animate 0 -> 0 and then display zero forever while the real number sat
+ * in the store.
  */
 export function AnimatedCounter({
   value,
@@ -42,44 +47,80 @@ export function AnimatedCounter({
 }: AnimatedCounterProps) {
   const ref = useRef<HTMLSpanElement | null>(null);
   const frameRef = useRef<number | null>(null);
-  // A ref, not state: flipping state here would re-render, re-run the effect,
+
+  // Refs, not state: flipping state here would re-render, re-run the effect,
   // and its cleanup would cancel the animation frame one tick in.
-  const startedRef = useRef(false);
+  //
+  // Two flags, because they answer different questions. `seenRef` is whether
+  // the element has ever scrolled into view; `animatedToRef` is which value was
+  // last counted to. One combined "started" flag cannot express "on screen, but
+  // the number just changed".
+  const seenRef = useRef(false);
+  const animatedToRef = useRef<number | null>(null);
+
+  // A lazy useState initialiser, not a ref: this has to be readable during
+  // render to decide whether to skip animating, and reading a ref during render
+  // is disallowed. The initialiser runs once per instance, so matchMedia is not
+  // consulted on every paint.
+  const [skipAnimation] = useState(shouldSkipAnimation);
+
   const [display, setDisplay] = useState(value);
+  // Mirrors `display` for the effect only. Written inside effects, never during
+  // render, so it can be read as the starting point of the next animation
+  // without taking `display` as a dependency and restarting on every frame.
+  const displayRef = useRef(value);
+
+  // Adjusting state during render is React's documented way to derive from
+  // props, and unlike an effect it does not schedule a second paint. Reached
+  // only when nothing will be animated, so no refs are touched here.
+  const [lastValue, setLastValue] = useState(value);
+  if (value !== lastValue) {
+    setLastValue(value);
+    if (skipAnimation) setDisplay(value);
+  }
 
   useEffect(() => {
     const node = ref.current;
-    if (!node || startedRef.current) return;
+    if (!node || skipAnimation) return;
+    if (animatedToRef.current === value) return;
 
-    // No setState needed: `display` is already initialised to `value`, so the
-    // final figure is what renders when animating is off or unavailable.
-    if (prefersReducedMotion() || typeof IntersectionObserver === "undefined") {
-      startedRef.current = true;
-      return;
+    const animate = (from: number) => {
+      animatedToRef.current = value;
+      const start = performance.now();
+      const tick = (now: number) => {
+        // Clamp low as well as high: the first rAF callback can carry the
+        // previous frame's timestamp, which predates `start` and would make
+        // progress negative — rendering a negative count.
+        const progress = Math.min(1, Math.max(0, (now - start) / durationMs));
+        const next = from + (value - from) * EASE_OUT_CUBIC(progress);
+        displayRef.current = next;
+        setDisplay(next);
+        if (progress < 1) {
+          frameRef.current = requestAnimationFrame(tick);
+        } else {
+          displayRef.current = value;
+          setDisplay(value);
+        }
+      };
+      frameRef.current = requestAnimationFrame(tick);
+    };
+
+    // Already on screen and the number changed under us — count to the new one
+    // rather than waiting for an intersection that will never come again.
+    if (seenRef.current) {
+      animate(displayRef.current);
+      return () => {
+        if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+      };
     }
 
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (!entry.isIntersecting || startedRef.current) return;
+          if (!entry.isIntersecting) return;
           observer.unobserve(entry.target);
-          startedRef.current = true;
-
-          const start = performance.now();
-          const tick = (now: number) => {
-            // Clamp low as well as high: the first rAF callback can carry the
-            // previous frame's timestamp, which predates `start` and would make
-            // progress negative — rendering a negative count.
-            const progress = Math.min(1, Math.max(0, (now - start) / durationMs));
-            setDisplay(value * EASE_OUT_CUBIC(progress));
-            if (progress < 1) {
-              frameRef.current = requestAnimationFrame(tick);
-            } else {
-              setDisplay(value);
-            }
-          };
-          setDisplay(0);
-          frameRef.current = requestAnimationFrame(tick);
+          seenRef.current = true;
+          animate(0);
         });
       },
       { threshold: 0.4 },
@@ -90,7 +131,7 @@ export function AnimatedCounter({
       observer.disconnect();
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
     };
-  }, [value, durationMs]);
+  }, [value, durationMs, skipAnimation]);
 
   return (
     <span ref={ref} className={className}>

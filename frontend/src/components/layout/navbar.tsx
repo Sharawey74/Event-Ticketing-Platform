@@ -128,7 +128,12 @@ export function Navbar() {
     router.push("/auth/login");
   };
 
-  if (pathname.includes("/confirmation") || pathname.includes("/checkout")) {
+  // /welcome carries its own minimal bar, so the shared one would double up.
+  if (
+    pathname.includes("/confirmation") ||
+    pathname.includes("/checkout") ||
+    pathname.startsWith("/welcome")
+  ) {
     return null;
   }
 
@@ -190,7 +195,9 @@ export function Navbar() {
               priority
               className="h-8 w-8 shrink-0"
             />
-            <span className="text-section-heading font-bold text-primary tracking-tighter transition-all duration-300 group-hover/brand:bg-linear-to-r group-hover/brand:from-primary group-hover/brand:to-secondary group-hover/brand:bg-clip-text group-hover/brand:text-transparent">
+            {/* Steps down on mobile. At 375 the padded row is 327px wide, and
+                the full-size wordmark plus both auth actions overflowed it. */}
+            <span className="text-lg font-bold tracking-tighter text-primary transition-all duration-300 group-hover/brand:bg-linear-to-r group-hover/brand:from-primary group-hover/brand:to-secondary group-hover/brand:bg-clip-text group-hover/brand:text-transparent sm:text-section-heading">
               Eventora
             </span>
           </Link>
@@ -233,7 +240,7 @@ export function Navbar() {
             )}
           </div>
 
-          <div className="flex items-center gap-3 sm:gap-6">
+          <div className="flex items-center gap-2 sm:gap-6">
             {/* Text links collapse below md, where they pushed the cart and
                 account controls off-screen. Both destinations stay reachable:
                 the logo goes to Discover, and the account menu carries
@@ -332,7 +339,7 @@ export function Navbar() {
                 )}
               </div>
             ) : !isAuthPage ? (
-              <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-1 sm:gap-3">
                 {/* Both shown at every width: measured at 375 the whole row is
                     312px, so there is room, and a returning user needs a login
                     affordance in the shell on pages that have no hero.
@@ -345,7 +352,7 @@ export function Navbar() {
                   Log in
                 </Link>
                 <Link
-                  className="btn-glass inline-flex min-h-11 items-center whitespace-nowrap px-5 py-2 font-label-sm text-on-primary outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                  className="btn-glass inline-flex min-h-11 items-center whitespace-nowrap px-4 py-2 font-label-sm text-on-primary outline-none focus-visible:ring-2 focus-visible:ring-primary/50 sm:px-5"
                   href="/auth/register"
                 >
                   Sign up

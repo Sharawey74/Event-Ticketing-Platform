@@ -30,6 +30,16 @@ export function Reveal({ children, delay = 0, className = "", as: Tag = "div" }:
     const node = ref.current;
     if (!node) return;
 
+    // Where CSS scroll-driven animations are supported, globals.css drives
+    // .reveal off a view() timeline and this observer would be dead weight —
+    // two systems animating one element. The stylesheet sets this flag inside
+    // the same @supports block that owns the timeline, so the two can never
+    // disagree about which one is in charge.
+    const cssDriven = getComputedStyle(document.documentElement)
+      .getPropertyValue("--supports-scroll-timeline")
+      .trim();
+    if (cssDriven === "1") return;
+
     if (typeof IntersectionObserver === "undefined") {
       node.classList.add("is-revealed");
       return;

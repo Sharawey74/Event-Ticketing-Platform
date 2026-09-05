@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 
 import { EventCard } from "@/components/events/event-card";
-import { HeroBackdrop } from "@/components/home/HeroBackdrop";
+import { AuroraBackdrop } from "@/components/home/AuroraBackdrop";
 import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
 import { Reveal } from "@/components/ui/Reveal";
 import { fetchCategories, fetchVenues } from "@/lib/catalog";
@@ -32,18 +32,19 @@ const FEATURED_EVENTS_LIMIT = 6;
 
 // Decorative marketing figures, not queries against the database — same as they
 // have always been. Split into number + suffix so they can be counted up.
-const HERO_STATS = [
-  { label: "Events hosted", value: 12400, suffix: "+", decimals: 0 },
-  { label: "Tickets sold", value: 2.1, suffix: "M", decimals: 1 },
-  { label: "On-time check-ins", value: 98, suffix: "%", decimals: 0 },
-] as const;
+const HERO_HEADLINE = "Find events worth leaving the house for.";
+
+/* Hero stats are derived from the API at render time, not authored here.
+   The previous values ("12,400+ events hosted", "2.1M tickets sold",
+   "98% on-time check-ins") were invented: nothing in the system counts
+   lifetime tickets or check-in punctuality, so they could never become true. */
 
 const FEATURE_STRIP = [
   {
     icon: Sparkles,
-    title: "Real-time seat availability",
+    title: "Live availability",
     description:
-      "See exactly what's open, down to the seat, updated the instant someone else books.",
+      "Every tier shows what is actually left, updated the instant someone else books.",
   },
   {
     icon: ShieldCheck,
@@ -55,14 +56,14 @@ const FEATURE_STRIP = [
     icon: QrCode,
     title: "Instant QR tickets",
     description:
-      "Tickets land in your inbox the second you pay — scan and walk in, no printing required.",
+      "Your ticket and its QR code are issued the moment payment confirms — scan and walk in.",
   },
 ] as const;
 
 const ORGANIZER_POINTS = [
-  "Set up your event page in minutes, no design skills needed",
-  "Real-time analytics dashboard tracks every sale as it happens",
-  "Get paid out fast with automatic Stripe payouts",
+  "Publish an event with tiered tickets in minutes",
+  "Track tickets sold against capacity for every event you run",
+  "Check attendees in at the door by scanning their QR code",
 ] as const;
 
 const noFilters: EventFilters = {};
@@ -109,6 +110,31 @@ export default function Home() {
 
   const events = (eventsData?.content ?? []).slice(0, FEATURED_EVENTS_LIMIT);
 
+  // Three counts the API can actually answer, replacing invented figures.
+  // They start at zero and count up as the queries land, so nothing is
+  // asserted before it is known.
+  //
+  // Deliberately not wrapped in useMemo: it is a map and a Set over at most 20
+  // rows, and a manual memo here makes the React Compiler bail out of
+  // optimising this component ("existing memoization could not be preserved").
+  const allEvents = eventsData?.content ?? [];
+  const heroCities = new Set(
+    allEvents
+      // venueId is nullable on EventResponse, so guard before the lookup.
+      .map((event) =>
+        event.venueId == null ? undefined : venueCityById.get(event.venueId),
+      )
+      .filter((city): city is string => Boolean(city)),
+  );
+  const heroStats = [
+    {
+      label: "Events on sale",
+      value: eventsData?.totalElements ?? allEvents.length,
+    },
+    { label: "Cities", value: heroCities.size },
+    { label: "Categories", value: categories.length },
+  ];
+
   function applySearch(): void {
     router.push(
       buildSearchHref({
@@ -124,18 +150,25 @@ export default function Home() {
     <div className="bg-surface">
       {/* ── Hero ── */}
       <section className="relative overflow-hidden bg-zinc-950 text-white">
-        <HeroBackdrop />
+        <AuroraBackdrop />
 
         <div className="relative mx-auto w-full max-w-6xl px-4 py-16 md:px-6 md:py-24">
           <div className="max-w-3xl space-y-4">
             <p className="animate-fade-up text-sm uppercase tracking-[0.2em] text-violet-300 font-semibold">
               Live in your city
             </p>
-            <h1
-              className="animate-fade-up text-4xl font-bold tracking-tight md:text-6xl leading-tight"
-              style={{ animationDelay: "90ms" }}
-            >
-              Find events worth leaving the house for.
+            {/* Word-by-word rise rather than one block fade. Split at render
+                from a constant, so server and client produce identical markup. */}
+            <h1 className="word-rise text-4xl font-bold leading-tight tracking-tight md:text-6xl">
+              {HERO_HEADLINE.split(" ").map((word, index) => (
+                <span
+                  key={`${word}-${index}`}
+                  style={{ "--word-index": index } as React.CSSProperties}
+                >
+                  {word}
+                  {index < HERO_HEADLINE.split(" ").length - 1 ? " " : ""}
+                </span>
+              ))}
             </h1>
             <p
               className="animate-fade-up text-base text-zinc-300 md:text-lg max-w-xl"
@@ -227,12 +260,12 @@ export default function Home() {
             className="animate-fade-up mt-8 flex flex-wrap gap-8 border-t border-white/15 pt-6"
             style={{ animationDelay: "450ms" }}
           >
-            {HERO_STATS.map((stat) => (
+            {heroStats.map((stat) => (
               <div key={stat.label} className="group flex flex-col gap-0.5">
                 <AnimatedCounter
                   value={stat.value}
-                  suffix={stat.suffix}
-                  decimals={stat.decimals}
+                  suffix=""
+                  decimals={0}
                   className="text-2xl font-extrabold text-white transition-colors duration-300 group-hover:text-violet-300"
                 />
                 <span className="text-xs text-white/65">{stat.label}</span>
