@@ -64,20 +64,24 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
       <div className="absolute bottom-0 right-0 w-4 h-4 bg-background rounded-tl-full shadow-[inset_1px_1px_0_rgba(204,195,216,0.3)] hidden sm:block"></div>
       
       <div className="w-full sm:w-48 bg-surface-container p-4 flex flex-col items-center justify-center border-b sm:border-b-0 sm:border-r border-outline-variant/30 border-dashed relative">
+        {/* bg-white is literal on purpose and must not be tokenised: a camera
+            reads this at a venue door, and a themed surface would go dark in
+            dark mode and stop working. Padding is the quiet zone. */}
         {ticket.qrCode ? (
-           <img
-             src={`data:image/png;base64,${ticket.qrCode}`}
-             alt={`QR Code for ticket ${ticket.id}`}
-             className="w-32 h-32 rounded-lg object-contain bg-white p-2"
-           />
-        ) : ticket.code ? (
-           <img
-             src={`https://api.qrserver.com/v1/create-qr-code/?size=128x128&data=${encodeURIComponent(ticket.code)}`}
-             alt={`QR Code for ticket ${ticket.id}`}
-             className="w-32 h-32 rounded-lg object-contain bg-white p-2"
-           />
+          <img
+            src={`data:image/png;base64,${ticket.qrCode}`}
+            alt={`Entry QR code for ticket ${ticket.id}`}
+            className="h-44 w-44 rounded-lg bg-white object-contain p-3"
+          />
         ) : (
-          <div className="w-32 h-32 border border-outline-variant/20 rounded-lg bg-surface-container-high"></div>
+          // No third-party fallback. This previously rendered the code through
+          // api.qrserver.com, which put the ticket's entry credential in a
+          // query string to an external host.
+          <div className="flex h-44 w-44 items-center justify-center rounded-lg border border-dashed border-outline-variant bg-surface-container-high p-3 text-center">
+            <span className="font-caption text-[11px] leading-tight text-on-surface-variant">
+              QR code not available yet
+            </span>
+          </div>
         )}
         <p className="font-caption text-caption text-on-surface-variant text-center mt-2">Scan at entry</p>
       </div>

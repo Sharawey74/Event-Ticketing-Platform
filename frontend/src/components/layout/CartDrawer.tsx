@@ -6,6 +6,7 @@ import { X, ShoppingCart, Timer, ArrowRight } from "lucide-react";
 import { useReservationStore } from "@/store/reservationStore";
 import { useAuthStore } from "@/store/authStore";
 import { api } from "@/lib/api";
+import { PriceBreakdown } from "@/components/events/PriceBreakdown";
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -139,29 +140,13 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                 </div>
               )}
 
-              <div className="bg-surface-container-low rounded-xl p-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-on-surface-variant">
-                    {store.tierName} × {store.quantity}
-                  </span>
-                  <span className="text-on-surface">EGP {store.totalAmount.toFixed(2)}</span>
-                </div>
-                {store.unitPrice * store.quantity > store.totalAmount && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-on-surface-variant line-through">
-                      EGP {(store.unitPrice * store.quantity).toFixed(2)}
-                    </span>
-                    <span className="text-primary">
-                      You saved EGP {(store.unitPrice * store.quantity - store.totalAmount).toFixed(2)}
-                    </span>
-                  </div>
-                )}
-                <div className="h-px bg-outline-variant" />
-                <div className="flex justify-between font-semibold">
-                  <span className="text-on-surface">Total</span>
-                  <span className="text-primary text-lg">EGP {store.totalAmount.toFixed(2)}</span>
-                </div>
-              </div>
+              <PriceBreakdown
+                tierName={store.tierName ?? "Ticket"}
+                quantity={store.quantity}
+                unitPrice={store.unitPrice}
+                totalAmount={store.totalAmount}
+                className="rounded-xl bg-surface-container-low p-4"
+              />
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full gap-4 text-center py-16">
