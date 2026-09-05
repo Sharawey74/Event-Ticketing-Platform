@@ -2,10 +2,19 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { Timer } from "lucide-react";
+
 import { TicketTierResponse } from "@/types/event";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import { useReservationStore } from "@/store/reservationStore";
+import { PriceBreakdown } from "./PriceBreakdown";
+
+/** Mirrors BusinessConstants.MAX_TICKETS_PER_BOOKING on the server. */
+const MAX_TICKETS_PER_BOOKING = 10;
+
+/** Below this many seconds left, the hold countdown switches to a warning. */
+const HOLD_WARNING_SECONDS = 60;
 
 interface TicketTierSelectorProps {
   eventId: number;
@@ -48,12 +57,32 @@ export function TicketTierSelector({ eventId, eventTitle, tiers }: TicketTierSel
     return () => clearInterval(interval);
   }, [store.expiresAt, hasActiveReservation]);
 
+  // The lower of three real limits, not a hardcoded 10: the platform cap
+  // (BusinessConstants.MAX_TICKETS_PER_BOOKING), the tier's own maxPerBooking,
+  // and what is actually left. Offering more than any of these produces a
+  // server rejection the user could not have predicted.
+  const maxQuantity = selectedTier
+    ? Math.max(
+        1,
+        Math.min(
+          MAX_TICKETS_PER_BOOKING,
+          selectedTier.maxPerBooking ?? MAX_TICKETS_PER_BOOKING,
+          selectedTier.availableCount,
+        ),
+      )
+    : 1;
+
+  // Derived rather than an effect: switching to a smaller tier must pull an
+  // over-large quantity down, and doing that with setState in an effect is a
+  // cascading render the lint rules rightly reject.
+  const effectiveQuantity = Math.min(quantity, maxQuantity);
+
   const handleDecrease = () => {
-    if (quantity > 1) setQuantity(quantity - 1);
+    if (effectiveQuantity > 1) setQuantity(effectiveQuantity - 1);
   };
 
   const handleIncrease = () => {
-    if (quantity < 10) setQuantity(quantity + 1);
+    if (effectiveQuantity < maxQuantity) setQuantity(effectiveQuantity + 1);
   };
 
   const handleReserve = async () => {
@@ -89,7 +118,7 @@ export function TicketTierSelector({ eventId, eventTitle, tiers }: TicketTierSel
       const idempotencyKey = crypto.randomUUID();
       const res = await api.post(
         "/api/v1/bookings",
-        { eventId, tierId: selectedTierId, quantity },
+        { eventId, tierId: selectedTierId, quantity: effectiveQuantity },
         { headers: { "Idempotency-Key": idempotencyKey } }
       );
 
@@ -101,7 +130,7 @@ export function TicketTierSelector({ eventId, eventTitle, tiers }: TicketTierSel
           pathname ?? "/",
           eventTitle,
           selectedTier?.tierName ?? "",
-          quantity,
+          effectiveQuantity,
           selectedTier?.basePrice ?? 0,
           Number(booking.totalAmount ?? 0),
           eventId,
@@ -163,6 +192,7 @@ export function TicketTierSelector({ eventId, eventTitle, tiers }: TicketTierSel
   if (hasActiveReservation) {
     const minutes = Math.floor(timeLeft / 60);
     const seconds = timeLeft % 60;
+    const isHoldEnding = timeLeft > 0 && timeLeft <= HOLD_WARNING_SECONDS;
 
     return (
       <div className="sticky top-28 bg-surface-container-lowest rounded-xl shadow-xl p-6 border border-outline-variant/30 flex flex-col gap-stack-md">
@@ -174,35 +204,45 @@ export function TicketTierSelector({ eventId, eventTitle, tiers }: TicketTierSel
           </div>
         )}
 
-        <div className="bg-surface-container-low rounded-xl p-4 border border-outline-variant/30 mb-4 space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-on-surface-variant">{store.tierName} × {store.quantity}</span>
-            <span className="text-on-surface">EGP {store.totalAmount.toFixed(2)}</span>
-          </div>
-          {store.unitPrice * store.quantity > store.totalAmount && (
-            <div className="flex justify-between text-sm">
-              <span className="text-on-surface-variant line-through">
-                EGP {(store.unitPrice * store.quantity).toFixed(2)}
-              </span>
-              <span className="text-primary">
-                You saved EGP {(store.unitPrice * store.quantity - store.totalAmount).toFixed(2)}
-              </span>
-            </div>
-          )}
-          <div className="h-px bg-outline-variant" />
-          <div className="flex justify-between font-semibold">
-            <span className="text-on-surface">Total</span>
-            <span className="text-primary text-lg">EGP {store.totalAmount.toFixed(2)}</span>
-          </div>
-        </div>
+        <PriceBreakdown
+          tierName={store.tierName ?? "Ticket"}
+          quantity={store.quantity}
+          unitPrice={store.unitPrice}
+          totalAmount={store.totalAmount}
+          className="mb-4 rounded-xl border border-outline-variant/30 bg-surface-container-low p-4"
+        />
 
         {timeLeft > 0 ? (
-          <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 mb-4 flex items-center gap-3">
-            <span className="material-symbols-outlined text-primary">timer</span>
+          <div
+            className={`mb-4 flex items-center gap-3 rounded-xl border p-4 ${
+              isHoldEnding
+                ? "border-warning/30 bg-warning-container"
+                : "border-primary/20 bg-primary/10"
+            }`}
+          >
+            <Timer
+              className={`h-5 w-5 shrink-0 ${
+                isHoldEnding ? "text-on-warning-container" : "text-primary"
+              }`}
+              aria-hidden="true"
+            />
             <div>
-              <p className="font-label-sm text-label-sm text-primary">Reservation Held</p>
-              <p className="font-caption text-caption text-on-surface-variant">
-                Completing order in {minutes}:{seconds.toString().padStart(2, "0")}
+              <p
+                className={`font-label-sm text-label-sm ${
+                  isHoldEnding ? "text-on-warning-container" : "text-primary"
+                }`}
+              >
+                {isHoldEnding ? "Hold expiring" : "Reservation held"}
+              </p>
+              {/* The remaining time is always text, never only a colour or a
+                  ring — it has to be readable under reduced motion too. */}
+              <p
+                className={`font-caption text-caption ${
+                  isHoldEnding ? "text-on-warning-container" : "text-on-surface-variant"
+                }`}
+                aria-live={isHoldEnding ? "polite" : "off"}
+              >
+                {minutes}:{seconds.toString().padStart(2, "0")} left to complete checkout
               </p>
             </div>
           </div>
@@ -275,18 +315,18 @@ export function TicketTierSelector({ eventId, eventTitle, tiers }: TicketTierSel
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); handleDecrease(); }}
-                      disabled={quantity <= 1}
+                      disabled={effectiveQuantity <= 1}
                       className="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors disabled:opacity-50"
                     >
                       <span className="material-symbols-outlined text-[20px]">remove</span>
                     </button>
                     <span className="font-label-sm text-label-sm text-on-surface w-4 text-center">
-                      {quantity}
+                      {effectiveQuantity}
                     </span>
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); handleIncrease(); }}
-                      disabled={quantity >= 10}
+                      disabled={effectiveQuantity >= maxQuantity}
                       className="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors disabled:opacity-50"
                     >
                       <span className="material-symbols-outlined text-[20px]">add</span>
@@ -302,13 +342,13 @@ export function TicketTierSelector({ eventId, eventTitle, tiers }: TicketTierSel
       <div className="pt-4 border-t border-outline-variant/30">
         <div className="space-y-1.5 mb-4">
           <div className="flex justify-between text-sm">
-            <span className="text-on-surface-variant">Ticket × {quantity}</span>
-            <span className="text-on-surface">EGP {(displayPrice * quantity).toFixed(2)}</span>
+            <span className="text-on-surface-variant">Ticket × {effectiveQuantity}</span>
+            <span className="text-on-surface">EGP {(displayPrice * effectiveQuantity).toFixed(2)}</span>
           </div>
           <div className="h-px bg-outline-variant my-1" />
           <div className="flex justify-between font-semibold">
             <span className="text-on-surface">Estimated Total</span>
-            <span className="text-primary font-section-heading">EGP {(displayPrice * quantity).toFixed(2)}</span>
+            <span className="text-primary font-section-heading">EGP {(displayPrice * effectiveQuantity).toFixed(2)}</span>
           </div>
         </div>
 
