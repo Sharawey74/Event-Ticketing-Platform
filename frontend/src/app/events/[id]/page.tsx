@@ -45,7 +45,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
   }
 
   return (
-    <main className="pb-section-gap">
+    <div className="pb-section-gap">
       {/* Cover Image */}
       <div className="w-full h-[409px] md:h-[512px] relative overflow-hidden bg-surface-container-high">
         {event.coverImageUrl ? (
@@ -166,6 +166,6 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
           </div>
         </div>
       </div>
-    </main>
+    </div>
   );
 }
