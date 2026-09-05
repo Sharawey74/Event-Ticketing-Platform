@@ -1,216 +1,120 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import {
-  buildSalesSeries,
-  chartTheme,
+  buildEventRevenueSeries,
   formatCompact,
-  type SalesPoint,
+  type EventBar,
 } from "@/lib/chart-theme";
 
-const VIEW_W = 800;
-const VIEW_H = 300;
-const PAD_L = 56;
-const PAD_R = 16;
-const PAD_T = 20;
-const PAD_B = 34;
-
 interface SalesChartProps {
-  events: { date: string; grossRevenue: number }[];
+  events: { title: string; grossRevenue: number; sold: number; capacity: number }[];
 }
 
+const egp = (value: number) => `EGP ${Math.round(value).toLocaleString("en-EG")}`;
+
 /**
- * Sales-over-time area chart.
+ * Revenue by event.
  *
- * Hand-rolled SVG rather than a charting dependency: this is one chart, and the
- * library would cost more bundle than the ~120 lines it replaces. The line
- * draws itself on mount and the nearest point tracks the pointer.
+ * Horizontal bars, not a line over time. The organizer endpoint returns a
+ * total per event and no dated transactions, so there is no time dimension to
+ * draw — see buildEventRevenueSeries for what this replaced and why.
+ *
+ * Horizontal because the labels are event titles: "El Gouna Tech & Innovation
+ * Summit 2026" does not fit under a vertical bar at any readable size.
+ *
+ * Hand-rolled rather than a charting dependency: this is one chart, and a
+ * library would cost more bundle than the markup it replaces.
  */
 export function SalesChart({ events }: SalesChartProps) {
-  const [hover, setHover] = useState<{ point: SalesPoint; x: number; y: number } | null>(null);
+  const [hovered, setHovered] = useState<string | null>(null);
+  const { bars, max, total } = buildEventRevenueSeries(events);
 
-  const { points, max } = useMemo(() => buildSalesSeries(events), [events]);
+  const hasRevenue = total > 0;
 
-  const plotW = VIEW_W - PAD_L - PAD_R;
-  const plotH = VIEW_H - PAD_T - PAD_B;
-
-  const coords = useMemo(
-    () =>
-      points.map((point, i) => ({
-        point,
-        x: PAD_L + (i / Math.max(1, points.length - 1)) * plotW,
-        y: PAD_T + plotH - (point.value / max) * plotH,
-      })),
-    [points, max, plotW, plotH],
-  );
-
-  // Catmull-Rom style smoothing — a straight polyline reads as jagged at this
-  // density, and a cubic through every point is smoother than midpoint curves.
-  const linePath = useMemo(() => {
-    if (coords.length < 2) return "";
-    let d = `M ${coords[0].x} ${coords[0].y}`;
-    for (let i = 0; i < coords.length - 1; i += 1) {
-      const curr = coords[i];
-      const next = coords[i + 1];
-      const cx = (curr.x + next.x) / 2;
-      d += ` C ${cx} ${curr.y}, ${cx} ${next.y}, ${next.x} ${next.y}`;
-    }
-    return d;
-  }, [coords]);
-
-  const areaPath = useMemo(() => {
-    if (!linePath) return "";
-    const last = coords[coords.length - 1];
-    const first = coords[0];
-    return `${linePath} L ${last.x} ${PAD_T + plotH} L ${first.x} ${PAD_T + plotH} Z`;
-  }, [linePath, coords, plotH]);
-
-  const gridValues = [max, max * 0.75, max * 0.5, max * 0.25, 0];
-
-  // A flat line pinned to zero reads as a broken chart rather than as "nothing
-  // has sold yet", so say so instead of drawing it.
-  const hasRevenue = points.some((p) => p.value > 0);
-
-  if (!hasRevenue) {
+  if (bars.length === 0 || !hasRevenue) {
     return (
-      <div className="mt-4 flex h-[300px] w-full flex-col items-center justify-center rounded-lg border border-dashed border-outline-variant/60 text-center">
-        <span className="material-symbols-outlined mb-3 text-[40px] text-surface-container-highest">
-          show_chart
-        </span>
-        <p className="font-body-lg font-bold text-on-surface">No sales yet</p>
-        <p className="font-body mt-1 max-w-xs text-on-surface-variant">
-          Once tickets start selling, revenue for the last 30 days appears here.
+      <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-outline-variant bg-surface-container-low px-6 py-14 text-center">
+        <p className="font-label-sm text-on-surface">No sales yet</p>
+        <p className="max-w-sm font-caption text-on-surface-variant">
+          {bars.length === 0
+            ? "Publish an event and its revenue will appear here."
+            : "Revenue appears here as tickets sell. Nothing has sold yet, so there is no chart to draw."}
         </p>
       </div>
     );
   }
 
-  function handleMove(e: React.MouseEvent<SVGSVGElement>) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = VIEW_W / rect.width;
-    const localX = (e.clientX - rect.left) * ratio;
-    let nearest = coords[0];
-    for (const c of coords) {
-      if (Math.abs(c.x - localX) < Math.abs(nearest.x - localX)) nearest = c;
-    }
-    setHover(nearest ? { point: nearest.point, x: nearest.x, y: nearest.y } : null);
-  }
-
   return (
-    <div className="relative mt-4 h-[300px] w-full">
-      <svg
-        viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
-        className="h-full w-full"
-        onMouseMove={handleMove}
-        onMouseLeave={() => setHover(null)}
-        role="img"
-        aria-label={`Sales over the last ${points.length} days, peaking at EGP ${formatCompact(max)}`}
-      >
-        <defs>
-          <linearGradient id="salesArea" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={chartTheme.line} stopOpacity="0.28" />
-            <stop offset="100%" stopColor={chartTheme.line} stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="salesLine" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor={chartTheme.line} />
-            <stop offset="100%" stopColor={chartTheme.lineAlt} />
-          </linearGradient>
-        </defs>
-
-        {gridValues.map((value, i) => {
-          const y = PAD_T + plotH - (value / max) * plotH;
+    <div>
+      <ul className="flex flex-col gap-3" role="list">
+        {bars.map((bar: EventBar) => {
+          const pct = max > 0 ? (bar.value / max) * 100 : 0;
+          const isHovered = hovered === bar.label;
           return (
-            <g key={value}>
-              <line
-                x1={PAD_L}
-                y1={y}
-                x2={VIEW_W - PAD_R}
-                y2={y}
-                stroke={chartTheme.grid}
-                strokeWidth="1"
-                strokeDasharray={i === gridValues.length - 1 ? undefined : "4,4"}
-              />
-              <text
-                x={PAD_L - 10}
-                y={y + 4}
-                fontSize="11"
-                fill={chartTheme.axisText}
-                textAnchor="end"
-              >
-                EGP {formatCompact(value)}
-              </text>
-            </g>
+            <li
+              key={bar.label}
+              className="group/bar"
+              onMouseEnter={() => setHovered(bar.label)}
+              onMouseLeave={() => setHovered(null)}
+            >
+              <div className="mb-1 flex items-baseline justify-between gap-4">
+                <span className="truncate font-label-sm text-on-surface" title={bar.label}>
+                  {bar.label}
+                </span>
+                <span className="shrink-0 font-caption tabular-nums text-on-surface-variant">
+                  {bar.sold.toLocaleString()} / {bar.capacity.toLocaleString()} ·{" "}
+                  <span className="font-semibold text-on-surface">{egp(bar.value)}</span>
+                </span>
+              </div>
+              <div className="h-3 w-full overflow-hidden rounded-full bg-surface-container-high">
+                <div
+                  className="h-full rounded-full bg-primary transition-[width,opacity] duration-500 ease-out"
+                  style={{ width: `${pct}%`, opacity: isHovered ? 1 : 0.88 }}
+                />
+              </div>
+            </li>
           );
         })}
+      </ul>
 
-        {[0, Math.floor(coords.length / 3), Math.floor((coords.length * 2) / 3), coords.length - 1]
-          .filter((i, idx, arr) => coords[i] && arr.indexOf(i) === idx)
-          .map((i) => (
-            <text
-              key={i}
-              x={coords[i].x}
-              y={VIEW_H - 10}
-              fontSize="11"
-              fill={chartTheme.axisText}
-              textAnchor="middle"
-            >
-              {coords[i].point.label}
-            </text>
-          ))}
+      <p className="mt-4 font-caption text-outline-text">
+        {/* States the total and the span, and claims no trend — there is no
+            dated data behind this, so there is nothing to say about direction. */}
+        {bars.length} {bars.length === 1 ? "event" : "events"} · {egp(total)} gross
+        {events.length > bars.length ? ` · showing the top ${bars.length}` : ""}
+      </p>
 
-        <path d={areaPath} fill="url(#salesArea)" className="animate-fade-in" />
-        <path
-          d={linePath}
-          fill="none"
-          stroke="url(#salesLine)"
-          strokeWidth="3.5"
-          strokeLinecap="round"
-          pathLength={1}
-          className="animate-draw"
-        />
-
-        {hover && (
-          <g className="pointer-events-none">
-            <line
-              x1={hover.x}
-              y1={PAD_T}
-              x2={hover.x}
-              y2={PAD_T + plotH}
-              stroke={chartTheme.line}
-              strokeWidth="1"
-              strokeDasharray="3,3"
-              opacity="0.5"
-            />
-            <circle
-              cx={hover.x}
-              cy={hover.y}
-              r="7"
-              fill={chartTheme.dot}
-              stroke={chartTheme.line}
-              strokeWidth="3.5"
-            />
-          </g>
-        )}
-      </svg>
-
-      {hover && (
-        <div
-          className="animate-scale-in pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[140%] rounded-lg bg-inverse-surface px-3 py-1.5 shadow-lg"
-          style={{ left: `${(hover.x / VIEW_W) * 100}%`, top: `${(hover.y / VIEW_H) * 100}%` }}
-        >
-          <p className="font-caption whitespace-nowrap text-inverse-on-surface">
-            {hover.point.label}
-          </p>
-          <p className="font-label-sm whitespace-nowrap text-inverse-on-surface">
-            EGP{" "}
-            {hover.point.value.toLocaleString(undefined, {
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 0,
-            })}
-          </p>
+      {/* Table fallback. A bar chart alone is not readable by assistive tech,
+          and the exact figures matter more here than the shape. */}
+      <details className="mt-3">
+        <summary className="cursor-pointer font-caption text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
+          View as table
+        </summary>
+        <div className="mt-2 overflow-x-auto">
+          <table className="w-full text-left font-caption">
+            <thead>
+              <tr className="border-b border-outline-variant text-on-surface-variant">
+                <th scope="col" className="py-2 pr-4 font-medium">Event</th>
+                <th scope="col" className="py-2 pr-4 font-medium">Sold</th>
+                <th scope="col" className="py-2 font-medium">Gross</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bars.map((bar) => (
+                <tr key={bar.label} className="border-b border-outline-variant/50">
+                  <td className="py-2 pr-4 text-on-surface">{bar.label}</td>
+                  <td className="py-2 pr-4 tabular-nums text-on-surface-variant">
+                    {bar.sold.toLocaleString()} / {bar.capacity.toLocaleString()}
+                  </td>
+                  <td className="py-2 tabular-nums text-on-surface">{formatCompact(bar.value)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
+      </details>
     </div>
   );
 }
