@@ -230,14 +230,30 @@ export default function ConfirmationPage() {
                     <div className="absolute top-0 right-0 w-4 h-4 bg-background rounded-bl-full shadow-[inset_1px_-1px_0_rgba(204,195,216,0.3)]"></div>
                     <div className="absolute bottom-0 right-0 w-4 h-4 bg-background rounded-tl-full shadow-[inset_1px_1px_0_rgba(204,195,216,0.3)]"></div>
 
-                    <div className={`w-32 h-32 bg-white rounded-lg p-2 mb-2 ${!qrsLoaded ? "shimmer" : ""}`}>
+                    {/* bg-white is literal on purpose and must not be tokenised:
+                        this is scanned by a camera at a venue door. A themed
+                        surface would go dark in dark mode and stop working.
+                        Sized up from 128px, with padding as the quiet zone. */}
+                    <div className={`mb-2 h-44 w-44 rounded-lg bg-white p-3 ${!qrsLoaded ? "shimmer" : ""}`}>
                       {qrsLoaded && ticket.qrCode ? (
-                        // Medium-17 fix: QR code rendered as <img>
-                        <img src={`data:image/png;base64,${ticket.qrCode}`} alt="QR Code" className="w-full h-full object-contain" />
-                      ) : qrsLoaded && ticket.code ? (
-                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=128x128&data=${encodeURIComponent(ticket.code)}`} alt="QR Code" className="w-full h-full object-contain" />
+                        <img
+                          src={`data:image/png;base64,${ticket.qrCode}`}
+                          alt={`Entry QR code for ticket ${ticket.code ?? index + 1}`}
+                          className="h-full w-full object-contain"
+                        />
+                      ) : qrsLoaded ? (
+                        // No third-party fallback. This previously rendered the
+                        // code through api.qrserver.com, which put the ticket's
+                        // entry credential in a query string to an external
+                        // host. The backend already generates the QR; if it is
+                        // missing, say so rather than leaking it.
+                        <div className="flex h-full w-full items-center justify-center rounded border border-dashed border-outline-variant p-2 text-center">
+                          <span className="font-caption text-[11px] leading-tight text-on-surface-variant">
+                            QR code not available yet
+                          </span>
+                        </div>
                       ) : (
-                        <div className="w-full h-full border border-outline-variant/20 rounded"></div>
+                        <div className="h-full w-full rounded border border-outline-variant/20" />
                       )}
                     </div>
                     <p className="font-caption text-caption text-on-surface-variant text-center">Scan at entry</p>
