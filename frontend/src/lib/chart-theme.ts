@@ -18,19 +18,24 @@ export const chartTheme = {
   axisText: "#7b7487",
 } as const;
 
-export interface SalesPoint {
-  /** Bucket label rendered on the X axis, e.g. "Oct 12". */
+export interface EventBar {
+  /** Event title, rendered as the bar's label. */
   label: string;
+  /** Real gross revenue for that event, straight from the API. */
   value: number;
+  /** Tickets sold, shown alongside the money. */
+  sold: number;
+  capacity: number;
 }
 
-export interface SalesSeries {
-  points: SalesPoint[];
+export interface EventSeries {
+  bars: EventBar[];
   /** Rounded-up axis maximum, so gridlines land on readable numbers. */
   max: number;
+  total: number;
 }
 
-/** Rounds up to 1/2/5 × 10ⁿ so the Y axis reads 10k rather than 9,847. */
+/** Rounds up to 1/2/5 x 10^n so the axis reads 10k rather than 9,847. */
 function niceCeiling(value: number): number {
   if (value <= 0) return 100;
   const magnitude = Math.pow(10, Math.floor(Math.log10(value)));
@@ -39,7 +44,7 @@ function niceCeiling(value: number): number {
   return step * magnitude;
 }
 
-/** Compact axis/tooltip formatting: 8250 → "8.3k". */
+/** Compact axis/tooltip formatting: 8250 -> "8.3k". */
 export function formatCompact(value: number): string {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}k`;
@@ -47,42 +52,39 @@ export function formatCompact(value: number): string {
 }
 
 /**
- * Distributes each event's gross revenue across the days leading up to it to
- * produce a plausible sales-over-time curve from the data the organizer
- * endpoint actually returns.
+ * One bar per event, from the figures the organizer endpoint actually returns.
  *
- * ⚠️ This is a *derived* view, not a real per-day ledger — the API exposes only
- * a total per event, not dated transactions. It replaces a chart whose
- * coordinates were hardcoded, so it is strictly more truthful than what it
- * supersedes, but a genuine daily series needs a new backend endpoint.
+ * This replaces a synthetic daily series. That version took each event's total
+ * gross revenue and spread it across thirty invented buckets with a weighting
+ * curve ("sales accelerate as the event approaches"), then rendered it as
+ * "Sales over the last 30 days" with per-day hover values. The total was real;
+ * every point on the curve was not, and an organizer reading revenue for a
+ * given day off that chart would have been reading a number nobody earned.
+ *
+ * The API returns id, title, date, status, sold, capacity and grossRevenue per
+ * event — and `date` is when the event happens, not when a ticket sold. There
+ * is no time dimension to plot, so this does not plot one. A real daily series
+ * needs a backend endpoint that does not exist yet.
+ *
+ * Sorted by revenue so the ranking is the message, and capped so a long roster
+ * stays readable.
  */
-export function buildSalesSeries(
-  events: { date: string; grossRevenue: number }[],
-  days = 30,
-): SalesSeries {
-  const today = new Date();
-  const buckets: SalesPoint[] = [];
+export function buildEventRevenueSeries(
+  events: { title: string; grossRevenue: number; sold: number; capacity: number }[],
+  limit = 8,
+): EventSeries {
+  const bars = events
+    .map((event) => ({
+      label: event.title,
+      value: event.grossRevenue || 0,
+      sold: event.sold || 0,
+      capacity: event.capacity || 0,
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, limit);
 
-  for (let offset = days - 1; offset >= 0; offset -= 1) {
-    const day = new Date(today);
-    day.setDate(today.getDate() - offset);
-    buckets.push({
-      label: day.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
-      value: 0,
-    });
-  }
+  const peak = bars.reduce((max, bar) => Math.max(max, bar.value), 0);
+  const total = events.reduce((sum, event) => sum + (event.grossRevenue || 0), 0);
 
-  const totalRevenue = events.reduce((sum, e) => sum + (e.grossRevenue || 0), 0);
-
-  if (totalRevenue > 0) {
-    // Weight later days more heavily — sales accelerate as an event approaches.
-    const weights = buckets.map((_, i) => 0.4 + (i / Math.max(1, buckets.length - 1)) * 1.2);
-    const weightSum = weights.reduce((a, b) => a + b, 0);
-    buckets.forEach((bucket, i) => {
-      bucket.value = (totalRevenue * weights[i]) / weightSum;
-    });
-  }
-
-  const peak = buckets.reduce((max, b) => Math.max(max, b.value), 0);
-  return { points: buckets, max: niceCeiling(peak) || 100 };
+  return { bars, max: niceCeiling(peak) || 100, total };
 }
