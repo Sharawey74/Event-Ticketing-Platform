@@ -106,20 +106,20 @@ export default function ConfirmationPage() {
 
   if (isLoading) {
     return (
-      <main className="flex-grow flex items-center justify-center p-8">
+      <div className="flex-grow flex items-center justify-center p-8">
         <p className="text-on-surface-variant font-body">Loading booking details...</p>
-      </main>
+      </div>
     );
   }
 
   if (error || !booking) {
     return (
-      <main className="flex-grow flex items-center justify-center p-8">
+      <div className="flex-grow flex items-center justify-center p-8">
         <div className="bg-error-container text-on-error-container p-6 rounded-xl max-w-md w-full shadow-md text-center">
           <h2 className="font-section-heading mb-2">Error</h2>
           <p className="font-body text-body">{error || "Booking not found."}</p>
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -127,7 +127,7 @@ export default function ConfirmationPage() {
   const isFailed = booking.state === "PAYMENT_FAILED" || booking.state === "CANCELLED" || booking.state === "EXPIRED";
 
   return (
-    <main className="flex-grow flex flex-col items-center justify-center pt-16 pb-section-gap px-edge-padding w-full min-h-screen">
+    <div className="flex-grow flex flex-col items-center justify-center pt-16 pb-section-gap px-edge-padding w-full min-h-screen">
       <div className="max-w-container-max w-full mx-auto max-w-3xl">
         {/* Status Header Area */}
         <div className="text-center mb-stack-lg">
@@ -306,6 +306,6 @@ export default function ConfirmationPage() {
           </Link>
         </div>
       </div>
-    </main>
+    </div>
   );
 }
