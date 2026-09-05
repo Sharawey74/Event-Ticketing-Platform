@@ -128,7 +128,12 @@ export function Navbar() {
     router.push("/auth/login");
   };
 
-  if (pathname.includes("/confirmation") || pathname.includes("/checkout")) {
+  // /welcome carries its own minimal bar, so the shared one would double up.
+  if (
+    pathname.includes("/confirmation") ||
+    pathname.includes("/checkout") ||
+    pathname.startsWith("/welcome")
+  ) {
     return null;
   }
 
