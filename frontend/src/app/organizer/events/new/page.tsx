@@ -160,7 +160,7 @@ export default function CreateEventPage() {
   const selectedVenue = venues.find((v) => String(v.id) === form.venueId);
 
   return (
-    <main className="grow pt-[104px] pb-section-gap px-edge-padding max-w-[800px] mx-auto w-full min-h-screen">
+    <div className="grow pt-[104px] pb-section-gap px-edge-padding max-w-[800px] mx-auto w-full min-h-screen">
       <div className="max-w-3xl mx-auto">
 
         <nav className="mb-6">
@@ -588,6 +588,6 @@ export default function CreateEventPage() {
           </>)}
         </div>
       </div>
-    </main>
+    </div>
   );
 }
