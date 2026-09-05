@@ -1,59 +1,252 @@
 @import "tailwindcss";
 
+/* ===========================================================================
+   THREE-LAYER TOKEN SYSTEM
+   ---------------------------------------------------------------------------
+   L1 PRIMITIVE  raw values, no meaning        --violet-600: #630ed4
+   L2 SEMANTIC   purpose; the theme swaps here --sem-primary: var(--violet-600)
+   L3 COMPONENT  retune one control            --btn-bg: var(--sem-primary)
+
+   Tailwind's `--color-*` namespace maps onto L2 at the bottom of this block, so
+   every existing utility name (bg-primary, text-on-surface, …) keeps working and
+   no component markup changes.
+
+   The semantic layer is prefixed `--sem-` rather than `--color-` because
+   `@theme` owns the `--color-*` namespace; reusing it here would make the
+   mapping self-referential (--color-primary: var(--color-primary)).
+
+   `@theme inline` is load-bearing. With `inline` a utility compiles to
+   `var(--sem-primary)` rather than a frozen value, which is what will let
+   [data-theme="dark"] reassign L2 at runtime in Phase 7 without regenerating a
+   single utility.
+   =========================================================================== */
+
+/* ---------- L1 · PRIMITIVES ------------------------------------------------ */
+:root {
+  /* violet — brand */
+  --violet-700: #4f13a3;
+  --violet-600: #630ed4;
+  --violet-550: #732ee4;
+  --violet-500: #7c3aed;
+  --violet-200: #d2bbff;
+  --violet-100: #ede0ff;
+  --violet-050: #f6f0ff;
+
+  /* indigo — secondary */
+  --indigo-600: #4b41e1;
+  --indigo-500: #645efb;
+  --indigo-100: #dee5ff;
+  --indigo-050: #fffbff;
+
+  /* ink — foreground greys */
+  --ink-900: #191c1e;
+  --ink-800: #2d3133;
+  --ink-700: #474e64;
+  --ink-650: #5e667d;
+  --ink-600: #4a4455;
+  --ink-500: #625b6e;
+  --ink-400: #7b7487;
+  --ink-300: #ccc3d8;
+
+  /* paper — light surfaces */
+  --paper-000: #ffffff;
+  --paper-050: #f7f9fb;
+  --paper-100: #f2f4f6;
+  --paper-200: #eceef0;
+  --paper-300: #e6e8ea;
+  --paper-400: #e0e3e5;
+  --paper-500: #d8dadc;
+  --paper-inverse: #eff1f3;
+
+  /* status */
+  --red-600: #ba1a1a;
+  --red-700: #93000a;
+  --red-100: #ffdad6;
+  --green-700: #137333;
+  --green-800: #0b5222;
+  --green-100: #e6f4ea;
+  --amber-800: #7a4b00;
+  --amber-100: #ffe6c4;
+
+  /* night / mist — dark-theme ramps. Declared now so Phase 7 is a pure L2
+     remap; nothing references them yet. */
+  --night-000: #0e0b12;
+  --night-050: #131016;
+  --night-100: #191520;
+  --night-200: #1f1a28;
+  --night-300: #262032;
+  --night-400: #2e2739;
+  --night-500: #3a3247;
+  --mist-100: #eae5f1;
+  --mist-200: #cdc4da;
+  --mist-300: #b2a9c2;
+  --mist-400: #8f86a0;
+}
+
+/* ---------- L2 · SEMANTIC -------------------------------------------------- */
+:root {
+  --sem-surface: var(--paper-050);
+  --sem-surface-dim: var(--paper-500);
+  --sem-surface-bright: var(--paper-050);
+  --sem-surface-container-lowest: var(--paper-000);
+  --sem-surface-container-low: var(--paper-100);
+  --sem-surface-container: var(--paper-200);
+  --sem-surface-container-high: var(--paper-300);
+  --sem-surface-container-highest: var(--paper-400);
+
+  --sem-on-surface: var(--ink-900);
+  --sem-on-surface-variant: var(--ink-600);
+
+  --sem-inverse-surface: var(--ink-800);
+  --sem-inverse-on-surface: var(--paper-inverse);
+
+  --sem-outline: var(--ink-400);
+  --sem-outline-variant: var(--ink-300);
+  /* Text-safe outline. --sem-outline is 4.24:1 on surface — below AA for body
+     copy — so it stays borders-only. Use this for outline-coloured TEXT. */
+  --sem-outline-text: var(--ink-500);
+
+  --sem-surface-tint: var(--violet-550);
+  --sem-primary: var(--violet-600);
+  --sem-on-primary: var(--paper-000);
+  --sem-primary-container: var(--violet-500);
+  --sem-on-primary-container: var(--violet-100);
+  --sem-inverse-primary: var(--violet-200);
+  --sem-primary-soft: var(--violet-050);
+  --sem-on-primary-soft: var(--violet-700);
+
+  --sem-secondary: var(--indigo-600);
+  --sem-on-secondary: var(--paper-000);
+  --sem-secondary-container: var(--indigo-500);
+  --sem-on-secondary-container: var(--indigo-050);
+
+  --sem-tertiary: var(--ink-700);
+  --sem-on-tertiary: var(--paper-000);
+  --sem-tertiary-container: var(--ink-650);
+  --sem-on-tertiary-container: var(--indigo-100);
+
+  --sem-error: var(--red-600);
+  --sem-on-error: var(--paper-000);
+  --sem-error-container: var(--red-100);
+  --sem-on-error-container: var(--red-700);
+
+  --sem-success: var(--green-700);
+  --sem-on-success: var(--paper-000);
+  --sem-success-container: var(--green-100);
+  --sem-on-success-container: var(--green-800);
+
+  /* Warning — no counterpart existed. The reservation countdown needs a state
+     between "fine" and "failed". */
+  --sem-warning: var(--amber-800);
+  --sem-on-warning: var(--paper-000);
+  --sem-warning-container: var(--amber-100);
+  --sem-on-warning-container: var(--amber-800);
+
+  --sem-background: var(--paper-050);
+  --sem-on-background: var(--ink-900);
+}
+
+/* ---------- L3 · COMPONENT ------------------------------------------------- */
+:root {
+  --btn-bg: var(--sem-primary);
+  --btn-fg: var(--sem-on-primary);
+  --btn-bg-hover: var(--sem-primary-container);
+  --btn-bg-active: var(--sem-primary-container);
+  --btn-ghost-fg: var(--sem-primary);
+  --btn-ghost-border: var(--sem-outline-variant);
+  --btn-ghost-bg-hover: var(--sem-primary-soft);
+  --btn-disabled-bg: var(--sem-surface-container-high);
+  --btn-disabled-fg: var(--sem-outline-text);
+
+  --card-bg: var(--sem-surface-container-lowest);
+  --card-border: var(--sem-outline-variant);
+  --card-radius: 14px;
+
+  --input-bg: var(--sem-surface-container-lowest);
+  --input-border: var(--sem-outline);
+  --input-border-focus: var(--sem-primary);
+  --input-fg: var(--sem-on-surface);
+  --input-label: var(--sem-on-surface-variant);
+  --input-placeholder: var(--sem-outline-text);
+
+  --band-bg: var(--sem-primary);
+  --band-fg: var(--sem-on-primary);
+  --band-alt-bg: var(--sem-inverse-surface);
+  --band-alt-fg: var(--sem-inverse-on-surface);
+
+  --nav-bg: var(--sem-surface-container-lowest);
+  --nav-fg: var(--sem-on-surface);
+
+  --table-head-bg: var(--sem-surface-container);
+  --table-border: var(--sem-outline-variant);
+  --table-row-hover: var(--sem-primary-soft);
+
+  --focus-ring: var(--sem-primary);
+}
+
+/* ---------- Tailwind namespace → L2 ---------------------------------------- */
 @theme inline {
-  --color-surface: #f7f9fb;
-  --color-surface-dim: #d8dadc;
-  --color-surface-bright: #f7f9fb;
-  --color-surface-container-lowest: #ffffff;
-  --color-surface-container-low: #f2f4f6;
-  --color-surface-container: #eceef0;
-  --color-surface-container-high: #e6e8ea;
-  --color-surface-container-highest: #e0e3e5;
-  
-  --color-on-surface: #191c1e;
-  --color-on-surface-variant: #4a4455;
-  
-  --color-inverse-surface: #2d3133;
-  --color-inverse-on-surface: #eff1f3;
-  
-  --color-outline: #7b7487;
-  --color-outline-variant: #ccc3d8;
-  
-  --color-surface-tint: #732ee4;
-  --color-primary: #630ed4;
-  --color-on-primary: #ffffff;
-  --color-primary-container: #7c3aed;
-  --color-on-primary-container: #ede0ff;
-  --color-inverse-primary: #d2bbff;
-  
-  --color-secondary: #4b41e1;
-  --color-on-secondary: #ffffff;
-  --color-secondary-container: #645efb;
-  --color-on-secondary-container: #fffbff;
-  
-  --color-tertiary: #474e64;
-  --color-on-tertiary: #ffffff;
-  --color-tertiary-container: #5e667d;
-  --color-on-tertiary-container: #dee5ff;
-  
-  --color-error: #ba1a1a;
-  --color-on-error: #ffffff;
-  --color-error-container: #ffdad6;
-  --color-on-error-container: #93000a;
+  --color-surface: var(--sem-surface);
+  --color-surface-dim: var(--sem-surface-dim);
+  --color-surface-bright: var(--sem-surface-bright);
+  --color-surface-container-lowest: var(--sem-surface-container-lowest);
+  --color-surface-container-low: var(--sem-surface-container-low);
+  --color-surface-container: var(--sem-surface-container);
+  --color-surface-container-high: var(--sem-surface-container-high);
+  --color-surface-container-highest: var(--sem-surface-container-highest);
 
-  /* Success — the counterpart to `error`, which was missing. Its absence is why
-     #137333 / #e6f4ea ended up hardcoded in three separate files. */
-  --color-success: #137333;
-  --color-on-success: #ffffff;
-  --color-success-container: #e6f4ea;
-  --color-on-success-container: #0b5222;
+  --color-on-surface: var(--sem-on-surface);
+  --color-on-surface-variant: var(--sem-on-surface-variant);
 
-  --color-background: #f7f9fb;
-  --color-on-background: #191c1e;
+  --color-inverse-surface: var(--sem-inverse-surface);
+  --color-inverse-on-surface: var(--sem-inverse-on-surface);
 
-  /* Typography */
+  --color-outline: var(--sem-outline);
+  --color-outline-variant: var(--sem-outline-variant);
+  --color-outline-text: var(--sem-outline-text);
+
+  --color-surface-tint: var(--sem-surface-tint);
+  --color-primary: var(--sem-primary);
+  --color-on-primary: var(--sem-on-primary);
+  --color-primary-container: var(--sem-primary-container);
+  --color-on-primary-container: var(--sem-on-primary-container);
+  --color-inverse-primary: var(--sem-inverse-primary);
+  --color-primary-soft: var(--sem-primary-soft);
+  --color-on-primary-soft: var(--sem-on-primary-soft);
+
+  --color-secondary: var(--sem-secondary);
+  --color-on-secondary: var(--sem-on-secondary);
+  --color-secondary-container: var(--sem-secondary-container);
+  --color-on-secondary-container: var(--sem-on-secondary-container);
+
+  --color-tertiary: var(--sem-tertiary);
+  --color-on-tertiary: var(--sem-on-tertiary);
+  --color-tertiary-container: var(--sem-tertiary-container);
+  --color-on-tertiary-container: var(--sem-on-tertiary-container);
+
+  --color-error: var(--sem-error);
+  --color-on-error: var(--sem-on-error);
+  --color-error-container: var(--sem-error-container);
+  --color-on-error-container: var(--sem-on-error-container);
+
+  --color-success: var(--sem-success);
+  --color-on-success: var(--sem-on-success);
+  --color-success-container: var(--sem-success-container);
+  --color-on-success-container: var(--sem-on-success-container);
+
+  --color-warning: var(--sem-warning);
+  --color-on-warning: var(--sem-on-warning);
+  --color-warning-container: var(--sem-warning-container);
+  --color-on-warning-container: var(--sem-on-warning-container);
+
+  --color-background: var(--sem-background);
+  --color-on-background: var(--sem-on-background);
+
+  /* Typography. One family: Inter. --font-display carries the display face used
+     by hero and section headings. */
   --font-body: "Inter", sans-serif;
   --font-caption: "Inter", sans-serif;
+  --font-display: "Inter", sans-serif;
   --font-hero-headline-mobile: "Inter", sans-serif;
   --font-section-heading: "Inter", sans-serif;
   --font-hero-headline: "Inter", sans-serif;
