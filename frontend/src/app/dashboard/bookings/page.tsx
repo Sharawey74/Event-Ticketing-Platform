@@ -10,31 +10,10 @@ import { useAuthStore } from "@/store/authStore";
 import { useReservationStore } from "@/store/reservationStore";
 import { api } from "@/lib/api";
 import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
+import { BookingStatusBadge } from "@/components/bookings/BookingStatusBadge";
 
 // Terminal states have no further action and are de-emphasised in the history table.
 const TERMINAL_STATES = new Set(["CANCELLED", "EXPIRED", "PAYMENT_FAILED", "REFUND_APPROVED", "REFUND_DENIED"]);
-
-function BookingStatusBadge({ state }: { state: string }) {
-  const styleMap: Record<string, string> = {
-    RESERVED: "bg-secondary-fixed text-on-secondary-fixed",
-    PAYMENT_PENDING: "bg-tertiary-fixed text-on-tertiary-fixed",
-    CONFIRMED: "bg-success-container text-on-success-container",
-    ATTENDED: "bg-success-container text-on-success-container",
-    EXPIRED: "bg-error-container text-on-error-container",
-    CANCELLED: "bg-error-container text-on-error-container",
-    REFUND_REQUESTED: "bg-primary-fixed text-on-primary-fixed",
-    REFUND_APPROVED: "bg-primary-fixed text-on-primary-fixed",
-    REFUND_DENIED: "bg-surface-container-high text-on-surface-variant",
-    PAYMENT_FAILED: "bg-error-container text-on-error-container",
-  };
-  const cls = styleMap[state] ?? "bg-surface-container text-on-surface-variant";
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${cls}`}>
-      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
-      {state.replace(/_/g, " ")}
-    </span>
-  );
-}
 
 interface Booking {
   id: number;
@@ -149,11 +128,11 @@ export default function DashboardBookingsPage() {
   };
 
   if (isLoading) {
-    return <main className="pt-32 pb-section-gap px-edge-padding max-w-container-max mx-auto min-h-screen flex items-center justify-center"><p>Loading dashboard...</p></main>;
+    return <div className="pt-32 pb-section-gap px-edge-padding max-w-container-max mx-auto min-h-screen flex items-center justify-center"><p>Loading dashboard...</p></div>;
   }
 
   return (
-    <main className="pt-32 pb-section-gap px-edge-padding max-w-container-max mx-auto min-h-screen flex flex-col gap-section-gap">
+    <div className="pt-32 pb-section-gap px-edge-padding max-w-container-max mx-auto min-h-screen flex flex-col gap-section-gap">
 
       {/* Profile + Stats Section */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
@@ -372,6 +351,6 @@ export default function DashboardBookingsPage() {
         )}
       </section>
 
-    </main>
+    </div>
   );
 }

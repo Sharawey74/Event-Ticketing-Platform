@@ -47,7 +47,7 @@ export default function RegisterPage() {
     "w-full rounded-xl border border-outline-variant bg-surface py-3 px-4 text-sm text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all [&:-webkit-autofill]:shadow-[inset_0_0_0_1000px_#f8f9ff]";
 
   return (
-    <main className="min-h-[calc(100vh-80px)] flex items-center justify-center bg-surface px-4 py-8">
+    <div className="min-h-[calc(100vh-80px)] flex items-center justify-center bg-surface px-4 py-8">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 h-96 w-96 rounded-full bg-primary/10 blur-3xl" />
         <div className="absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-secondary/10 blur-3xl" />
@@ -261,6 +261,6 @@ export default function RegisterPage() {
           </p>
         </div>
       </div>
-    </main>
+    </div>
   );
 }
