@@ -8,29 +8,7 @@ import Link from "next/link";
 import { useAuthStore } from "@/store/authStore";
 import { useReservationStore } from "@/store/reservationStore";
 import { api } from "@/lib/api";
-
-function BookingStatusBadge({ state }: { state: string }) {
-  const styleMap: Record<string, string> = {
-    RESERVED: "bg-secondary-fixed text-on-secondary-fixed",
-    PAYMENT_PENDING: "bg-tertiary-fixed text-on-tertiary-fixed",
-    CONFIRMED: "bg-success-container text-on-success-container",
-    ATTENDED: "bg-success-container text-on-success-container",
-    EXPIRED: "bg-error-container text-on-error-container",
-    CANCELLED: "bg-error-container text-on-error-container",
-    REFUND_REQUESTED: "bg-primary-fixed text-on-primary-fixed",
-    REFUND_APPROVED: "bg-primary-fixed text-on-primary-fixed",
-    REFUND_DENIED: "bg-surface-container-high text-on-surface-variant",
-    PAYMENT_FAILED: "bg-error-container text-on-error-container",
-  };
-  if (!state) return null;
-  const cls = styleMap[state] ?? "bg-surface-container text-on-surface-variant";
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${cls}`}>
-      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
-      {state.replace("_", " ")}
-    </span>
-  );
-}
+import { BookingStatusBadge } from "@/components/bookings/BookingStatusBadge";
 
 interface Ticket {
   id: number;
@@ -175,15 +153,15 @@ export default function BookingDetailPage() {
 
   if (isLoading) {
     return (
-      <main className="pt-32 pb-section-gap px-edge-padding max-w-container-max mx-auto min-h-screen flex items-center justify-center">
+      <div className="pt-32 pb-section-gap px-edge-padding max-w-container-max mx-auto min-h-screen flex items-center justify-center">
         <p>Loading booking details...</p>
-      </main>
+      </div>
     );
   }
 
   if (error || !booking) {
     return (
-      <main className="pt-32 pb-section-gap px-edge-padding max-w-container-max mx-auto min-h-screen">
+      <div className="pt-32 pb-section-gap px-edge-padding max-w-container-max mx-auto min-h-screen">
         <div className="bg-error-container text-on-error-container p-6 rounded-xl max-w-md mx-auto text-center shadow-md">
           <h2 className="font-section-heading mb-2">Error</h2>
           <p className="font-body text-body">{error || "Booking not found."}</p>
@@ -191,7 +169,7 @@ export default function BookingDetailPage() {
             Back to Dashboard
           </Link>
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -229,13 +207,18 @@ export default function BookingDetailPage() {
   const diffTime = eventDate.getTime() - now.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   const canRefund = booking.state === "CONFIRMED" && diffDays > 3;
+  // A denial moves the booking to REFUND_DENIED and records the reason on it.
+  // Both gates below previously required CONFIRMED, so once a refund was
+  // actually denied the section — and the reason for it — vanished on the next
+  // load. The user was told once, transiently, and never again.
+  const hasDenialReason = Boolean(booking.refundDenialReason);
   const isRecoverable = booking.state === "RESERVED" || booking.state === "PAYMENT_PENDING";
   const holdStillValid =
     !!booking.expiresAt && new Date(booking.expiresAt).getTime() > Date.now();
   const canContinueCheckout = isRecoverable && holdStillValid;
 
   return (
-    <main className="pt-32 pb-section-gap px-edge-padding max-w-4xl mx-auto min-h-screen flex flex-col gap-stack-lg">
+    <div className="pt-32 pb-section-gap px-edge-padding max-w-4xl mx-auto min-h-screen flex flex-col gap-stack-lg">
       {/* Back button */}
       <nav>
         <Link href="/dashboard/bookings" className="inline-flex items-center gap-1 text-primary hover:text-primary-container-variant transition-colors font-label-sm">
@@ -310,7 +293,7 @@ export default function BookingDetailPage() {
       )}
 
       {/* Refund Section */}
-      {canRefund || refundStatus ? (
+      {canRefund || refundStatus || hasDenialReason ? (
         <div className="bg-surface-container-low rounded-xl p-6 border border-outline-variant">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
@@ -338,7 +321,7 @@ export default function BookingDetailPage() {
             </div>
           ) : null}
           
-          {booking.state === "CONFIRMED" && booking.refundDenialReason && !refundStatus ? (
+          {hasDenialReason && !refundStatus ? (
             <div className="mt-4 p-4 rounded-lg font-body text-sm bg-error-container text-on-error-container">
               <strong>Refund Denied:</strong> {booking.refundDenialReason}
             </div>
@@ -366,6 +349,6 @@ export default function BookingDetailPage() {
         )}
       </div>
 
-    </main>
+    </div>
   );
 }
