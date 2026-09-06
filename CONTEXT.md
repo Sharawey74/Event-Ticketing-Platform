@@ -1,6 +1,26 @@
 # CONTEXT SNAPSHOT — Event Ticketing Platform
 
-## Last Updated: Day 24 (2026-08-21) — UI enhancement (Track A), brand mark swap, portfolio-site recapture, and a **payment-reliability fix found by the user during a normal booking**.
+## Last Updated: Day 25 (2026-09-06) — UI Redesign v2 (Phases 1–8) merged, and a booking-idempotency gap found while auditing it.
+
+**Shipped.** The full `design_tasks.md` redesign, 71 commits across eight phase branches, merged to `main` as PRs #37–#45. Phase 1 restructured colour into three layers — primitive → semantic → component — and mapped Tailwind's `--color-*` namespace onto the semantic layer with **`@theme inline`**, which is the load-bearing detail: `inline` compiles each utility to `var(--sem-…)` rather than a frozen value, so Phase 7's dark mode is one `[data-theme="dark"]` block reassigning that layer, with no utility, component token or markup touched. Phase 1 was proven byte-identical on the built output before anything was built on it.
+
+**Phases.** 1 tokens · 2 shell · 3 landing hero · 3b `/welcome` · 4 booking path · 5 attendee account · 6 organizer · 7 dark mode · 8 responsive, states, legal.
+
+**Bugs the redesign surfaced and fixed.**
+- **Security:** both ticket views fell back to `https://api.qrserver.com/v1/create-qr-code/?data=<ticket.code>`, putting the venue-door entry credential in a query string to a third party. Removed from both files in one commit so the leak was never live in an intermediate state.
+- **Fabricated data:** `buildSalesSeries` spread real totals across 30 synthetic daily buckets with an invented weighting curve and labelled it "Sales over the last 30 days", with per-day hover figures. Replaced by `buildEventRevenueSeries` — one bar per event from real `grossRevenue`. Chart total verified equal to `SELECT sum(total_amount)`.
+- **QR race:** removing the third-party fallback exposed a real one. The confirmation page fetched before RabbitMQ had written the codes, and a cosmetic two-second timer hid that it never re-fetched. Now polls until they arrive.
+- **Accessibility:** the Material Symbols icon font renders through *ligatures*, so each glyph name was a real text node landing in the accessible name of its container — the legal back links announced as "arrow_back Back to Home", the register role options as "confirmation_numberAttend Events". Removed across 41 usages in 11 files, which also drops a render-blocking font request.
+- **Contrast:** three controls flipped their fill with the theme while their label did not. `.btn-gradient` put white on pale violet at **1.71:1** in dark (sign-in and create-account); `.btn-glass` and the confirmation panel's "Total Paid" label had the same shape of problem, the latter at **1.36:1**. ⚠️ The first dark-mode sweep missed all three because it read `background-color`, and a gradient is a `background-image` — worth knowing for any future audit.
+- `--violet-400` was referenced by `.aurora-pointer` and never defined. An undefined var inside `color-mix()` invalidates the whole declaration, so the hero pointer glow had **never once painted**.
+
+**Verification.** 41 semantic token pairs measured on built output in both themes (dark matches light, lowest dark pair 6.13:1); six public routes swept live in both themes with zero failures; 375 / 768 / 1024 / 1440 signed in as an organizer — no horizontal page scroll, one `<main>`, no heading-order skips, no unnamed controls, no placeholder-only inputs. Frontend build passes, vitest 4/4, lint improved from 9 errors / 6 warnings to **9 / 4**. No backend code was touched, so the Java suite is unchanged at 202/202.
+
+**⚠️ The open item — booking idempotency is nominal, not real.** The frontend now sends `Idempotency-Key` on `POST /api/v1/bookings`, which unblocks `app.rate-limit.enabled=true` in production and closes the Day 20 carryover *as written*. But it provides no actual idempotency: `RateLimitFilter` only checks the header is **present** (`RateLimitFilter.java:83`), never storing or comparing it, and the frontend mints a fresh `crypto.randomUUID()` on every attempt, so a retry would carry a different key regardless. The in-browser double-click is already blocked by `disabled={isSubmitting}`, so the exposure is narrow — a client-side timeout on a request that actually succeeded, two tabs, or an automatic network retry. That is the same failure mode that charged booking 562 twice. **Day 26 exists to close it**, using the `processed_stripe_events` pattern already proven in this codebase: UNIQUE constraint + catch `DataIntegrityViolationException`.
+
+**Known deviations, deliberate.** Footer links are 24×24 rather than the plan's 44×44 — nine stacked links at 44 adds ~250px of column and the hit areas would overlap and steal each other's taps; 24px on a 12px gap clears WCAG 2.5.8 with room. Hover/active/disabled states were not exhaustively re-verified on every control; only controls with no focus indicator at all were fixed.
+
+## Previously — Day 24 (2026-08-21) — UI enhancement (Track A), brand mark swap, portfolio-site recapture, and a **payment-reliability fix found by the user during a normal booking**.
 
 **The headline bug.** A booking paid for through Stripe stayed `PAYMENT_PENDING` on the dashboard. Root cause was not application code: the Stripe account has **zero webhook endpoints registered**, and Stripe cannot reach `localhost:8088` regardless — so `checkout.session.completed` had never once been delivered. Since `WebhookService.handlePaymentSuccess` is the *only* path out of `PAYMENT_PENDING`, every paid booking was stranded, and `ReservationExpirationJob` then sweeps stale `PAYMENT_PENDING` to `PAYMENT_FAILED` and releases the seats — i.e. **the card is charged and the booking still fails**. Booking 562 was charged **twice** (EGP 1,500 × 2) because the stuck state leaves a *Resume* action in the UI that opens a fresh checkout session for the same booking; it ended `CANCELLED` with two live payments.
 
@@ -20,9 +40,9 @@ Verified end to end against real Stripe test mode: a genuine purchase (card `424
 
 ## Previously — Day 20 (2026-07-03) — Code Quality + Security Hardening: restricted `/actuator/**` to ADMIN-only (only `/actuator/health` stays public), added Redis-Lua-backed rate limiting on auth/booking endpoints (M-002), added a JWT `jti` + Redis denylist with a new `/logout` endpoint (M-004), fixed a bug where `TicketTier.availableCount` in the database never decremented on reservation and could have permanently leaked inventory if fixed naively (D19-1), and audited/fixed 3 `log.error()` calls that were silently discarding stack traces (CC-1). 191/191 tests passing, 82% INSTRUCTION coverage verified via `./mvnw clean verify`, JaCoCo gate passed.
 
-## Branch: feat/payment-reconciliation-and-docs (local, cut from feat/github-pages-portfolio-site — not pushed)
+## Branch: feat/booking-idempotency (local, cut from `main` at PR #45 — not pushed). All redesign branches are merged and can be deleted.
 
-## Test Status: 202/202 ALL passing (+6 — `PaymentReconciliationServiceTest`, written Red before the service existed), JaCoCo gate passed, verified via `./mvnw clean verify`
+## Test Status: 202/202 ALL passing (unchanged — Day 25 was frontend-only). Frontend: vitest 4/4, `npm run build` clean, lint 9 errors / 4 warnings. **NEXT MIGRATION MUST BE: V14__**
 
 ## 1. NON-NEGOTIABLE RULES (From instructions.txt + Overlay)
 
@@ -215,6 +235,16 @@ class YourControllerTest {
 | **D19-1** (Day 20) | `BookingService.reserveTickets()` only ever decremented the Redis inventory counter, never the DB-persisted `TicketTier.availableCount` — `GET /api/events/{id}` showed a stale, falsely-high seat count during active holds (confirmed via k6 + direct Redis inspection in Day 19). Fixed with a DB-side decrement on reserve; a decrement-only fix would have permanently leaked inventory, since the abandoned-RESERVED-hold expiry path (`ReleaseSeatsAction` is a Redis-release stub only) restored nothing — so the release was added there too, mirroring the existing `cancelBooking`/`expireStalePaymentPending` increment pattern | Booking | ✅ Applied | BookingService.java, ReservationExpirationJob.java |
 | **20-cc1** | CC-1 audit found 3 `log.error()` calls passing `ex.getMessage()` instead of the exception object, silently discarding the stack trace, on Stripe session creation failure, Stripe refund failure, and the Stripe GSON deserialization fallback | Payment | ✅ Applied | PaymentService.java, WebhookService.java |
 | **21-1** (Day 21 pre-session) | `GlobalExceptionHandler` had no handler for `ObjectOptimisticLockingFailureException` (fell through to 500) despite `@Version` on 3 entities — added as its 13th handler (409). Writing the TDD-mandated extended concurrency test for this (`BookingServiceReservationConcurrencyTest`, 100 threads/50 seats through the FULL `reserveTickets()` path, not just Redis) then surfaced a real, previously-undocumented bug: two different users concurrently reserving from the same tier raced on `TicketTier`'s `@Version` during the DB-mirror write (D19-1's decrement); the loser's rollback did not undo the earlier Redis decrement, permanently leaking that seat (not an oversell — a silent, unrecoverable capacity loss). Widening the distributed lock from per-user-per-tier to per-tier-only was tried first and reverted — it closed the leak but collapsed throughput to ~1 success per 100 concurrent requests, since the lock is fail-fast with no retry/backoff. Fixed instead by replacing the JPA read-modify-write with a single atomic conditional SQL `UPDATE` (`TicketTierRepository.decrementAvailableCount`, `WHERE available_count >= :quantity`), which has no read-then-write gap regardless of lock granularity | Booking | ✅ Applied | GlobalExceptionHandler.java, BookingService.java, TicketTierRepository.java |
+| **25-tokens** (Day 25) | Three-layer token system: primitive → semantic → component, with Tailwind's `--color-*` namespace mapped onto the semantic layer via `@theme inline`. `inline` is load-bearing — it compiles utilities to `var(--sem-…)` instead of a frozen value, which is what makes a runtime theme swap possible at all | Frontend | ✅ Applied | globals.css |
+| **25-dark** | Dark mode as a single `[data-theme="dark"]` block reassigning L2. Pre-paint inline script in `<head>` stamps the attribute before first paint (anything deferred flashes the wrong theme); toggle persists to `localStorage` and defaults to `prefers-color-scheme`. The M3 `-fixed` roles are deliberately NOT redeclared — that is what keeps the ten booking status chips stable across themes | Frontend | ✅ Applied | globals.css, lib/theme.ts, ui/ThemeToggle.tsx, layout.tsx |
+| **25-qrleak** | **SECURITY.** Both ticket views fell back to `api.qrserver.com/v1/create-qr-code/?data=<ticket.code>` — the venue-door entry credential in a query string to a third party. Removed from both files in one commit so the leak was never live in an intermediate state | Security | ✅ Applied | confirmation/page.tsx, dashboard/bookings/[id]/page.tsx |
+| **25-qrrace** | Removing that fallback exposed a real race: the confirmation page fetched before RabbitMQ had written the codes, and a cosmetic `setTimeout(2000)` shimmer hid the fact that it never re-fetched. Replaced with real polling (600ms interval, 12s ceiling, cancellation flag) | Booking | ✅ Applied | bookings/[id]/confirmation/page.tsx |
+| **25-chart** | `buildSalesSeries` spread real totals across 30 synthetic daily buckets with an invented weighting curve, labelled "Sales over the last 30 days" with per-day hover figures — fabricated data presented as real. Replaced by `buildEventRevenueSeries`: one bar per event from real `grossRevenue`, verified equal to `SELECT sum(total_amount)` | Frontend | ✅ Applied | lib/chart-theme.ts, organizer/SalesChart.tsx |
+| **25-iconfont** | **A11Y.** Material Symbols renders through ligatures, so each glyph name was a real text node landing in its container's accessible name ("arrow_back Back to Home", "confirmation_numberAttend Events"). 41 usages across 11 files replaced with inline SVG; the render-blocking font request is gone. Removing it also un-named several icon-only controls, which were then given explicit `aria-label`s | A11y | ✅ Applied | 11 page/component files, layout.tsx |
+| **25-contrast** | Three controls flipped their fill with the theme while their label did not: `.btn-gradient` at **1.71:1** in dark (sign-in / create-account), `.btn-glass`, and the confirmation panel's "Total Paid" label at **1.36:1**. ⚠️ The dark-mode sweep missed all three because it reads `background-color` and a gradient is a `background-image` — a known blind spot for any future audit | Frontend | ✅ Applied | auth/login, auth/register, confirmation/page.tsx, globals.css |
+| **25-violet400** | `--violet-400` was referenced by `.aurora-pointer` and never defined. An undefined var inside `color-mix()` invalidates the entire declaration, so the hero pointer glow had never once painted | Frontend | ✅ Applied | globals.css |
+| **25-welcome** | `/welcome` rebuilt full-bleed on a new scene (morphing light fields, canvas particle field). Pinned to the viewport — `overflow-x-hidden` alone had made it its own scroll container, since a box that is not `visible` on one axis computes to `auto` on the other. No cursor-driven motion. Ambient pulse peak lowered after measuring the composited ground swing to #b655cf, which took the tagline to 2.94:1 | Frontend | ✅ Applied | welcome/page.tsx, welcome/ParticleField.tsx, globals.css |
+| **26-idem** (Day 26) | ⚠️ **OPEN.** `Idempotency-Key` is sent on booking creation but provides no idempotency: `RateLimitFilter` only checks the header is present, never storing or comparing it, and the client mints a fresh UUID per attempt. Double-click is already blocked by `disabled={isSubmitting}`, so exposure is a client timeout on a succeeded request, two tabs, or a network retry — the failure that charged booking 562 twice. To be closed with the `processed_stripe_events` pattern: UNIQUE constraint + catch `DataIntegrityViolationException` | Booking | ⬜ In progress | RateLimitFilter.java:83, TicketTierSelector.tsx:118 |
 
 ---
 
@@ -397,10 +427,42 @@ This repository has two deployable parts:
 
 ---
 
-## 10. NEXT SESSION START — DAY 25
+## 10. NEXT SESSION START — DAY 26
 
-**Current Branch:** `feat/github-pages-portfolio-site` (local, created from `main` at the
-`feat/seed-data-frontend-refresh` merge, not yet pushed/merged)
+**Current Branch:** `feat/booking-idempotency` (local, cut from `main` at PR #45 — not pushed)
+
+**The task.** Make `Idempotency-Key` mean something. Today it is a doorman who checks you
+have a ticket without ever reading it: `RateLimitFilter` rejects a blank header and does
+nothing else with the value, and the client mints a fresh `crypto.randomUUID()` per attempt,
+so even a server that remembered keys would see every retry as a new booking.
+
+Two halves, both needed:
+
+1. **Backend** — persist the key with a `UNIQUE` constraint and, on collision, return the
+   booking that key already created instead of making another. This is the pattern
+   `processed_stripe_events` already uses in this repo (Fix 9.2): try the insert, catch
+   `DataIntegrityViolationException`. New migration — **next is `V14__`**. TDD mandate
+   applies: the duplicate-key test goes Red first.
+2. **Frontend** — mint the key once per reservation attempt and reuse it on retry, rather
+   than per click. `TicketTierSelector.tsx:118`.
+
+**Scope note.** `disabled={isSubmitting}` already blocks the in-browser double-click, so this
+is not an emergency. It closes the residual window: a client-side timeout on a request that
+actually succeeded, two tabs or devices, or an automatic network retry — the shape of the
+failure that charged booking 562 twice.
+
+**Also still open, unchanged from Day 24 — the user's to do, not automatic:**
+- Stripe CLI is **not installed**; the Stripe account still has **zero webhook endpoints**
+  registered. `PaymentReconciliationService` covers the gap but the webhook is the primary path.
+- Booking 562's two duplicate charges (`pi_3U6rvL…`, `pi_3U6ruj…`) have not been refunded.
+- Day 21 carryovers: the 6 browser-based Critical Path smoke tests and the Railway/Vercel
+  env-var audits.
+
+**Redesign items not verified in Day 25, needing a device or a live purchase:** QR scannable
+from a phone at arm's length in low light; displayed total equals the Stripe charge exactly;
+all ten booking states rendering with icon + label; `prefers-reduced-motion` final-state
+render (the CSS and JS guards were read, not run); a full keyboard path end-to-end through
+the booking flow.
 
 **Completed in Day 23 (Portfolio Site + 2 Production Bug Fixes, 2026-07-16):**
 
