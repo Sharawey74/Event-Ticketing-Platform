@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Timer } from "lucide-react";
+import { Lock, Minus, Plus, ShoppingCart, Timer } from "lucide-react";
 
 import { TicketTierResponse } from "@/types/event";
 import { api } from "@/lib/api";
@@ -259,7 +259,7 @@ export function TicketTierSelector({ eventId, eventTitle, tiers }: TicketTierSel
           disabled={isSubmitting || timeLeft <= 0}
           className="w-full btn-gradient text-on-primary font-label-sm text-label-sm h-14 rounded-full flex items-center justify-center gap-2 hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
         >
-          <span className="material-symbols-outlined text-[20px]">lock</span>
+          <Lock className="h-[20px] w-[20px]" aria-hidden="true" />
           {isSubmitting ? "Processing..." : "Proceed to Checkout"}
         </button>
       </div>
@@ -318,7 +318,7 @@ export function TicketTierSelector({ eventId, eventTitle, tiers }: TicketTierSel
                       disabled={effectiveQuantity <= 1}
                       className="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors disabled:opacity-50"
                     >
-                      <span className="material-symbols-outlined text-[20px]">remove</span>
+                      <Minus className="h-[20px] w-[20px]" aria-hidden="true" />
                     </button>
                     <span className="font-label-sm text-label-sm text-on-surface w-4 text-center">
                       {effectiveQuantity}
@@ -329,7 +329,7 @@ export function TicketTierSelector({ eventId, eventTitle, tiers }: TicketTierSel
                       disabled={effectiveQuantity >= maxQuantity}
                       className="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors disabled:opacity-50"
                     >
-                      <span className="material-symbols-outlined text-[20px]">add</span>
+                      <Plus className="h-[20px] w-[20px]" aria-hidden="true" />
                     </button>
                   </div>
                 </div>
@@ -386,7 +386,7 @@ export function TicketTierSelector({ eventId, eventTitle, tiers }: TicketTierSel
           disabled={isSubmitting || !selectedTierId || showReplacePrompt}
           className="w-full btn-gradient text-on-primary font-label-sm text-label-sm h-14 rounded-full flex items-center justify-center gap-2 hover:shadow-lg transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
         >
-          <span className="material-symbols-outlined text-[20px]">shopping_cart_checkout</span>
+          <ShoppingCart className="h-[20px] w-[20px]" aria-hidden="true" />
           {isSubmitting ? "Reserving..." : "Add to Cart"}
         </button>
         <p className="text-center font-caption text-caption text-on-surface-variant mt-4">
