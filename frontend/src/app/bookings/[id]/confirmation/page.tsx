@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
+import { AlertCircle, CalendarDays, CheckCircle2, Copy, Home, Hourglass, LayoutDashboard, MapPin, RefreshCw } from "lucide-react";
 
 interface Ticket {
   id: number;
@@ -194,7 +195,7 @@ export default function ConfirmationPage() {
                 disabled={isRefreshing}
                 className="inline-flex items-center gap-2 bg-surface-container text-on-surface hover:bg-surface-container-high px-5 py-2 rounded-full font-label-lg transition-colors border border-outline-variant disabled:opacity-60 mb-stack-md"
               >
-                <span className="material-symbols-outlined text-[18px]">refresh</span>
+                <RefreshCw className="h-[18px] w-[18px]" aria-hidden="true" />
                 {isRefreshing ? "Checking..." : "Refresh Status"}
               </button>
             </>
@@ -208,7 +209,7 @@ export default function ConfirmationPage() {
               aria-label="Copy booking reference"
               className="text-primary hover:text-primary-container transition-colors ml-2"
             >
-              <span className="material-symbols-outlined text-[18px]">content_copy</span>
+              <Copy className="h-[18px] w-[18px]" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -225,13 +226,13 @@ export default function ConfirmationPage() {
               <div className="flex items-center gap-2 mb-2">
                 <span className="bg-primary-fixed text-on-primary-fixed font-label-sm text-label-sm px-3 py-1 rounded-full">Event</span>
                 <span className="text-on-surface-variant text-caption flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[14px]">calendar_month</span>
+                  <CalendarDays className="h-[14px] w-[14px]" aria-hidden="true" />
                   {new Date(booking.event.startDate).toLocaleDateString()}
                 </span>
               </div>
               <h2 className="font-section-heading text-section-heading text-on-surface mb-1">{booking.event.title}</h2>
               <p className="font-body text-body text-on-surface-variant flex items-center gap-1">
-                <span className="material-symbols-outlined text-[18px]">location_on</span> {booking.event.venueName}
+                <MapPin className="h-[18px] w-[18px]" aria-hidden="true" /> {booking.event.venueName}
               </p>
             </div>
           </div>
@@ -245,9 +246,15 @@ export default function ConfirmationPage() {
             </div>
             <div className="mt-4 pt-4 border-t border-white/20">
               <p className="font-caption text-caption flex items-center gap-1">
-                <span className="material-symbols-outlined text-[16px]">
-                  {isConfirmed ? "check_circle" : isFailed ? "error" : "hourglass_top"}
-                </span>
+                {/* The icon repeats the state the sentence beside it already
+                    gives, so it is decorative and stays out of the name. */}
+                {isConfirmed ? (
+                  <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                ) : isFailed ? (
+                  <AlertCircle className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Hourglass className="h-4 w-4" aria-hidden="true" />
+                )}
                 {isConfirmed ? "Payment Successful" : isFailed ? "Payment Not Completed" : "Payment Processing"}
               </p>
             </div>
@@ -333,11 +340,11 @@ export default function ConfirmationPage() {
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
           <Link href="/" className="w-full sm:w-auto bg-gradient-to-r from-primary to-secondary text-on-primary font-body text-body font-semibold py-3 px-8 rounded-full shadow-md hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 group">
-            <span className="material-symbols-outlined transition-transform group-hover:-translate-x-1">home</span>
+            <Home className="h-4 w-4 transition-transform group-hover:-translate-x-1" aria-hidden="true" />
             Homepage
           </Link>
           <Link href="/dashboard/bookings" className="inline-flex items-center gap-2 bg-surface-container text-on-surface hover:bg-surface-container-high px-6 py-3 rounded-full font-label-lg transition-colors border border-outline-variant">
-            <span className="material-symbols-outlined">dashboard</span>
+            <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
             My Dashboard
           </Link>
         </div>
