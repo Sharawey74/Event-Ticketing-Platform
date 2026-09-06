@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle } from "lucide-react";
 
 import { useAuthStore } from "@/store/authStore";
 import { api } from "@/lib/api";
@@ -200,7 +200,7 @@ export default function EditEventPage() {
           href="/organizer/events"
           className="inline-flex items-center gap-1 text-primary hover:text-primary-container-variant transition-colors font-label-sm"
         >
-          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+          <ArrowLeft className="h-[18px] w-[18px]" aria-hidden="true" />
           Back to Events
         </Link>
       </nav>
