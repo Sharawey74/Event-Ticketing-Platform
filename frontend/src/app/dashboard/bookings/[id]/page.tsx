@@ -9,6 +9,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useReservationStore } from "@/store/reservationStore";
 import { api } from "@/lib/api";
 import { BookingStatusBadge } from "@/components/bookings/BookingStatusBadge";
+import { ArrowLeft, CalendarDays, MapPin, Ticket } from "lucide-react";
 
 interface Ticket {
   id: number;
@@ -222,7 +223,7 @@ export default function BookingDetailPage() {
       {/* Back button */}
       <nav>
         <Link href="/dashboard/bookings" className="inline-flex items-center gap-1 text-primary hover:text-primary-container-variant transition-colors font-label-sm">
-          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+          <ArrowLeft className="h-[18px] w-[18px]" aria-hidden="true" />
           Back to Dashboard
         </Link>
       </nav>
@@ -232,11 +233,11 @@ export default function BookingDetailPage() {
         <div>
           <h1 className="font-hero-headline-mobile text-on-surface mb-2">{booking.event?.title}</h1>
           <p className="font-body text-on-surface-variant flex items-center gap-2">
-            <span className="material-symbols-outlined text-[18px]">calendar_month</span>
+            <CalendarDays className="h-[18px] w-[18px]" aria-hidden="true" />
             {eventDate.toLocaleDateString()} at {eventDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
           </p>
           <p className="font-body text-on-surface-variant flex items-center gap-2 mt-1">
-            <span className="material-symbols-outlined text-[18px]">location_on</span>
+            <MapPin className="h-[18px] w-[18px]" aria-hidden="true" />
             {booking.event?.venueName}
           </p>
         </div>
@@ -332,7 +333,7 @@ export default function BookingDetailPage() {
       {/* Tickets Section */}
       <div>
         <h2 className="font-section-heading text-on-surface mb-stack-md flex items-center gap-2">
-          <span className="material-symbols-outlined">confirmation_number</span>
+          <Ticket className="h-4 w-4" aria-hidden="true" />
           Your Tickets ({booking.tickets?.length || 0})
         </h2>
         
