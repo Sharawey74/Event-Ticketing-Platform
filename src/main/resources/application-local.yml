@@ -16,6 +16,22 @@ spring:
     port: 5672
     username: ticketing
     password: ticketing
+    listener:
+      simple:
+        # Fix 26-dlq. The DLQs in RabbitMQConfig were declared and bound but unreachable:
+        # dead-lettering only happens when a message is rejected WITHOUT requeue, and Spring
+        # Boot defaults to default-requeue-rejected=true with retry disabled. A listener that
+        # threw was therefore requeued immediately and forever -- a hot loop that burns CPU,
+        # blocks the queue head and floods the logs, instead of parking one message in a DLQ.
+        #
+        # default-requeue-rejected: false is the load-bearing line. Without it the retry block
+        # alone still ends in an infinite requeue once the attempts are exhausted.
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3          # 1 initial delivery + 2 retries
+          initial-interval: 3000   # 3s, then 6s (multiplier below)
+          multiplier: 2
   flyway:
     enabled: true
     locations: classpath:db/migration
