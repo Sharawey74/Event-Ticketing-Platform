@@ -241,7 +241,10 @@ export default function ConfirmationPage() {
           <div className="md:col-span-1 bg-gradient-to-br from-primary to-secondary rounded-xl shadow-md p-stack-md text-on-primary flex flex-col justify-between relative overflow-hidden">
             <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
             <div>
-              <p className="font-caption text-caption text-primary-fixed mb-1 opacity-90">Total Paid</p>
+              {/* Inherits the panel's text-on-primary rather than pinning a fixed
+                  tone. primary-fixed is a light violet by definition, which sat
+                  at 6.57:1 on the light gradient and 1.36:1 on the dark one. */}
+              <p className="font-caption text-caption mb-1 opacity-90">Total Paid</p>
               <p className="font-hero-headline-mobile text-hero-headline-mobile">EGP {booking.totalPrice?.toFixed(2) || "0.00"}</p>
             </div>
             <div className="mt-4 pt-4 border-t border-white/20">
