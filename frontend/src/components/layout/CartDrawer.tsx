@@ -103,7 +103,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
           <button
             type="button"
             onClick={onClose}
-            className="text-on-surface-variant hover:text-on-surface transition-colors"
+            className="-mr-2 inline-flex min-h-11 min-w-11 items-center justify-center rounded text-on-surface-variant outline-none transition-colors hover:text-on-surface focus-visible:ring-2 focus-visible:ring-primary/50"
             aria-label="Close cart"
           >
             <X className="h-5 w-5" />
