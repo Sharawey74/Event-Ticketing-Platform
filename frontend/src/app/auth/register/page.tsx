@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Store, Ticket } from "lucide-react";
 import { api } from "@/lib/api";
 
 export default function RegisterPage() {
@@ -140,7 +140,7 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors focus:outline-none"
+                  className="absolute right-0 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-on-surface-variant outline-none transition-colors hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/50"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -205,13 +205,12 @@ export default function RegisterPage() {
                     onChange={() => setRole("USER")}
                   />
                   <div className="border-2 border-outline-variant peer-checked:border-primary peer-checked:ring-2 peer-checked:ring-primary/20 peer-checked:bg-primary-fixed/20 rounded-xl p-5 flex flex-col items-center gap-2 transition-all">
-                    <span
-                      className={`material-symbols-outlined text-[36px] ${
+                    <Ticket
+                      className={`h-9 w-9 ${
                         role === "USER" ? "text-primary" : "text-on-surface-variant"
                       }`}
-                    >
-                      confirmation_number
-                    </span>
+                      aria-hidden="true"
+                    />
                     <span className={`text-sm font-medium ${role === "USER" ? "text-primary" : "text-on-surface"}`}>
                       Attend Events
                     </span>
@@ -228,13 +227,12 @@ export default function RegisterPage() {
                     onChange={() => setRole("ORGANIZER")}
                   />
                   <div className="border-2 border-outline-variant peer-checked:border-primary peer-checked:ring-2 peer-checked:ring-primary/20 peer-checked:bg-primary-fixed/20 rounded-xl p-5 flex flex-col items-center gap-2 transition-all">
-                    <span
-                      className={`material-symbols-outlined text-[36px] ${
+                    <Store
+                      className={`h-9 w-9 ${
                         role === "ORGANIZER" ? "text-primary" : "text-on-surface-variant"
                       }`}
-                    >
-                      storefront
-                    </span>
+                      aria-hidden="true"
+                    />
                     <span
                       className={`text-sm font-medium ${role === "ORGANIZER" ? "text-primary" : "text-on-surface"}`}
                     >
@@ -253,7 +251,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="btn-gradient mt-2 w-full rounded-full py-3 text-sm font-semibold text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed disabled:translate-y-0 flex justify-center items-center gap-2"
+              className="btn-gradient mt-2 w-full rounded-full py-3 text-sm font-semibold text-on-primary shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed disabled:translate-y-0 flex justify-center items-center gap-2"
             >
               {isLoading ? "Creating Account…" : "Create Account"}
             </button>

@@ -1,17 +1,18 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 
 export default function PrivacyPage() {
   return (
     <div className="pt-32 pb-section-gap px-edge-padding max-w-3xl mx-auto min-h-screen">
       <nav className="mb-8">
-        <Link href="/" className="inline-flex items-center gap-1 text-primary hover:underline font-label-sm">
-          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+        <Link href="/" className="inline-flex min-h-11 items-center gap-1 rounded text-primary outline-none font-label-sm hover:underline focus-visible:ring-2 focus-visible:ring-primary/50">
+          <ArrowLeft className="h-[18px] w-[18px]" aria-hidden="true" />
           Back to Home
         </Link>
       </nav>
 
       <h1 className="font-hero-headline text-hero-headline text-on-surface mb-4">Privacy Policy</h1>
-      <p className="font-caption text-on-surface-variant mb-10">Last updated: June 2025</p>
+      <p className="font-caption text-on-surface-variant mb-10">Last updated: September 2026</p>
 
       <div className="space-y-8 font-body text-body text-on-surface-variant leading-relaxed">
         <section>
@@ -46,7 +47,12 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="font-section-heading text-section-heading text-on-surface mb-3">7. Your Rights</h2>
-          <p>You have the right to access, correct, or delete your personal data. To exercise these rights, please contact us at <span className="text-primary">privacy@eventora.com</span>.</p>
+          <p>You have the right to access, correct, or delete your personal data. To exercise these rights, please contact us at <a
+            href="mailto:privacy@eventora.com"
+            className="rounded text-primary underline underline-offset-2 outline-none hover:text-primary-container focus-visible:ring-2 focus-visible:ring-primary/50"
+          >
+            privacy@eventora.com
+          </a>.</p>
         </section>
 
         <section>

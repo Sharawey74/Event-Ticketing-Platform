@@ -181,13 +181,13 @@ export function Navbar() {
   }
 
   const navLinkBase =
-    "link-underline font-label-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded px-1 transition-colors duration-200";
+    "link-underline inline-flex min-h-11 items-center font-label-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded px-1 transition-colors duration-200";
 
   return (
     <>
       <header className="sticky top-0 z-30 h-20 bg-surface/80 backdrop-blur-md shadow-md border-b border-outline-variant flex items-center">
         <div className="mx-auto flex w-full max-w-container-max items-center justify-between gap-4 px-edge-padding">
-          <Link href="/" className="group/brand inline-flex items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded transition-transform duration-300 hover:scale-[1.03]">
+          <Link href="/" className="group/brand inline-flex min-h-11 items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded transition-transform duration-300 hover:scale-[1.03]">
             <Image
               src="/eventora-mark-v2.png"
               alt=""
@@ -203,9 +203,12 @@ export function Navbar() {
             </span>
           </Link>
 
-          <div ref={searchContainerRef} className="hidden md:flex relative w-full max-w-md">
+                    {/* lg, not md. At 768 the brand, links, toggle, cart and account
+              controls left the field 92px wide — present, but too narrow to
+              type a search into. Browse still reaches /search below that. */}
+          <div ref={searchContainerRef} className="hidden lg:flex relative w-full max-w-md">
             <form
-              className="w-full flex items-center gap-2 rounded-full border border-outline-variant bg-surface-bright px-3 py-2 transition-all duration-300 focus-within:border-primary focus-within:bg-surface-container-lowest focus-within:shadow-md focus-within:shadow-primary/10"
+              className="w-full flex min-h-11 items-center gap-2 rounded-full border border-outline-variant bg-surface-bright px-3 py-2 transition-all duration-300 focus-within:border-primary focus-within:bg-surface-container-lowest focus-within:shadow-md focus-within:shadow-primary/10 focus-within:ring-2 focus-within:ring-primary/40"
               onSubmit={submitSearch}
             >
               <Search className="h-4 w-4 text-outline shrink-0" />
@@ -287,7 +290,7 @@ export function Navbar() {
                 <button
                   type="button"
                   onClick={() => setDropdownOpen((o) => !o)}
-                  className="group/user flex items-center gap-1.5 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded"
+                  className="group/user flex min-h-11 items-center gap-1.5 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded"
                   aria-haspopup="true"
                   aria-expanded={dropdownOpen}
                 >

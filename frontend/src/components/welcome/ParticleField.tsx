@@ -3,8 +3,13 @@
 import { useEffect, useRef } from "react";
 
 /**
- * The drifting, twinkling star field on /welcome, plus the parallax that
- * shifts the light fields behind it with the cursor.
+ * The drifting, twinkling star field on /welcome.
+ *
+ * Nothing here moves with the cursor. The reference shifted the light fields
+ * by up to 42px and slid the nearest particles by up to 272px, which made the
+ * whole scene appear to swim as the pointer crossed it. The only thing left of
+ * that is a brightening near the cursor: the field responds, it does not
+ * relocate.
  *
  * Canvas rather than DOM: this is several hundred moving dots, and that many
  * elements each with their own transform is a compositor layer count no
@@ -31,7 +36,6 @@ interface Particle {
   twinkleSpeed: number;
   twinklePhase: number;
   shimmerDepth: number;
-  parallaxFactor: number;
   depth: number;
 }
 
@@ -50,7 +54,8 @@ const PALETTE = [
 const REFERENCE_AREA = 1440 * 900;
 const REFERENCE_COUNT = 320;
 const MIN_COUNT = 90;
-const PUSH_RADIUS = 180;
+/** How close the cursor has to be for a particle to light up. */
+const GLOW_RADIUS = 180;
 
 /**
  * Pace of the field, as fractions of the reference implementation.
@@ -77,19 +82,14 @@ export function ParticleField({ containerId }: { containerId: string }) {
 
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)");
     const fine = window.matchMedia("(hover: hover) and (pointer: fine)");
-    const fields = container.querySelector<HTMLElement>("[data-ws-fields]");
 
     let width = 0;
     let height = 0;
     let particles: Particle[] = [];
     let frame = 0;
 
-    // Pointer state. currentX/Y trail targetX/Y so the parallax eases in
-    // rather than snapping to every event.
-    let targetX = 0;
-    let targetY = 0;
-    let currentX = 0;
-    let currentY = 0;
+    // Pointer position only, in scene coordinates. There is no smoothed
+    // target to trail any more, because nothing is being moved.
     let pointerActive = false;
     let pointerX = -1000;
     let pointerY = -1000;
@@ -130,22 +130,19 @@ export function ParticleField({ containerId }: { containerId: string }) {
           baseY = Math.random() * height;
         }
 
-        // Three depth bands. Nearer particles are larger, faster, and shift
-        // further with the cursor, which is what reads as depth.
+        // Three depth bands. Nearer particles are larger and drift faster,
+        // which is what still reads as depth now that the cursor no longer
+        // separates them.
         const depth = Math.random();
-        let parallaxFactor: number;
         let radius: number;
         let speed: number;
         if (depth < 0.45) {
-          parallaxFactor = 0.035;
           radius = 0.6 + Math.random() * 0.6;
           speed = 0.75;
         } else if (depth < 0.82) {
-          parallaxFactor = 0.075;
           radius = 1.1 + Math.random() * 0.8;
           speed = 1.2;
         } else {
-          parallaxFactor = 0.14;
           radius = 1.6 + Math.random() * 1.0;
           speed = 1.7;
         }
@@ -168,7 +165,6 @@ export function ParticleField({ containerId }: { containerId: string }) {
           twinkleSpeed: (0.04 + Math.random() * 0.08) * TWINKLE_SPEED,
           twinklePhase: Math.random() * Math.PI * 2,
           shimmerDepth: 0.35 + Math.random() * 0.4,
-          parallaxFactor,
           depth,
         });
       }
@@ -189,9 +185,6 @@ export function ParticleField({ containerId }: { containerId: string }) {
 
     const draw = (animate: boolean) => {
       frame += 1;
-      currentX += (targetX - currentX) * 0.1;
-      currentY += (targetY - currentY) * 0.1;
-
       ctx.clearRect(0, 0, width, height);
 
       for (const p of particles) {
@@ -211,22 +204,18 @@ export function ParticleField({ containerId }: { containerId: string }) {
         const wobbleY =
           Math.cos(frame * p.wobbleFreqY + p.twinklePhase) * p.wobbleAmpY;
 
-        let x = p.originX + wobbleX + currentX * p.parallaxFactor * width * 1.35;
-        let y = p.originY + wobbleY + currentY * p.parallaxFactor * height * 1.35;
+        const x = p.originX + wobbleX;
+        const y = p.originY + wobbleY;
 
-        // Near the cursor a particle is pushed aside and brightens, so the
-        // field reads as displaced rather than merely lit.
+        // Near the cursor a particle brightens and swells in place. The
+        // reference also shoved it aside; that is the part that read as the
+        // page moving, so only the light is left.
         let extraAlpha = 0;
         let scale = 1;
         if (pointerActive) {
-          const dx = x - pointerX;
-          const dy = y - pointerY;
-          const dist = Math.hypot(dx, dy);
-          if (dist < PUSH_RADIUS && dist > 0) {
-            const force = 1 - dist / PUSH_RADIUS;
-            const push = force * 24 * (p.depth + 0.3);
-            x += (dx / dist) * push;
-            y += (dy / dist) * push;
+          const dist = Math.hypot(x - pointerX, y - pointerY);
+          if (dist < GLOW_RADIUS) {
+            const force = 1 - dist / GLOW_RADIUS;
             extraAlpha = force * 0.55;
             scale = 1 + force * 0.5;
           }
@@ -258,24 +247,15 @@ export function ParticleField({ containerId }: { containerId: string }) {
     let raf = 0;
     const loop = () => {
       draw(true);
-      if (fields) {
-        fields.style.transform = `translate3d(${currentX * 42}px, ${
-          currentY * 34
-        }px, 0)`;
-      }
       raf = requestAnimationFrame(loop);
     };
 
     const onPointerMove = (event: PointerEvent) => {
-      targetX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      targetY = ((event.clientY - rect.top) / rect.height) * 2 - 1;
       pointerX = event.clientX - rect.left;
       pointerY = event.clientY - rect.top;
       pointerActive = true;
     };
     const onPointerLeave = () => {
-      targetX = 0;
-      targetY = 0;
       pointerActive = false;
       pointerX = -1000;
       pointerY = -1000;

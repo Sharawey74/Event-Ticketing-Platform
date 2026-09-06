@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { TrendingUp } from "lucide-react";
+import { Calendar, CalendarClock, CalendarX, MapPin, ReceiptText, Ticket, TrendingUp, Wallet } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useReservationStore } from "@/store/reservationStore";
 import { api } from "@/lib/api";
@@ -150,7 +150,7 @@ export default function DashboardBookingsPage() {
         <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-gutter">
           <div className="interactive group bg-surface-container-lowest rounded-xl p-stack-lg shadow-md border border-surface-container-high hover:shadow-xl hover:border-primary/40 flex flex-col items-start h-full">
             <div className="w-12 h-12 rounded-xl bg-primary-container/20 text-primary flex items-center justify-center mb-4 transition-all duration-300 group-hover:scale-110 group-hover:bg-primary group-hover:text-on-primary">
-              <span className="material-symbols-outlined">confirmation_number</span>
+              <Ticket className="h-4 w-4" aria-hidden="true" />
             </div>
             <div className="flex items-end gap-2">
               <p className="text-4xl font-black text-on-surface leading-tight"><AnimatedCounter value={totalBookings} /></p>
@@ -160,7 +160,7 @@ export default function DashboardBookingsPage() {
           </div>
           <div className="interactive group bg-surface-container-lowest rounded-xl p-stack-lg shadow-md border border-surface-container-high hover:shadow-xl hover:border-primary/40 flex flex-col items-start h-full">
             <div className="w-12 h-12 rounded-xl bg-secondary-container/20 text-secondary flex items-center justify-center mb-4 transition-all duration-300 group-hover:scale-110 group-hover:bg-secondary group-hover:text-on-secondary">
-              <span className="material-symbols-outlined">event_upcoming</span>
+              <CalendarClock className="h-4 w-4" aria-hidden="true" />
             </div>
             <p className="text-4xl font-black text-on-surface leading-tight"><AnimatedCounter value={upcomingEvents.length} /></p>
             <p className="font-body text-on-surface-variant">Upcoming Events</p>
@@ -168,7 +168,7 @@ export default function DashboardBookingsPage() {
           </div>
           <div className="interactive group bg-surface-container-lowest rounded-xl p-stack-lg shadow-md border border-surface-container-high hover:shadow-xl hover:border-primary/40 flex flex-col items-start h-full">
             <div className="w-12 h-12 rounded-xl bg-tertiary-container/20 text-tertiary flex items-center justify-center mb-4 transition-all duration-300 group-hover:scale-110 group-hover:bg-tertiary group-hover:text-on-tertiary">
-              <span className="material-symbols-outlined">account_balance_wallet</span>
+              <Wallet className="h-4 w-4" aria-hidden="true" />
             </div>
             <p className="text-4xl font-black text-on-surface leading-tight"><AnimatedCounter value={totalSpent} prefix="EGP " /></p>
             <p className="font-body text-on-surface-variant">Total Spent</p>
@@ -197,12 +197,12 @@ export default function DashboardBookingsPage() {
                 <div className="p-stack-md flex flex-col justify-between border-x border-b border-surface-container-highest rounded-b-xl grow">
                   <div>
                     <p className="flex items-center gap-2 text-primary font-label-sm mb-2">
-                      <span className="material-symbols-outlined text-[16px]">calendar_today</span>
+                      <Calendar className="h-[16px] w-[16px]" aria-hidden="true" />
                       {new Date(booking.eventDate).toLocaleDateString()}
                     </p>
                     <h3 className="font-body-lg font-bold text-on-surface line-clamp-1 mb-1">{booking.eventTitle}</h3>
                     <p className="font-caption text-on-surface-variant flex items-center gap-1 mb-4">
-                      <span className="material-symbols-outlined text-[14px]">location_on</span>
+                      <MapPin className="h-[14px] w-[14px]" aria-hidden="true" />
                       {booking.venueName}
                     </p>
                   </div>
@@ -220,7 +220,7 @@ export default function DashboardBookingsPage() {
           </div>
         ) : (
           <div className="bg-surface-container-lowest rounded-xl p-8 border border-surface-container-high text-center flex flex-col items-center">
-            <span className="material-symbols-outlined text-[64px] text-surface-container-highest mb-4">event_busy</span>
+            <CalendarX className="h-[64px] w-[64px] text-surface-container-highest mb-4" aria-hidden="true" />
             <h3 className="font-body-lg font-bold text-on-surface mb-2">No upcoming events yet</h3>
             <p className="font-body text-on-surface-variant mb-6">Your schedule is clear. Start exploring events and book your next adventure!</p>
             <Link href="/search" className="btn-gradient text-on-primary font-label-sm px-6 py-3 rounded-full hover:shadow-lg transition-all">
@@ -232,11 +232,13 @@ export default function DashboardBookingsPage() {
 
       {/* Booking History Section */}
       <section>
+        {/* The filter button that used to sit here had no onClick and no
+            handler anywhere — a control that looked interactive, was not, and
+            announced as nothing once its icon-font ligature was removed. There
+            is no filter behind it to wire up, so it is gone rather than
+            labelled. */}
         <div className="flex justify-between items-end mb-stack-md">
           <h2 className="font-section-heading text-section-heading text-on-surface">Booking History</h2>
-          <button type="button" className="w-10 h-10 rounded-full border border-surface-container-highest hover:bg-surface-container-low flex items-center justify-center text-on-surface-variant">
-            <span className="material-symbols-outlined text-[20px]">filter_list</span>
-          </button>
         </div>
 
         {resumeError && (
@@ -341,7 +343,7 @@ export default function DashboardBookingsPage() {
           </div>
         ) : (
           <div className="bg-surface-container-lowest rounded-xl p-14 border border-surface-container-high text-center flex flex-col items-center">
-            <span className="material-symbols-outlined text-[64px] text-surface-container-highest mb-4">receipt_long</span>
+            <ReceiptText className="h-[64px] w-[64px] text-surface-container-highest mb-4" aria-hidden="true" />
             <h3 className="font-body-lg font-bold text-on-surface mb-2">Your history is empty</h3>
             <p className="font-body text-on-surface-variant mb-6 max-w-sm">Once you book an event, your tickets and receipts will show up here.</p>
             <Link href="/search" className="btn-gradient text-on-primary font-label-sm px-6 py-3 rounded-full hover:shadow-lg transition-all">

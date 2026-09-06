@@ -185,21 +185,21 @@ export default function Home() {
             >
               <Link
                 href="/search"
-                className="interactive sheen inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/15 border border-white/30 backdrop-blur-sm text-white text-sm font-medium hover:bg-white/25 hover:border-white/50"
+                className="interactive sheen inline-flex min-h-11 items-center gap-2 px-5 py-2.5 rounded-full bg-white/15 border border-white/30 backdrop-blur-sm text-white text-sm font-medium hover:bg-white/25 hover:border-white/50"
               >
                 <Search className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
                 Browse Events
               </Link>
               <a
                 href="#organizers"
-                className="interactive sheen inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-[var(--fixed-cta-on-light)] text-sm font-semibold hover:bg-white/90 hover:shadow-lg hover:shadow-primary/20"
+                className="interactive sheen inline-flex min-h-11 items-center gap-2 px-5 py-2.5 rounded-full bg-white text-[var(--fixed-cta-on-light)] text-sm font-semibold hover:bg-white/90 hover:shadow-lg hover:shadow-primary/20"
               >
                 Become an Organizer
               </a>
               {!isLoggedIn && (
                 <Link
                   href="/auth/login"
-                  className="interactive inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm text-white/80 text-sm font-medium hover:bg-white/20 hover:text-white"
+                  className="interactive inline-flex min-h-11 items-center gap-2 px-5 py-2.5 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm text-white/80 text-sm font-medium hover:bg-white/20 hover:text-white"
                 >
                   Sign In
                 </Link>
@@ -212,18 +212,19 @@ export default function Home() {
             className="animate-fade-up mt-10 grid gap-3 rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-md transition-colors duration-300 focus-within:border-white/45 focus-within:bg-white/15 md:grid-cols-[1.3fr_1fr_1fr_auto]"
             style={{ animationDelay: "360ms" }}
           >
-            <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-zinc-900">
+            <label className="flex min-h-11 items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-zinc-900 focus-within:ring-2 focus-within:ring-[var(--fixed-cta-bg)]">
               <Search className="h-4 w-4 shrink-0 text-zinc-400" />
               <input
                 className="w-full bg-transparent text-sm outline-none placeholder:text-zinc-400"
                 type="text"
                 placeholder="Search title or description"
+                aria-label="Search events by title or description"
                 value={draftQuery}
                 onChange={(event) => setDraftQuery(event.target.value)}
               />
             </label>
 
-            <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-zinc-900">
+            <label className="flex min-h-11 items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-zinc-900 focus-within:ring-2 focus-within:ring-[var(--fixed-cta-bg)]">
               <MapPin className="h-4 w-4 shrink-0 text-zinc-400" />
               <input
                 className="w-full bg-transparent text-sm outline-none placeholder:text-zinc-400"
@@ -235,7 +236,7 @@ export default function Home() {
               />
             </label>
 
-            <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-zinc-900">
+            <label className="flex min-h-11 items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-zinc-900 focus-within:ring-2 focus-within:ring-[var(--fixed-cta-bg)]">
               <Calendar className="h-4 w-4 shrink-0 text-zinc-400" />
               <input
                 className="w-full bg-transparent text-sm outline-none"
@@ -247,7 +248,7 @@ export default function Home() {
             </label>
 
             <button
-              className="interactive sheen rounded-xl bg-[var(--fixed-cta-bg)] px-5 py-2.5 text-sm font-semibold text-[var(--fixed-cta-fg)] hover:bg-[var(--fixed-cta-bg-hover)] hover:shadow-lg hover:shadow-primary/30"
+              className="interactive sheen min-h-11 rounded-xl bg-[var(--fixed-cta-bg)] px-5 py-2.5 text-sm font-semibold text-[var(--fixed-cta-fg)] hover:bg-[var(--fixed-cta-bg-hover)] hover:shadow-lg hover:shadow-primary/30"
               onClick={applySearch}
               type="button"
             >
@@ -284,9 +285,9 @@ export default function Home() {
                 <span className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:scale-110 group-hover:bg-primary group-hover:text-on-primary group-hover:shadow-lg group-hover:shadow-primary/30">
                   <feature.icon className="h-5 w-5" />
                 </span>
-                <h3 className="mb-2 text-lg font-bold text-on-surface">
+                <h2 className="mb-2 text-lg font-bold text-on-surface">
                   {feature.title}
-                </h3>
+                </h2>
                 <p className="text-sm leading-relaxed text-on-surface-variant">
                   {feature.description}
                 </p>
@@ -323,7 +324,7 @@ export default function Home() {
           </div>
           <Link
             href="/search"
-            className="group whitespace-nowrap text-sm font-bold text-primary transition-colors hover:text-primary-container"
+            className="group inline-flex min-h-11 items-center whitespace-nowrap rounded text-sm font-bold text-primary outline-none transition-colors hover:text-primary-container focus-visible:ring-2 focus-visible:ring-primary/50"
           >
             See all events{" "}
             <span className="inline-block transition-transform duration-300 group-hover:translate-x-1">
