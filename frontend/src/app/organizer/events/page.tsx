@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 import { SalesChart } from "@/components/organizer/SalesChart";
 import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
 import { Reveal } from "@/components/ui/Reveal";
+import { CalendarClock, CalendarDays, Pencil, Plus, Search, Ticket, Users, Wallet } from "lucide-react";
 
 interface OrganizerEvent {
   id: number;
@@ -93,7 +94,7 @@ export default function OrganizerDashboardPage() {
           href="/organizer/events/new"
           className="interactive sheen group bg-primary text-on-primary rounded-full px-6 py-3 shadow-md hover:shadow-xl hover:shadow-primary/30 flex items-center justify-center gap-2 font-label-sm w-fit"
         >
-          <span className="material-symbols-outlined text-[20px] transition-transform duration-300 group-hover:rotate-90">add</span>
+          <Plus className="h-[20px] w-[20px] transition-transform duration-300 group-hover:rotate-90" aria-hidden="true" />
           Create New Event
         </Link>
       </div>
@@ -103,19 +104,19 @@ export default function OrganizerDashboardPage() {
         {[
           {
             label: "Total Bookings",
-            icon: "confirmation_number",
+            Icon: Ticket,
             node: <AnimatedCounter value={summary.totalBookings} />,
             sub: `${events.length} event${events.length === 1 ? "" : "s"} total`,
           },
           {
             label: "Upcoming Events",
-            icon: "event_upcoming",
+            Icon: CalendarClock,
             node: <AnimatedCounter value={summary.upcoming} />,
             sub: summary.nextEvent ? `Next: ${summary.nextEvent.title}` : "None scheduled",
           },
           {
             label: "Gross Revenue",
-            icon: "payments",
+            Icon: Wallet,
             node: <AnimatedCounter value={summary.grossRevenue} prefix="EGP " decimals={2} />,
             sub: "Across all events",
           },
@@ -125,7 +126,7 @@ export default function OrganizerDashboardPage() {
               <div className="flex items-start justify-between gap-3 mb-3">
                 <span className="font-label-sm text-on-surface-variant uppercase">{card.label}</span>
                 <span className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 transition-all duration-300 group-hover:bg-primary group-hover:text-on-primary group-hover:scale-110">
-                  <span className="material-symbols-outlined text-[20px]">{card.icon}</span>
+                  <card.Icon className="h-5 w-5" aria-hidden="true" />
                 </span>
               </div>
               <p className="font-hero-headline text-[32px] leading-tight text-on-surface">{card.node}</p>
@@ -159,7 +160,7 @@ export default function OrganizerDashboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-stack-md">
           <h2 className="font-section-heading text-section-heading text-on-surface">Recent Venues & Events</h2>
           <div className="relative w-full sm:w-64">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant h-[20px] w-[20px]" aria-hidden="true" />
             <input 
               type="text" 
               placeholder="Search events..." 
@@ -233,14 +234,14 @@ export default function OrganizerDashboardPage() {
                       title="View Attendees"
                       onClick={(e) => { e.stopPropagation(); router.push(`/organizer/events/${event.id}/attendees`); }}
                     >
-                      <span className="material-symbols-outlined text-[20px]">group</span>
+                      <Users className="h-[20px] w-[20px]" aria-hidden="true" />
                     </button>
                     <button
                       className="interactive w-10 h-10 rounded-full border border-outline-variant hover:text-on-primary hover:border-primary hover:bg-primary flex items-center justify-center text-on-surface-variant"
                       title="Edit Event"
                       onClick={(e) => { e.stopPropagation(); router.push(`/organizer/events/${event.id}/edit`); }}
                     >
-                      <span className="material-symbols-outlined text-[20px]">edit</span>
+                      <Pencil className="h-[20px] w-[20px]" aria-hidden="true" />
                     </button>
                   </div>
                 </div>
@@ -250,14 +251,14 @@ export default function OrganizerDashboardPage() {
             ))
           ) : (
             <div className="bg-surface-container-lowest rounded-xl border border-surface-container-high p-14 text-center flex flex-col items-center justify-center">
-              <span className="material-symbols-outlined text-[48px] text-surface-container-highest mb-4">event_note</span>
+              <CalendarDays className="h-[48px] w-[48px] text-surface-container-highest mb-4" aria-hidden="true" />
               <h3 className="font-body-lg font-bold text-on-surface mb-2">You haven&apos;t created any events yet</h3>
               <p className="font-body text-on-surface-variant mb-6 max-w-sm">Create your first event and start selling tickets in minutes.</p>
               <Link
                 href="/organizer/events/new"
                 className="bg-primary text-on-primary rounded-full px-6 py-3 shadow-sm hover:shadow-md transition-shadow font-label-sm flex items-center gap-2"
               >
-                <span className="material-symbols-outlined text-[18px]">add</span>
+                <Plus className="h-[18px] w-[18px]" aria-hidden="true" />
                 Create Your First Event
               </Link>
             </div>
