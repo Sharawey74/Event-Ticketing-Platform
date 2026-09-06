@@ -1,11 +1,12 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 
 export default function TermsPage() {
   return (
     <div className="pt-32 pb-section-gap px-edge-padding max-w-3xl mx-auto min-h-screen">
       <nav className="mb-8">
         <Link href="/" className="inline-flex items-center gap-1 text-primary hover:underline font-label-sm">
-          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+          <ArrowLeft className="h-[18px] w-[18px]" aria-hidden="true" />
           Back to Home
         </Link>
       </nav>
