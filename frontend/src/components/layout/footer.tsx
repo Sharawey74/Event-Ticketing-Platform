@@ -37,7 +37,7 @@ export function Footer() {
         <div className="col-span-2 flex flex-col gap-2 lg:col-span-1">
           <Link
             href="/"
-            className="group/brand inline-flex w-fit items-center gap-2 rounded outline-none transition-transform duration-300 hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-primary/50"
+            className="group/brand inline-flex min-h-11 w-fit items-center gap-2 rounded outline-none transition-transform duration-300 hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-primary/50"
           >
             {/* Explicit dimensions: an unsized next/image shifts layout on load.
                 alt is empty because the wordmark beside it already names the
@@ -60,7 +60,7 @@ export function Footer() {
         </div>
 
         {COLUMNS.map((column) => (
-          <div key={column.heading} className="flex flex-col gap-2">
+          <div key={column.heading} className="flex flex-col gap-3">
             <span className="mb-1 font-label-sm uppercase tracking-wider text-outline-text">
               {column.heading}
             </span>
@@ -68,7 +68,7 @@ export function Footer() {
               <Link
                 key={link.label}
                 href={link.href}
-                className="group/fl inline-flex w-fit items-center gap-1.5 font-caption text-on-surface-variant transition-colors hover:text-primary"
+                className="group/fl inline-flex w-fit items-center gap-1.5 rounded py-1 font-caption text-on-surface-variant outline-none transition-colors hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/50"
               >
                 <span className="h-px w-0 bg-primary transition-all duration-300 group-hover/fl:w-3" />
                 {link.label}
