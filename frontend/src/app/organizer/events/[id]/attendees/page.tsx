@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuthStore } from "@/store/authStore";
+import { useAuthStore, useAuthHydrated } from "@/store/authStore";
 import { api } from "@/lib/api";
 import { BookingStatusBadge } from "@/components/bookings/BookingStatusBadge";
 import { ArrowLeft, Search } from "lucide-react";
@@ -27,6 +27,12 @@ export default function EventAttendeesPage() {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [isCheckingIn, setIsCheckingIn] = useState<number | null>(null);
+  // Fix 26-hydration: Zustand's `persist` middleware rehydrates from localStorage AFTER the first
+  // client render, so `token` is null on that render even for a signed-in user. Acting on it
+  // immediately bounced people to /auth/login on any cold load -- a bookmark, a shared link, or
+  // simply pressing refresh. Wait until hydration has actually finished before judging.
+  const hasHydrated = useAuthHydrated();
+
 
   const { data: attendeesData, isLoading } = useQuery({
     queryKey: ["eventAttendees", id],
@@ -40,6 +46,7 @@ export default function EventAttendeesPage() {
   const attendees = (attendeesData as Attendee[]) || [];
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!token) {
       router.push("/auth/login");
       return;
@@ -49,7 +56,7 @@ export default function EventAttendeesPage() {
       router.push("/dashboard/bookings");
       return;
     }
-  }, [token, userRole, router]);
+  }, [hasHydrated, token, userRole, router]);
 
   const handleCheckIn = async (bookingId: number) => {
     setIsCheckingIn(bookingId);
