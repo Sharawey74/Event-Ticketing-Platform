@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Calendar, CalendarClock, CalendarX, ListFilter, MapPin, ReceiptText, Ticket, TrendingUp, Wallet } from "lucide-react";
+import { Calendar, CalendarClock, CalendarX, MapPin, ReceiptText, Ticket, TrendingUp, Wallet } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useReservationStore } from "@/store/reservationStore";
 import { api } from "@/lib/api";
@@ -232,11 +232,13 @@ export default function DashboardBookingsPage() {
 
       {/* Booking History Section */}
       <section>
+        {/* The filter button that used to sit here had no onClick and no
+            handler anywhere — a control that looked interactive, was not, and
+            announced as nothing once its icon-font ligature was removed. There
+            is no filter behind it to wire up, so it is gone rather than
+            labelled. */}
         <div className="flex justify-between items-end mb-stack-md">
           <h2 className="font-section-heading text-section-heading text-on-surface">Booking History</h2>
-          <button type="button" className="w-10 h-10 rounded-full border border-surface-container-highest hover:bg-surface-container-low flex items-center justify-center text-on-surface-variant">
-            <ListFilter className="h-[20px] w-[20px]" aria-hidden="true" />
-          </button>
         </div>
 
         {resumeError && (
