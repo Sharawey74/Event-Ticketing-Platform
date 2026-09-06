@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Store, Ticket } from "lucide-react";
 import { api } from "@/lib/api";
 
 export default function RegisterPage() {
@@ -205,13 +205,12 @@ export default function RegisterPage() {
                     onChange={() => setRole("USER")}
                   />
                   <div className="border-2 border-outline-variant peer-checked:border-primary peer-checked:ring-2 peer-checked:ring-primary/20 peer-checked:bg-primary-fixed/20 rounded-xl p-5 flex flex-col items-center gap-2 transition-all">
-                    <span
-                      className={`material-symbols-outlined text-[36px] ${
+                    <Ticket
+                      className={`h-9 w-9 ${
                         role === "USER" ? "text-primary" : "text-on-surface-variant"
                       }`}
-                    >
-                      confirmation_number
-                    </span>
+                      aria-hidden="true"
+                    />
                     <span className={`text-sm font-medium ${role === "USER" ? "text-primary" : "text-on-surface"}`}>
                       Attend Events
                     </span>
@@ -228,13 +227,12 @@ export default function RegisterPage() {
                     onChange={() => setRole("ORGANIZER")}
                   />
                   <div className="border-2 border-outline-variant peer-checked:border-primary peer-checked:ring-2 peer-checked:ring-primary/20 peer-checked:bg-primary-fixed/20 rounded-xl p-5 flex flex-col items-center gap-2 transition-all">
-                    <span
-                      className={`material-symbols-outlined text-[36px] ${
+                    <Store
+                      className={`h-9 w-9 ${
                         role === "ORGANIZER" ? "text-primary" : "text-on-surface-variant"
                       }`}
-                    >
-                      storefront
-                    </span>
+                      aria-hidden="true"
+                    />
                     <span
                       className={`text-sm font-medium ${role === "ORGANIZER" ? "text-primary" : "text-on-surface"}`}
                     >
