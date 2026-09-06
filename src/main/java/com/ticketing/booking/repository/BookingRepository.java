@@ -32,6 +32,19 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     // BUG-03 Fix: Required by ReservationExpirationJob on Day 8
     List<Booking> findByStateAndExpiresAtBefore(BookingState state, Instant time);
 
+    /**
+     * Fix 26-idem: looks up the booking a given Idempotency-Key already created.
+     *
+     * <p>Used twice by {@code BookingIdempotencyService} — once as a fast path before reserving,
+     * and again after a {@code DataIntegrityViolationException} to find the row that won the race.
+     *
+     * <p>Note this inherits {@code @SQLRestriction("deleted_at IS NULL")} from the entity, so a
+     * soft-deleted booking is invisible here even though its key still occupies the UNIQUE index.
+     * Nothing soft-deletes bookings today (cancellation sets state, not {@code deleted_at}); if
+     * that ever changes, a replayed key would surface as a 500 rather than a replay.
+     */
+    Optional<Booking> findByIdempotencyKey(String idempotencyKey);
+
     // Recovery: ReservationExpirationJob expires stale RESERVED and PAYMENT_PENDING holds.
     // Tickets + tier are fetched so inventory can be released without a lazy-load round trip.
     @EntityGraph(attributePaths = { "tickets", "tickets.tier" })
