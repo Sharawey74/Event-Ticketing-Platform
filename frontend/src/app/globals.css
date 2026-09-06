@@ -28,6 +28,11 @@
   --violet-600: #630ed4;
   --violet-550: #732ee4;
   --violet-500: #7c3aed;
+  /* Used by the hero pointer glow and the glass-button gradient. It was
+     referenced by both before it existed: an undefined var inside
+     color-mix() invalidates the whole declaration, so .aurora-pointer
+     painted nothing at all and the glow has never once shown. */
+  --violet-400: #a855f7;
   --violet-200: #d2bbff;
   --violet-100: #ede0ff;
   --violet-050: #f6f0ff;
@@ -61,15 +66,25 @@
   --paper-500: #d8dadc;
   --paper-inverse: #eff1f3;
 
-  /* status */
+  /* status — the -200/-900 tones are the dark-theme side of each pair. A
+     status colour cannot simply be reused across themes: #ba1a1a on a
+     near-black surface is 2.9:1, so dark needs its own light tone and a
+     correspondingly dark on-colour. */
   --red-600: #ba1a1a;
   --red-700: #93000a;
+  --red-200: #ffb4ab;
   --red-100: #ffdad6;
+  --red-900: #690005;
   --green-700: #137333;
   --green-800: #0b5222;
+  --green-200: #7fe0a2;
   --green-100: #e6f4ea;
+  --green-900: #00391a;
   --amber-800: #7a4b00;
+  --amber-200: #ffb951;
   --amber-100: #ffe6c4;
+  --amber-900: #452b00;
+  --indigo-200: #c0c1ff;
 
   /* night / mist — dark-theme ramps. Declared now so Phase 7 is a pure L2
      remap; nothing references them yet. */
@@ -161,6 +176,86 @@
   --sem-on-background: var(--ink-900);
 }
 
+/* ---------- L2 · SEMANTIC, dark -------------------------------------------
+   The entire theme is this one block. Nothing below L2 is redeclared: because
+   the Tailwind namespace was mapped with `@theme inline`, every utility already
+   compiles to `var(--sem-…)`, so reassigning the semantic layer re-themes the
+   whole app without regenerating a single class. L3 follows for free, since
+   every component token is itself a reference into L2.
+
+   Two roles are deliberately absent:
+
+   · The `-fixed` family. That is the definition of a fixed role in Material 3 —
+     a tone that stays put across themes — and it is what keeps the ten booking
+     status chips reading the same at a venue door under either setting.
+   · `--card-radius` and friends, which are not colours.
+   ------------------------------------------------------------------------ */
+[data-theme="dark"] {
+  --sem-surface: var(--night-050);
+  --sem-surface-dim: var(--night-000);
+  --sem-surface-bright: var(--night-400);
+  --sem-surface-container-lowest: var(--night-000);
+  --sem-surface-container-low: var(--night-100);
+  --sem-surface-container: var(--night-200);
+  --sem-surface-container-high: var(--night-300);
+  --sem-surface-container-highest: var(--night-400);
+
+  --sem-on-surface: var(--mist-100);
+  --sem-on-surface-variant: var(--mist-300);
+
+  --sem-inverse-surface: var(--mist-100);
+  --sem-inverse-on-surface: var(--night-100);
+
+  --sem-outline: var(--mist-400);
+  --sem-outline-variant: var(--night-500);
+  --sem-outline-text: var(--mist-300);
+
+  /* Brand tones invert: a 4.9:1 violet on white is a 2.4:1 violet on near
+     black. The light ramp becomes the foreground and the dark ramp the fill. */
+  --sem-surface-tint: var(--violet-200);
+  --sem-primary: var(--violet-200);
+  --sem-on-primary: var(--violet-900);
+  --sem-primary-container: var(--violet-700);
+  --sem-on-primary-container: var(--violet-100);
+  --sem-inverse-primary: var(--violet-600);
+  --sem-primary-soft: var(--night-300);
+  --sem-on-primary-soft: var(--violet-200);
+
+  --sem-secondary: var(--indigo-200);
+  --sem-on-secondary: var(--navy-900);
+  --sem-secondary-container: var(--indigo-600);
+  --sem-on-secondary-container: var(--indigo-050);
+
+  --sem-tertiary: var(--slate-100);
+  --sem-on-tertiary: var(--navy-900);
+  --sem-tertiary-container: var(--ink-700);
+  --sem-on-tertiary-container: var(--slate-100);
+
+  --sem-error: var(--red-200);
+  --sem-on-error: var(--red-900);
+  --sem-error-container: var(--red-700);
+  --sem-on-error-container: var(--red-100);
+
+  --sem-success: var(--green-200);
+  --sem-on-success: var(--green-900);
+  --sem-success-container: var(--green-800);
+  --sem-on-success-container: var(--green-100);
+
+  --sem-warning: var(--amber-200);
+  --sem-on-warning: var(--amber-900);
+  --sem-warning-container: var(--amber-800);
+  --sem-on-warning-container: var(--amber-100);
+
+  --sem-background: var(--night-050);
+  --sem-on-background: var(--mist-100);
+}
+
+/* Native widgets — the date picker on the hero, scrollbars, form control
+   chrome — are painted by the browser, not by us. Without this they stay light
+   on a dark page and there is no CSS that can reach inside them. */
+:root { color-scheme: light; }
+[data-theme="dark"] { color-scheme: dark; }
+
 /* ---------- L3 · COMPONENT ------------------------------------------------- */
 :root {
   --btn-bg: var(--sem-primary);
@@ -188,6 +283,20 @@
   --band-fg: var(--sem-on-primary);
   --band-alt-bg: var(--sem-inverse-surface);
   --band-alt-fg: var(--sem-inverse-on-surface);
+
+  /* Controls whose own fill is brand violet in both themes: the hero and
+     organizer CTAs, which sit on bands that are near-black either way, and the
+     gradient pill in the navbar, whose fill is painted by .btn-glass rather
+     than inherited from the surface behind it.
+
+     "fixed" in the Material 3 sense — a tone that does not move with the theme.
+     --sem-primary lightens for dark, which is right everywhere else and wrong
+     here: it would put pale violet text on a pale violet fill. Declared once,
+     never overridden in the dark block. */
+  --fixed-cta-bg: var(--violet-600);
+  --fixed-cta-fg: var(--paper-000);
+  --fixed-cta-bg-hover: var(--violet-550);
+  --fixed-cta-on-light: var(--violet-700);
 
   --nav-bg: var(--sem-surface-container-lowest);
   --nav-fg: var(--sem-on-surface);
@@ -396,6 +505,18 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
+/* Frosting is a tint of what is behind it. A white pane over a near-black page
+   is not frosted glass, it is a white box. */
+[data-theme="dark"] .glass-panel {
+  background: rgba(38, 32, 50, 0.7);
+  border-color: rgba(234, 229, 241, 0.12);
+}
+
+[data-theme="dark"] .btn-glass-ghost {
+  background: rgba(38, 32, 50, 0.55);
+  box-shadow: inset 0 1px 0 0 rgba(234, 229, 241, 0.12);
+}
+
 /* Gradients */
 .gradient-text {
   background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
@@ -549,7 +670,7 @@ body {
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
-  scrollbar-color: rgba(99, 14, 212, 0.35) transparent;
+  scrollbar-color: color-mix(in srgb, var(--color-primary) 45%, transparent) transparent;
   scroll-behavior: smooth;
   scroll-snap-type: x proximity;
   overscroll-behavior-x: contain;
@@ -729,12 +850,16 @@ body {
   position: absolute;
   inset: 0;
   z-index: -1;
+  /* Primitives, not semantic tokens. This gradient is the button's own
+     background, not a tint of the page, so it must read the same in both
+     themes — --color-primary here would go pale in dark and collide with the
+     label, which is pinned to --fixed-cta-fg for the same reason. */
   background: linear-gradient(
     115deg,
-    var(--color-primary),
-    var(--color-secondary-container),
-    #a855f7,
-    var(--color-primary)
+    var(--violet-600),
+    var(--indigo-500),
+    var(--violet-400),
+    var(--violet-600)
   );
   background-size: 300% 300%;
   animation: ev-gradient-pan 9s ease infinite;
@@ -815,9 +940,18 @@ body {
   border-radius: 6px;
 }
 
+/* Tokenised rather than fixed greys: a skeleton is a stand-in for the surface
+   it will become, so it has to be that surface's colour in whichever theme is
+   active. The two literals here were the last raw hex in the file. */
 .shimmer {
-  background: #f6f7f8;
-  background-image: linear-gradient(to right, #f6f7f8 0%, #edeef1 20%, #f6f7f8 40%, #f6f7f8 100%);
+  background: var(--color-surface-container-low);
+  background-image: linear-gradient(
+    to right,
+    var(--color-surface-container-low) 0%,
+    var(--color-surface-container-high) 20%,
+    var(--color-surface-container-low) 40%,
+    var(--color-surface-container-low) 100%
+  );
   background-repeat: no-repeat;
   background-size: 800px 100%; 
   animation-duration: 1.5s;
