@@ -1524,6 +1524,84 @@ discards anything parked in them. Worth making durable in the same change.
 
 ---
 
+### Fix 26-hydration — Protected Pages Bounce Signed-In Users to Login on a Cold Load
+**Severity:** 🟠 HIGH — availability / usability (no data exposure)
+**Status:** ⬜ **OPEN**
+**Affects:** `dashboard/bookings/[id]/page.tsx`, `organizer/events/[id]/attendees/page.tsx`,
+`organizer/events/new/page.tsx`
+
+**Classification:** a **frontend code defect**. Found while recapturing the walkthrough
+screenshots — two pages redirected to the login form when the automation opened them directly,
+even though the session was valid.
+
+**Why:**
+`authStore` is a Zustand store using the `persist` middleware over `localStorage`. On a cold load
+the first client render always sees `token === null`, because rehydration happens *after* mount.
+These three pages act on that first render:
+
+```java
+// dashboard/bookings/[id]/page.tsx — fires before the store has rehydrated
+useEffect(() => {
+    if (!token) {
+        router.push("/auth/login");
+    }
+}, [token, router]);
+```
+
+So opening a protected page **directly** — a bookmark, a shared link, or simply pressing refresh —
+kicks an authenticated user to the login screen. The concrete case that matters: an attendee at the
+venue door refreshes their ticket page and loses the QR code they are queuing to scan.
+
+The list pages are unaffected because they never redirect; they only gate the query with
+`enabled: !!token`, which resolves harmlessly once the token arrives.
+
+**Server-side authorization is NOT affected.** Middleware reads the `token` cookie (path `/`,
+correctly set) and passes; the JWT filter is untouched. This is a client-side routing bug only —
+nothing is exposed, and no request is made without credentials.
+
+**The codebase already contains the correct pattern.** `organizer/events/page.tsx` and
+`organizer/events/[id]/edit/page.tsx` gate the same check behind an `isClient` flag and render a
+placeholder until it flips:
+
+```java
+useEffect(() => {
+    if (!isClient) return;          // ← the missing line on the three broken pages
+    if (!token) { router.push("/auth/login"); return; }
+    if (userRole !== "ORGANIZER") { router.push("/dashboard/bookings"); return; }
+}, [isClient, token, userRole, router]);
+```
+
+**Exact Fix — preferred.** `isClient` works, but only because a mount tick happens to be long
+enough. Zustand exposes the real signal, so gate on hydration explicitly rather than on a proxy
+for it:
+
+```java
+const hasHydrated = useAuthStore.persist.hasHydrated();
+
+useEffect(() => {
+    if (!hasHydrated) return;       // say what we actually mean: "not resolved yet"
+    if (!token) router.push("/auth/login");
+}, [hasHydrated, token, router]);
+
+if (!hasHydrated) return <PageSkeleton />;   // never render a protected page in an unknown state
+```
+
+Applying `isClient` to the three pages is the smaller change and matches existing code;
+`hasHydrated` is the more honest one. Either closes the bug — do not mix both in one file.
+
+**Verification.** Reproduce before fixing: sign in, then load `/dashboard/bookings/{id}` directly
+(a fresh tab, or F5). Pre-fix it lands on `/auth/login`; post-fix it renders the ticket. A Playwright
+regression test is the natural home for this, since the bug only appears on a cold navigation and
+is invisible to a click-through path.
+
+⚠️ **Two of the three are confirmed by observation** (`dashboard/bookings/[id]` and
+`organizer/events/[id]/attendees` both redirected during the screenshot run).
+`organizer/events/new` is **inferred** — it carries the identical unguarded pattern
+(`if (!token || userRole !== "ORGANIZER")` with no `isClient`) but was not exercised. Confirm it
+before closing the fix.
+
+---
+
 ## PHASE 1B — Deferred Items and New Issues
 
 The following items were explicitly deferred to Phase 1B or are newly identified from full project audit. They are NOT to be implemented in Phase 1A.
