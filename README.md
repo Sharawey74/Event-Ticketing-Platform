@@ -250,8 +250,8 @@ com.ticketing
 
 | Metric | Result |
 | :--- | :--- |
-| Backend test suite | **217 / 217 passing** — unit, `@WebMvcTest` slices, and Testcontainers integration |
-| Instruction coverage (JaCoCo) | **83.8%** gate-scoped (gate: 80% minimum, enforced on `./mvnw verify`) |
+| Backend test suite | **228 / 228 passing** — unit, `@WebMvcTest` slices, and Testcontainers integration |
+| Instruction coverage (JaCoCo) | **84.1%** gate-scoped (gate: 80% minimum, enforced on `./mvnw verify`) |
 | Dedicated concurrency tests | 2 — a 100-thread/50-seat Redis floor-guard proof, and a second end-to-end test through the full reservation path (DB write included) |
 | Integration tests | Real PostgreSQL, Redis, and RabbitMQ via Testcontainers — no mocked infrastructure in integration suites |
 | `@WebMvcTest` security coverage | Every slice runs the real Spring Security filter chain (`addFilters=false` is never used, so `@PreAuthorize` is always exercised) |
@@ -355,7 +355,7 @@ substitutes for the other.
 | **React JSX auto-escaping · JSON-only API · frontend CSP** | Cross-Site Scripting (XSS) — no server-rendered HTML templates, `dangerouslySetInnerHTML` is never used, and a `Content-Security-Policy` restricts script sources as defense-in-depth. |
 | **Stateless JWT auth (no ambient cookies)** | Cross-Site Request Forgery (CSRF) — the API is stateless (`SessionCreationPolicy.STATELESS`) and authenticated via a Bearer token a cross-site page cannot silently attach, so CSRF's underlying attack vector doesn't exist here. Spring Security's CSRF filter is deliberately disabled — the correct configuration for a token-authenticated REST API, not an oversight. |
 | **Role-Based Access Control (RBAC)** | Unauthorized endpoint access — `@PreAuthorize` role checks (`USER` / `ORGANIZER` / `ADMIN`) gate 18 of 30 endpoints. |
-| **Object-level authorization** | Insecure Direct Object References / Broken Object Level Authorization — RBAC alone only proves a role may call an endpoint, not that a specific resource belongs to the caller. Booking read/cancel operations separately re-validate `booking.getUser().getId().equals(requestingUserId)` before returning or mutating data. |
+| **Object-level authorization** | Insecure Direct Object References / Broken Object Level Authorization — RBAC alone only proves a role may call an endpoint, not that a specific resource belongs to the caller. Booking read/cancel operations separately re-validate `booking.getUser().getId().equals(requestingUserId)` before returning or mutating data, and attendee check-in separately verifies the caller organizes the event the booking belongs to — enforced twice, in the service (for a correct `403`) and again in the state machine guard. |
 | **Server-side role validation on registration** | Privilege Escalation — `Role.ADMIN` is explicitly rejected in `AuthService.register()` regardless of what a client sends, not merely omitted from a form. |
 | **`UNIQUE` idempotency constraints** | Duplicate side effects — a replayed Stripe webhook cannot confirm a booking twice (`uq_processed_stripe_events_event_id`), and a retried booking request cannot create a second reservation or a second charge (`uq_bookings_idempotency_key`). Both are enforced by the database, because a check-then-insert in application code is a race two concurrent callers both win. |
 | **JWT `jti` + Redis denylist** | Session/Token Hijacking — logout immediately revokes the token's `jti` rather than waiting out its natural expiry. |
