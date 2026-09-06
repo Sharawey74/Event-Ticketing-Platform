@@ -12,6 +12,12 @@ const SCENE_ID = "welcome-scene";
  * A standalone entry page: full-bleed midnight scene, a minimal bar, and one
  * button through to the home page.
  *
+ * Locked to the viewport: exactly 100svh, both overflow axes pinned, and no
+ * shared footer (SiteFooter suppresses itself here). `overflow-x-hidden` alone
+ * was not enough — a container that is not `visible` on one axis computes to
+ * `auto` on the other, so the scene had quietly become its own scroll
+ * container. Same rule that put a stray scrollbar on the featured rail.
+ *
  * Nothing redirects here and nothing is stored to remember a visit — it is a
  * page you link to deliberately, not a gate in front of `/`.
  *
@@ -28,7 +34,7 @@ export default function WelcomePage() {
   return (
     <div
       id={SCENE_ID}
-      className="welcome-scene relative flex min-h-[100svh] w-full select-none flex-col justify-between overflow-x-hidden text-white"
+      className="welcome-scene relative flex h-[100svh] w-full select-none flex-col justify-between overflow-hidden overscroll-none text-white"
     >
       {/* Light fields. The wrapper is what the pointer parallax translates —
           moving one element rather than three keeps it to a single transform
@@ -43,7 +49,7 @@ export default function WelcomePage() {
       <ParticleField containerId={SCENE_ID} />
 
       {/* Bar */}
-      <header className="relative z-10 flex items-center justify-between gap-4 px-6 py-8 md:px-16 lg:px-20">
+      <header className="ws-header relative z-10 flex items-center justify-between gap-4 px-6 py-8 md:px-16 lg:px-20">
         <Link
           href="/"
           className="group/brand inline-flex items-center gap-3.5 rounded outline-none focus-visible:ring-2 focus-visible:ring-white/70"
@@ -85,12 +91,12 @@ export default function WelcomePage() {
 
       {/* Centre stack. A div, not <main>: the root layout already wraps every
           page in <main>, and nesting a second one is invalid. */}
-      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-12 text-center">
-        <h1 className="mb-6 select-text text-6xl font-black tracking-tight text-white drop-shadow-sm sm:text-7xl md:text-8xl lg:text-[6.5rem]">
+      <div className="ws-stack relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-12 text-center">
+        <h1 className="ws-title mb-6 select-text text-6xl font-black tracking-tight text-white drop-shadow-sm sm:text-7xl md:text-8xl lg:text-[6.5rem]">
           Welcome.
         </h1>
 
-        <p className="mb-10 max-w-2xl select-text text-lg leading-relaxed font-normal text-slate-100 sm:text-xl md:text-[1.28rem]">
+        <p className="ws-tagline mb-10 max-w-2xl select-text text-lg leading-relaxed font-normal text-slate-100 sm:text-xl md:text-[1.28rem]">
           Live events across Egypt — find one, hold your seat for five minutes,
           and walk in with a QR code.
         </p>
@@ -110,7 +116,7 @@ export default function WelcomePage() {
       </div>
 
       {/* Keeps the headline optically centred against the taller header. */}
-      <div className="h-10" aria-hidden="true" />
+      <div className="ws-spacer h-10" aria-hidden="true" />
     </div>
   );
 }
