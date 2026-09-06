@@ -272,4 +272,42 @@ class BookingServiceReserveTest {
                 verify(inventoryService).releaseSeat(100L, 1);
                 verify(bookingRepository, never()).save(any(Booking.class));
         }
+
+        @Test
+        @DisplayName("reserveTickets: Fix 26-idem — the Idempotency-Key is stamped on the persisted booking")
+        void reserveTickets_whenIdempotencyKeyProvided_shouldStampItOnTheBooking() {
+                stubHappyPath(2);
+
+                Booking booking = bookingService.reserveTickets(1L, 10L, 100L, 2, "key-abc-123");
+
+                // The UNIQUE constraint on this column is what makes a replay impossible;
+                // if the column is never populated the constraint can never fire.
+                assertThat(booking.getIdempotencyKey()).isEqualTo("key-abc-123");
+        }
+
+        @Test
+        @DisplayName("reserveTickets: Fix 26-idem — the 4-arg overload still works and leaves the key null")
+        void reserveTickets_whenNoIdempotencyKey_shouldLeaveKeyNull() {
+                stubHappyPath(2);
+
+                Booking booking = bookingService.reserveTickets(1L, 10L, 100L, 2);
+
+                // Postgres allows many NULLs under a UNIQUE constraint, so un-keyed bookings
+                // (existing rows, and any caller that does not pass a key) never collide.
+                assertThat(booking.getIdempotencyKey()).isNull();
+        }
+
+        /** The full set of stubs a successful reservation needs, for the two tests above. */
+        private void stubHappyPath(int quantity) {
+                when(eventRepository.findByIdWithDetails(10L)).thenReturn(Optional.of(event));
+                when(ticketTierRepository.findById(100L)).thenReturn(Optional.of(tier));
+                when(inventoryService.getAvailableCount(100L)).thenReturn(5);
+                when(lockService.acquireLock(any(), any(), anyLong())).thenReturn(true);
+                when(inventoryService.reserveSeat(100L, quantity)).thenReturn(true);
+                when(ticketTierRepository.decrementAvailableCount(100L, quantity)).thenReturn(1);
+                when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+                when(pricingEngine.calculateFinalPrice(any(), any(), eq(quantity), anyInt(), anyInt()))
+                                .thenReturn(BigDecimal.valueOf(50));
+                when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
+        }
 }
