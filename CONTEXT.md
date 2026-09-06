@@ -483,29 +483,31 @@ This repository has two deployable parts:
 
 ---
 
-## 10. NEXT SESSION START — DAY 26
+## 10. NEXT SESSION START — DAY 27
 
-**Current Branch:** `feat/booking-idempotency` (local, cut from `main` at PR #45 — not pushed)
+**Current Branch:** `feat/booking-idempotency` (local, 13 commits — **not pushed**)
 
-**The task.** Make `Idempotency-Key` mean something. Today it is a doorman who checks you
-have a ticket without ever reading it: `RateLimitFilter` rejects a blank header and does
-nothing else with the value, and the client mints a fresh `crypto.randomUUID()` per attempt,
-so even a server that remembered keys would see every retry as a new booking.
+**Day 26 is complete.** `Idempotency-Key` is now honoured end to end — see the Day 26 entry at the
+top of this file. Nothing is pushed; the branch holds 13 commits.
 
-Two halves, both needed:
+**First task — push and open the PR.** Then pick from the open items below.
 
-1. **Backend** — persist the key with a `UNIQUE` constraint and, on collision, return the
-   booking that key already created instead of making another. This is the pattern
-   `processed_stripe_events` already uses in this repo (Fix 9.2): try the insert, catch
-   `DataIntegrityViolationException`. New migration — **next is `V14__`**. TDD mandate
-   applies: the duplicate-key test goes Red first.
-2. **Frontend** — mint the key once per reservation attempt and reuse it on retry, rather
-   than per click. `TicketTierSelector.tsx:118`.
+**Two gaps the Day 26 docs audit found, both still open and both small:**
 
-**Scope note.** `disabled={isSubmitting}` already blocks the in-browser double-click, so this
-is not an emergency. It closes the residual window: a client-side timeout on a request that
-actually succeeded, two tabs or devices, or an automatic network retry — the shape of the
-failure that charged booking 562 twice.
+1. **`CheckInGuard` is a stub** (`CheckInGuard.java`). `evaluate()` logs and returns `true`: no
+   event-date check, no organizer-ownership check. Fix 8.2's "CHECK_IN dual-guard" is therefore one
+   layer, not two — any `ORGANIZER` can check in any `CONFIRMED` booking, for any event, on any
+   date. The hook is wired correctly and *is* consulted on every check-in; only the body is missing.
+   Closing it means injecting the repositories and comparing
+   `booking.getEvent().getOrganizer().getId()` against the authenticated principal, plus the
+   event-is-today window. TDD: the cross-organizer denial test goes Red first.
+2. **The RabbitMQ retry/DLQ ladder is unconfigured.** The three DLQs are declared and bound, but
+   no `spring.rabbitmq.listener.simple.retry.*` or `default-requeue-rejected` properties exist. Under
+   Spring Boot's defaults a throwing listener **requeues in a tight loop** and never dead-letters, so
+   the documented "3 attempts then DLQ" behaviour does not happen. Config-only fix; see
+   `docs/Core/10_rabbitmq.md` for the exact block.
+
+**Note on migrations:** V14 is applied. **Next is `V15__`.**
 
 **Also still open, unchanged from Day 24 — the user's to do, not automatic:**
 - Stripe CLI is **not installed**; the Stripe account still has **zero webhook endpoints**
