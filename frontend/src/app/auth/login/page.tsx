@@ -93,7 +93,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Email address"
                 autoComplete="email"
-                className="w-full rounded-xl border border-outline-variant bg-surface py-3 pl-10 pr-4 text-sm text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                className="w-full rounded-xl border border-outline-variant bg-surface py-3 pl-10 pr-4 text-sm text-on-surface placeholder:text-outline-text focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all [&:-webkit-autofill]:shadow-[inset_0_0_0_1000px_var(--color-surface)] [&:-webkit-autofill]:[-webkit-text-fill-color:var(--color-on-surface)]"
               />
             </div>
 
@@ -106,7 +106,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
                 autoComplete="current-password"
-                className="w-full rounded-xl border border-outline-variant bg-surface py-3 pl-10 pr-11 text-sm text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                className="w-full rounded-xl border border-outline-variant bg-surface py-3 pl-10 pr-11 text-sm text-on-surface placeholder:text-outline-text focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all [&:-webkit-autofill]:shadow-[inset_0_0_0_1000px_var(--color-surface)] [&:-webkit-autofill]:[-webkit-text-fill-color:var(--color-on-surface)]"
               />
               <button
                 type="button"
