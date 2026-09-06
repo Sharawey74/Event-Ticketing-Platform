@@ -1477,8 +1477,8 @@ missing-extended-state fail-closed test.
 
 ### Fix 26-dlq — Dead-Letter Queues Are Declared but Unreachable
 **Severity:** 🟠 HIGH — reliability / availability
-**Status:** ⬜ **OPEN**
-**Affects:** `application-local.yml`, `application-prod.yml` (config only)
+**Status:** ✅ **APPLIED**
+**Affects:** `application-local.yml`, `application-prod.yml`, `DeadLetterQueueIntegrationTest` (new)
 
 **Classification:** a **configuration defect with a runtime consequence**, not a doc problem. The
 DLQ topology in `RabbitMQConfig` is correct; nothing routes to it because the listener never
@@ -1519,8 +1519,10 @@ force a listener to throw, then assert the message lands in the matching `*.dlq`
 `messages_ready == 1` and that the working queue drains. Testcontainers' `RabbitMQContainer`
 plus the management API can assert this.
 
-**Note:** the DLQs are declared with `new Queue(name)` — **non-durable**. A broker restart
-discards anything parked in them. Worth making durable in the same change.
+**Correction to an earlier note in this file:** the DLQs were described here as non-durable.
+They are not. Spring AMQP's single-argument `new Queue(name)` constructor is `durable=true`, and
+`DeadLetterQueueIntegrationTest.deadLetterQueues_shouldBeDurable` now asserts that against the
+actual declared beans rather than assuming it either way.
 
 ---
 
