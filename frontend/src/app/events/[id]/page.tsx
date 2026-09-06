@@ -121,7 +121,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
                   <CalendarDays className="h-4 w-4 text-primary" aria-hidden="true" />
                 </div>
                 <div>
-                  <h3 className="font-label-sm text-label-sm text-on-surface mb-1">Date & Time</h3>
+                  <h2 className="font-label-sm text-label-sm text-on-surface mb-1">Date & Time</h2>
                   <p className="font-body text-body text-on-surface-variant">
                     {formatDateTime(event.startDate)}
                     <br />
@@ -135,7 +135,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
                   <MapPin className="h-4 w-4 text-primary" aria-hidden="true" />
                 </div>
                 <div>
-                  <h3 className="font-label-sm text-label-sm text-on-surface mb-1">Venue</h3>
+                  <h2 className="font-label-sm text-label-sm text-on-surface mb-1">Venue</h2>
                   <p className="font-body text-body text-on-surface-variant">
                     {event.venue?.name || "TBA"}
                     <br />
