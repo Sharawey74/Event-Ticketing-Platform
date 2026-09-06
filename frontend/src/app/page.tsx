@@ -192,7 +192,7 @@ export default function Home() {
               </Link>
               <a
                 href="#organizers"
-                className="interactive sheen inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-primary text-sm font-semibold hover:bg-white/90 hover:shadow-lg hover:shadow-primary/20"
+                className="interactive sheen inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-[var(--fixed-cta-on-light)] text-sm font-semibold hover:bg-white/90 hover:shadow-lg hover:shadow-primary/20"
               >
                 Become an Organizer
               </a>
@@ -247,7 +247,7 @@ export default function Home() {
             </label>
 
             <button
-              className="interactive sheen rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-container hover:shadow-lg hover:shadow-primary/30"
+              className="interactive sheen rounded-xl bg-[var(--fixed-cta-bg)] px-5 py-2.5 text-sm font-semibold text-[var(--fixed-cta-fg)] hover:bg-[var(--fixed-cta-bg-hover)] hover:shadow-lg hover:shadow-primary/30"
               onClick={applySearch}
               type="button"
             >
@@ -345,7 +345,7 @@ export default function Home() {
             <p className="text-on-surface-variant text-sm font-medium">
               Could not load events — make sure the backend is reachable at the URL below.
             </p>
-            <p className="mt-1 text-xs text-outline">
+            <p className="mt-1 text-xs text-outline-text">
               Expected:{" "}
               <code className="font-mono">
                 {process.env.NEXT_PUBLIC_API_URL}/api/events
@@ -418,7 +418,7 @@ export default function Home() {
 
             <Link
               href="/auth/register"
-              className="mt-3 w-fit rounded-full bg-primary px-7 py-3 text-sm font-bold text-white transition hover:bg-primary-container"
+              className="mt-3 w-fit rounded-full bg-[var(--fixed-cta-bg)] px-7 py-3 text-sm font-bold text-[var(--fixed-cta-fg)] transition hover:bg-[var(--fixed-cta-bg-hover)]"
             >
               Become an Organizer
             </Link>
