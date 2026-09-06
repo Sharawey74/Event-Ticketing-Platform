@@ -76,6 +76,21 @@ public class Booking {
     private Instant deletedAt;
 
     /**
+     * Fix 26-idem — the client-supplied {@code Idempotency-Key} for this reservation.
+     *
+     * <p>The UNIQUE constraint behind this column (V14) is the real guard, not any application-level
+     * check: two concurrent duplicates would both pass a {@code existsBy...()} test, but only one
+     * can win the INSERT. The loser gets {@link org.springframework.dao.DataIntegrityViolationException},
+     * which {@code BookingIdempotencyService} catches and turns into "here is the booking your key
+     * already created". Same pattern as {@code processed_stripe_events} (Fix 9.2).
+     *
+     * <p>NULL when the caller sent no key. PostgreSQL treats NULLs as distinct under UNIQUE, so
+     * un-keyed bookings never collide with each other.
+     */
+    @Column(name = "idempotency_key", length = 255)
+    private String idempotencyKey;
+
+    /**
      * Fix 12.1 — Refund denial transparency.
      * Set when a refund request is denied (< 3 days before event).
      * Stored in the DB via V11 migration: ALTER TABLE bookings ADD COLUMN refund_denial_reason VARCHAR(500).

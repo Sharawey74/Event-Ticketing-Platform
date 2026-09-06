@@ -1,9 +1,12 @@
 package com.ticketing.booking.controller;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -34,6 +37,7 @@ import com.ticketing.booking.dto.BookingResponse;
 import com.ticketing.booking.dto.CreateBookingRequest;
 import com.ticketing.booking.model.Booking;
 import com.ticketing.booking.model.BookingState;
+import com.ticketing.booking.service.BookingIdempotencyService;
 import com.ticketing.booking.service.BookingQueryService;
 import com.ticketing.booking.service.BookingService;
 import com.ticketing.common.config.TestSecurityConfig;
@@ -55,6 +59,11 @@ class BookingControllerTest {
 
     @MockitoBean
     private BookingService bookingService;
+
+    // Fix 26-idem: BookingController now creates bookings through this, and @WebMvcTest still
+    // constructs the controller bean — without a mock the whole slice fails to load (Fix 24-slice).
+    @MockitoBean
+    private BookingIdempotencyService bookingIdempotencyService;
 
     @MockitoBean
     private BookingQueryService bookingQueryService;
@@ -195,15 +204,72 @@ class BookingControllerTest {
                 .build();
         mockBooking.setEvent(event);
 
-        when(bookingService.reserveTickets(anyLong(), anyLong(), anyLong(), anyInt()))
+        when(bookingIdempotencyService.reserveTickets(any(), anyLong(), anyLong(), anyLong(), anyInt()))
                 .thenReturn(mockBooking);
 
         mockMvc.perform(post("/api/v1/bookings")
                 .with(user(mockUser))
+                .header("Idempotency-Key", "key-abc-123")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.state").value("RESERVED"));
+    }
+
+    @Test
+    @DisplayName("POST / Fix 26-idem: the Idempotency-Key header is passed through to the service")
+    void createBooking_whenIdempotencyKeyHeaderPresent_shouldForwardItToTheService() throws Exception {
+        CreateBookingRequest request = new CreateBookingRequest();
+        request.setEventId(10L);
+        request.setTierId(5L);
+        request.setQuantity(2);
+
+        com.ticketing.event.model.Event event = com.ticketing.event.model.Event.builder()
+                .id(10L)
+                .title("Test Event")
+                .startDate(Instant.now())
+                .build();
+
+        Booking mockBooking = Booking.builder()
+                .id(1L)
+                .state(BookingState.RESERVED)
+                .totalAmount(BigDecimal.valueOf(1000))
+                .tickets(List.of())
+                .build();
+        mockBooking.setEvent(event);
+
+        when(bookingIdempotencyService.reserveTickets(any(), anyLong(), anyLong(), anyLong(), anyInt()))
+                .thenReturn(mockBooking);
+
+        mockMvc.perform(post("/api/v1/bookings")
+                .with(user(mockUser))
+                .header("Idempotency-Key", "key-abc-123")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+        // The header must reach the service verbatim — if it is dropped here, the UNIQUE
+        // constraint can never fire and the whole guard is inert.
+        verify(bookingIdempotencyService).reserveTickets(eq("key-abc-123"), eq(1L), eq(10L), eq(5L), eq(2));
+    }
+
+    @Test
+    @DisplayName("POST / Fix 26-idem: a key already used by another user returns 409")
+    void createBooking_whenIdempotencyKeyUsedByAnotherUser_shouldReturn409() throws Exception {
+        CreateBookingRequest request = new CreateBookingRequest();
+        request.setEventId(10L);
+        request.setTierId(5L);
+        request.setQuantity(2);
+
+        when(bookingIdempotencyService.reserveTickets(any(), anyLong(), anyLong(), anyLong(), anyInt()))
+                .thenThrow(new ConflictException("This Idempotency-Key has already been used by a different request."));
+
+        mockMvc.perform(post("/api/v1/bookings")
+                .with(user(mockUser))
+                .header("Idempotency-Key", "someone-elses-key")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict());
     }
 
     @Test

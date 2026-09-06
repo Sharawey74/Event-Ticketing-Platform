@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -18,6 +19,7 @@ import com.ticketing.booking.dto.BookingDetailsResponse;
 import com.ticketing.booking.dto.BookingResponse;
 import com.ticketing.booking.dto.CreateBookingRequest;
 import com.ticketing.booking.model.Booking;
+import com.ticketing.booking.service.BookingIdempotencyService;
 import com.ticketing.booking.service.BookingQueryService;
 import com.ticketing.booking.service.BookingService;
 import com.ticketing.common.dto.ApiResponse;
@@ -36,7 +38,7 @@ import lombok.extern.slf4j.Slf4j;
  * All business logic and DTO mapping lives in BookingService / BookingQueryService / RefundService.
  *
  * Endpoints:
- *   POST /api/v1/bookings                       — Create reservation (authenticated)
+ *   POST /api/v1/bookings                       — Create reservation (authenticated, Idempotency-Key honoured)
  *   GET  /api/v1/bookings/my                    — Get own bookings (authenticated)
  *   GET  /api/v1/bookings/{id}                  — Get booking detail — tickets/QR gated by state
  *   POST /api/v1/bookings/{bookingId}/check-in  — Check in attendee (ORGANIZER/ADMIN)
@@ -51,6 +53,7 @@ import lombok.extern.slf4j.Slf4j;
 public class BookingController {
 
     private final BookingService bookingService;
+    private final BookingIdempotencyService bookingIdempotencyService;
     private final BookingQueryService bookingQueryService;
     private final RefundService refundService;
     private final com.ticketing.payment.service.PaymentReconciliationService paymentReconciliationService;
@@ -159,14 +162,19 @@ public class BookingController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<BookingResponse>> createBooking(
             @Valid @RequestBody CreateBookingRequest request,
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            // Fix 26-idem. required = false so local dev (rate limiting off) still works; when
+            // app.rate-limit.enabled=true, RateLimitFilter has already rejected a missing header
+            // with a 400 before this method is reached.
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
 
         String correlationId = MDC.get("correlationId");
         log.info("[{}] [booking] Reservation request for event {} tier {} qty {} by user {}",
                 correlationId, request.getEventId(), request.getTierId(),
                 request.getQuantity(), userDetails.getId());
 
-        Booking booking = bookingService.reserveTickets(
+        Booking booking = bookingIdempotencyService.reserveTickets(
+                idempotencyKey,
                 userDetails.getId(),
                 request.getEventId(),
                 request.getTierId(),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Lock, Minus, Plus, ShoppingCart, Timer } from "lucide-react";
 
@@ -39,6 +39,30 @@ export function TicketTierSelector({ eventId, eventTitle, tiers }: TicketTierSel
 
   // Local countdown derived from the global store's expiresAt
   const [timeLeft, setTimeLeft] = useState<number>(0);
+
+  // Fix 26-idem: one Idempotency-Key per reservation *intent*, not per click.
+  //
+  // Minting a fresh UUID on every attempt made the header decorative: a retry carried a
+  // different key, so the server saw a brand-new request and could create a second booking —
+  // and a second Stripe charge. Retrying the same intent must therefore reuse the key.
+  //
+  // The key is scoped to the exact request. Changing tier or quantity is a different intent and
+  // gets a new key: replaying the old one would return the ORIGINAL booking, silently ignoring
+  // the change the user just made.
+  //
+  // A ref rather than state on purpose — it must survive a re-render without causing one, and
+  // it is never rendered.
+  const idempotencyKeyRef = useRef<{ key: string; forRequest: string } | null>(null);
+
+  const idempotencyKeyFor = (requestSignature: string): string => {
+    const current = idempotencyKeyRef.current;
+    if (current && current.forRequest === requestSignature) {
+      return current.key; // retry of the same request — reuse so the server can dedupe it
+    }
+    const key = crypto.randomUUID();
+    idempotencyKeyRef.current = { key, forRequest: requestSignature };
+    return key;
+  };
 
   const selectedTier = tiers.find((t) => t.id === selectedTierId);
 
@@ -115,7 +139,9 @@ export function TicketTierSelector({ eventId, eventTitle, tiers }: TicketTierSel
         store.clear();
       }
 
-      const idempotencyKey = crypto.randomUUID();
+      const idempotencyKey = idempotencyKeyFor(
+        `${eventId}:${selectedTierId}:${effectiveQuantity}`
+      );
       const res = await api.post(
         "/api/v1/bookings",
         { eventId, tierId: selectedTierId, quantity: effectiveQuantity },
@@ -124,6 +150,9 @@ export function TicketTierSelector({ eventId, eventTitle, tiers }: TicketTierSel
 
       const booking = res.data?.data;
       if (booking && booking.bookingId) {
+        // Reserved (or replayed). This intent is finished, so the next reservation the user
+        // makes is a genuinely new one and must not reuse this key.
+        idempotencyKeyRef.current = null;
         store.set(
           booking.bookingId,
           booking.expiresAt,

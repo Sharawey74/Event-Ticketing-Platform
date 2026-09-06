@@ -49,8 +49,27 @@ public class BookingService {
     private final StateMachineFactory<BookingState, BookingEvent> stateMachineFactory;
     private final PricingEngine pricingEngine;
 
+    /**
+     * Reserves seats with no idempotency key — the behaviour every existing caller had.
+     * Kept as an overload rather than changing the signature so no call site or test moves.
+     */
     @Transactional
     public Booking reserveTickets(Long userId, Long eventId, Long tierId, int quantity) {
+        return reserveTickets(userId, eventId, tierId, quantity, null);
+    }
+
+    /**
+     * Fix 26-idem: as above, but stamps {@code idempotencyKey} on the booking so the UNIQUE
+     * constraint from V14 can refuse a duplicate.
+     *
+     * <p>This method does <em>not</em> catch the resulting
+     * {@link org.springframework.dao.DataIntegrityViolationException} — it cannot. By the time the
+     * violation is raised this transaction is already marked rollback-only, so it could not read
+     * the winning row anyway. {@code BookingIdempotencyService} sits outside the transaction and
+     * handles it there.
+     */
+    @Transactional
+    public Booking reserveTickets(Long userId, Long eventId, Long tierId, int quantity, String idempotencyKey) {
         if (quantity <= 0 || quantity > BusinessConstants.MAX_TICKETS_PER_BOOKING) {
             throw new IllegalArgumentException("Invalid ticket quantity. Max allowed: " + BusinessConstants.MAX_TICKETS_PER_BOOKING);
         }
@@ -141,6 +160,9 @@ public class BookingService {
                     .state(BookingState.RESERVED)
                     .totalAmount(totalAmount)
                     .expiresAt(Instant.now().plusSeconds(BusinessConstants.RESERVATION_TTL_SECONDS))
+                    // Fix 26-idem: NULL when the caller sent no key — Postgres allows many NULLs
+                    // under a UNIQUE constraint, so un-keyed bookings never collide.
+                    .idempotencyKey(idempotencyKey)
                     .build();
 
             for (int i = 0; i < quantity; i++) {
