@@ -187,7 +187,7 @@ export function Navbar() {
     <>
       <header className="sticky top-0 z-30 h-20 bg-surface/80 backdrop-blur-md shadow-md border-b border-outline-variant flex items-center">
         <div className="mx-auto flex w-full max-w-container-max items-center justify-between gap-4 px-edge-padding">
-          <Link href="/" className="group/brand inline-flex items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded transition-transform duration-300 hover:scale-[1.03]">
+          <Link href="/" className="group/brand inline-flex min-h-11 items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded transition-transform duration-300 hover:scale-[1.03]">
             <Image
               src="/eventora-mark-v2.png"
               alt=""
@@ -205,7 +205,7 @@ export function Navbar() {
 
           <div ref={searchContainerRef} className="hidden md:flex relative w-full max-w-md">
             <form
-              className="w-full flex items-center gap-2 rounded-full border border-outline-variant bg-surface-bright px-3 py-2 transition-all duration-300 focus-within:border-primary focus-within:bg-surface-container-lowest focus-within:shadow-md focus-within:shadow-primary/10"
+              className="w-full flex items-center gap-2 rounded-full border border-outline-variant bg-surface-bright px-3 py-2 transition-all duration-300 focus-within:border-primary focus-within:bg-surface-container-lowest focus-within:shadow-md focus-within:shadow-primary/10 focus-within:ring-2 focus-within:ring-primary/40"
               onSubmit={submitSearch}
             >
               <Search className="h-4 w-4 text-outline shrink-0" />
