@@ -161,10 +161,11 @@ export default function OrganizerDashboardPage() {
           <h2 className="font-section-heading text-section-heading text-on-surface">Recent Venues & Events</h2>
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant h-[20px] w-[20px]" aria-hidden="true" />
-            <input 
-              type="text" 
-              placeholder="Search events..." 
-              className="w-full rounded-full border border-outline-variant py-2 pl-10 pr-4 bg-surface-bright focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-body text-sm"
+            <input
+              type="text"
+              placeholder="Search events..."
+              aria-label="Search your events"
+              className="w-full min-h-11 rounded-full border border-outline-variant py-2 pl-10 pr-4 bg-surface-bright focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-body text-sm"
             />
           </div>
         </div>
@@ -230,15 +231,17 @@ export default function OrganizerDashboardPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      className="interactive w-10 h-10 rounded-full border border-outline-variant hover:text-on-primary hover:border-primary hover:bg-primary flex items-center justify-center text-on-surface-variant"
+                      className="interactive w-11 h-11 rounded-full border border-outline-variant hover:text-on-primary hover:border-primary hover:bg-primary flex items-center justify-center text-on-surface-variant outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                       title="View Attendees"
+                      aria-label="View Attendees"
                       onClick={(e) => { e.stopPropagation(); router.push(`/organizer/events/${event.id}/attendees`); }}
                     >
                       <Users className="h-[20px] w-[20px]" aria-hidden="true" />
                     </button>
                     <button
-                      className="interactive w-10 h-10 rounded-full border border-outline-variant hover:text-on-primary hover:border-primary hover:bg-primary flex items-center justify-center text-on-surface-variant"
+                      className="interactive w-11 h-11 rounded-full border border-outline-variant hover:text-on-primary hover:border-primary hover:bg-primary flex items-center justify-center text-on-surface-variant outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                       title="Edit Event"
+                      aria-label="Edit Event"
                       onClick={(e) => { e.stopPropagation(); router.push(`/organizer/events/${event.id}/edit`); }}
                     >
                       <Pencil className="h-[20px] w-[20px]" aria-hidden="true" />
