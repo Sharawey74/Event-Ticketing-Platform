@@ -52,6 +52,19 @@ const REFERENCE_COUNT = 320;
 const MIN_COUNT = 90;
 const PUSH_RADIUS = 180;
 
+/**
+ * Pace of the field, as fractions of the reference implementation.
+ *
+ * The reference moved fast enough to read as weather rather than as a night
+ * sky, and drifting motion behind body copy competes with reading it. Split
+ * into three because they are three different sensations: DRIFT is how fast a
+ * point crosses the screen, WOBBLE how much it wanders on the way, TWINKLE how
+ * quickly it brightens and dims.
+ */
+const DRIFT_SPEED = 0.35;
+const WOBBLE_SPEED = 0.5;
+const TWINKLE_SPEED = 0.55;
+
 export function ParticleField({ containerId }: { containerId: string }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -81,9 +94,11 @@ export function ParticleField({ containerId }: { containerId: string }) {
     let pointerX = -1000;
     let pointerY = -1000;
 
-    // Cached, and refreshed by ResizeObserver and scroll rather than read per
-    // event. getBoundingClientRect() inside pointermove forces a layout on
-    // every move, which is the standard way to ruin INP on a page like this.
+    // Cached and refreshed by ResizeObserver rather than read per event.
+    // getBoundingClientRect() inside pointermove forces a layout on every
+    // move, which is the standard way to ruin INP on a page like this. No
+    // scroll listener alongside it: the scene is pinned to the viewport, so
+    // its top never moves.
     let rect = container.getBoundingClientRect();
 
     const seed = () => {
@@ -136,21 +151,21 @@ export function ParticleField({ containerId }: { containerId: string }) {
         }
 
         const angle = Math.random() * Math.PI * 2;
-        const velocity = (0.28 + Math.random() * 0.45) * speed;
+        const velocity = (0.28 + Math.random() * 0.45) * speed * DRIFT_SPEED;
 
         particles.push({
           originX: baseX,
           originY: baseY,
           vx: Math.cos(angle) * velocity,
           vy: Math.sin(angle) * velocity,
-          wobbleFreqX: 0.008 + Math.random() * 0.018,
-          wobbleFreqY: 0.008 + Math.random() * 0.018,
+          wobbleFreqX: (0.008 + Math.random() * 0.018) * WOBBLE_SPEED,
+          wobbleFreqY: (0.008 + Math.random() * 0.018) * WOBBLE_SPEED,
           wobbleAmpX: 18 + Math.random() * 32,
           wobbleAmpY: 15 + Math.random() * 26,
           radius,
           color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
           baseAlpha: 0.2 + Math.random() * 0.6,
-          twinkleSpeed: 0.04 + Math.random() * 0.08,
+          twinkleSpeed: (0.04 + Math.random() * 0.08) * TWINKLE_SPEED,
           twinklePhase: Math.random() * Math.PI * 2,
           shimmerDepth: 0.35 + Math.random() * 0.4,
           parallaxFactor,
@@ -265,10 +280,6 @@ export function ParticleField({ containerId }: { containerId: string }) {
       pointerX = -1000;
       pointerY = -1000;
     };
-    const onScroll = () => {
-      rect = container.getBoundingClientRect();
-    };
-
     measure();
 
     // Reduced motion gets the field once and nothing else: no loop, no
@@ -288,7 +299,6 @@ export function ParticleField({ containerId }: { containerId: string }) {
       container.addEventListener("pointerleave", onPointerLeave, {
         passive: true,
       });
-      window.addEventListener("scroll", onScroll, { passive: true });
     }
 
     raf = requestAnimationFrame(loop);
@@ -301,7 +311,6 @@ export function ParticleField({ containerId }: { containerId: string }) {
       observer.disconnect();
       container.removeEventListener("pointermove", onPointerMove);
       container.removeEventListener("pointerleave", onPointerLeave);
-      window.removeEventListener("scroll", onScroll);
     };
   }, [containerId]);
 
