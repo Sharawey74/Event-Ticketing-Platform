@@ -1142,6 +1142,193 @@ body {
   .aurora-pointer { display: none; }
 }
 
+/* ===========================================================================
+   WELCOME SCENE
+   ---------------------------------------------------------------------------
+   The /welcome entry page: a midnight-violet ground, three organic light
+   fields that morph and drift, a vignette, and a canvas particle field on top.
+
+   Its palette is scoped to .welcome-scene rather than added to L1. These
+   colours belong to one page and mean nothing anywhere else, and the scene is
+   fixed-dark in both themes — putting them in the primitive layer would invite
+   exactly the reuse that would then have to be undone.
+
+   The morph is on border-radius, which is not a compositor-friendly property:
+   it repaints. That is affordable here and nowhere else because each blob is
+   behind a 90–150px blur, so the repaint is of a shape nobody can resolve —
+   and the whole layer is `contain: strict`, so it never invalidates the page.
+   =========================================================================== */
+
+.welcome-scene {
+  --ws-ink: #05030a;
+  --ws-core: #1a0e33;
+  --ws-mid: #0d071c;
+
+  --ws-purple-a: #b05cff;
+  --ws-purple-b: #9333ea;
+  --ws-purple-c: #7c3aed;
+
+  --ws-magenta-a: #d946ef;
+  --ws-magenta-b: #a855f7;
+  --ws-magenta-c: #e879f9;
+
+  --ws-indigo-a: #4318ff;
+  --ws-indigo-b: #6366f1;
+  --ws-indigo-c: #7e22ce;
+
+  background: radial-gradient(
+    140% 120% at 50% 42%,
+    var(--ws-core) 0%,
+    var(--ws-mid) 50%,
+    var(--ws-ink) 100%
+  );
+}
+
+/* isolate: mix-blend-screen blends against the nearest stacking context. With
+   no isolation the blobs would reach past the scene and screen against the
+   page behind it. */
+.ws-fields {
+  position: absolute;
+  inset: 0;
+  isolation: isolate;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+  will-change: transform;
+  animation: ws-ambient 7s ease-in-out infinite;
+}
+
+.ws-blob {
+  position: absolute;
+  mix-blend-mode: screen;
+  will-change: transform, border-radius;
+}
+
+.ws-blob-purple {
+  background: linear-gradient(
+    to bottom right,
+    color-mix(in srgb, var(--ws-purple-a) 55%, transparent),
+    color-mix(in srgb, var(--ws-purple-b) 45%, transparent),
+    color-mix(in srgb, var(--ws-purple-c) 35%, transparent)
+  );
+  border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+  animation: ws-drift-purple 12s ease-in-out infinite;
+}
+
+.ws-blob-magenta {
+  background: linear-gradient(
+    to top right,
+    color-mix(in srgb, var(--ws-magenta-a) 45%, transparent),
+    color-mix(in srgb, var(--ws-magenta-b) 40%, transparent),
+    color-mix(in srgb, var(--ws-magenta-c) 30%, transparent)
+  );
+  border-radius: 50% 50% 40% 60% / 60% 40% 50% 50%;
+  animation: ws-drift-magenta 15s ease-in-out infinite;
+}
+
+.ws-blob-indigo {
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--ws-indigo-a) 50%, transparent),
+    color-mix(in srgb, var(--ws-indigo-b) 40%, transparent),
+    color-mix(in srgb, var(--ws-indigo-c) 35%, transparent)
+  );
+  border-radius: 60% 40% 50% 50% / 50% 60% 40% 50%;
+  animation: ws-drift-indigo 13s ease-in-out infinite;
+}
+
+/* Peripheral falloff. The blobs drift, so the headline needs a floor that does
+   not depend on where they happen to be. */
+.ws-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 45%,
+    transparent 42%,
+    color-mix(in srgb, var(--ws-ink) 68%, transparent) 92%
+  );
+}
+
+@keyframes ws-drift-purple {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+    border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+  }
+  25% {
+    transform: translate3d(60px, -45px, 0) scale(1.16) rotate(8deg);
+    border-radius: 58% 42% 64% 36% / 44% 66% 34% 56%;
+  }
+  50% {
+    transform: translate3d(-35px, 30px, 0) scale(0.92) rotate(-6deg);
+    border-radius: 35% 65% 40% 60% / 62% 38% 58% 42%;
+  }
+  75% {
+    transform: translate3d(40px, 20px, 0) scale(1.12) rotate(5deg);
+    border-radius: 60% 40% 55% 45% / 50% 60% 40% 50%;
+  }
+}
+
+@keyframes ws-drift-magenta {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+    border-radius: 50% 50% 40% 60% / 60% 40% 50% 50%;
+  }
+  33% {
+    transform: translate3d(-65px, -50px, 0) scale(1.15) rotate(-9deg);
+    border-radius: 68% 32% 60% 40% / 40% 60% 40% 60%;
+  }
+  66% {
+    transform: translate3d(50px, 35px, 0) scale(0.94) rotate(7deg);
+    border-radius: 42% 58% 48% 52% / 58% 42% 62% 38%;
+  }
+}
+
+@keyframes ws-drift-indigo {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+    border-radius: 60% 40% 50% 50% / 50% 60% 40% 50%;
+  }
+  40% {
+    transform: translate3d(55px, 50px, 0) scale(1.22) rotate(6deg);
+    border-radius: 42% 58% 65% 35% / 38% 55% 62% 45%;
+  }
+  80% {
+    transform: translate3d(-45px, -25px, 0) scale(0.95) rotate(-5deg);
+    border-radius: 58% 42% 45% 55% / 55% 45% 50% 50%;
+  }
+}
+
+/* The reference peaked at brightness(1.25) saturate(1.35). Measured against a
+   reconstruction of the composited ground, that swung the surface under the
+   copy from #7740b5 to #b655cf across the 7s cycle, taking the tagline from
+   4.59:1 down to 2.94:1 — i.e. below AA for most of every breath. The pulse is
+   kept, its peak is not: the breathing still reads, the floor holds. */
+@keyframes ws-ambient {
+  0%,
+  100% {
+    opacity: 0.85;
+    filter: brightness(1) saturate(1.1);
+  }
+  50% {
+    opacity: 0.97;
+    filter: brightness(1.08) saturate(1.18);
+  }
+}
+
+/* Stop, do not shorten — same rule as the hero. A still scene is still a good
+   looking one; the particle field freezes itself in the component. */
+@media (prefers-reduced-motion: reduce) {
+  .ws-fields,
+  .ws-blob-purple,
+  .ws-blob-magenta,
+  .ws-blob-indigo {
+    animation: none !important;
+  }
+}
+
 /* --- hero headline word stagger --------------------------------------- */
 
 @keyframes ev-word-rise {
