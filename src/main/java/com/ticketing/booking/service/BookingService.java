@@ -221,14 +221,54 @@ public class BookingService {
         maxAttempts = 3,
         backoff = @Backoff(delay = 100, multiplier = 2)
     )
+    /**
+     * Checks an attendee in.
+     *
+     * <p>Fix 26-checkin. The previous signature took only a booking id, so neither this method nor
+     * {@code CheckInGuard} had any idea who was asking — which is precisely why the guard could not
+     * enforce anything and defaulted to allowing every check-in. The caller's identity is now
+     * required, and is both checked here and pushed into the machine's extended state for the guard.
+     *
+     * <p>Ownership is verified twice on purpose, and the duplication is not accidental:
+     * <ul>
+     *   <li>here, so an unauthorized caller gets <b>403</b> — a guard can only return true or false,
+     *       so a denial reaching the state machine surfaces as a rejected transition and would be
+     *       reported as 409 Conflict, which is the wrong answer to "this is not your event";</li>
+     *   <li>in the guard, so the transition itself is safe for any future caller that does not come
+     *       through this method.</li>
+     * </ul>
+     *
+     * @param bookingId     the booking to check in
+     * @param currentUserId the authenticated caller
+     * @param isAdmin       true when the caller holds ADMIN, which bypasses the organizer-ownership
+     *                      rule (they are already granted the endpoint by {@code @PreAuthorize})
+     */
     @Transactional
-    public void checkIn(Long bookingId) {
+    public void checkIn(Long bookingId, Long currentUserId, boolean isAdmin) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new EntityNotFoundException("Booking not found: " + bookingId));
-        
+
+        if (!isAdmin) {
+            Long organizerId = booking.getEvent() != null && booking.getEvent().getOrganizer() != null
+                    ? booking.getEvent().getOrganizer().getId()
+                    : null;
+            if (organizerId == null || !organizerId.equals(currentUserId)) {
+                log.warn("[booking] Check-in refused: user {} does not organize the event for booking {}",
+                        currentUserId, bookingId);
+                throw new AccessDeniedException("You may only check in attendees for your own events");
+            }
+        }
+
         var stateMachine = stateMachineFactory.getStateMachine(Long.toString(bookingId));
+
+        // The guard reads these; before this fix nothing was ever put here, so it had no caller
+        // identity to check even in principle.
+        stateMachine.getExtendedState().getVariables().put("bookingId", bookingId);
+        stateMachine.getExtendedState().getVariables().put("currentUserId", currentUserId);
+        stateMachine.getExtendedState().getVariables().put("isAdmin", isAdmin);
+
         stateMachine.startReactively().block();
-        
+
         var result = stateMachine.sendEvent(reactor.core.publisher.Mono.just(
                 org.springframework.messaging.support.MessageBuilder.withPayload(BookingEvent.CHECK_IN).build()
         )).blockLast();
@@ -236,7 +276,7 @@ public class BookingService {
         if (result == null || result.getResultType().name().equals("DENIED")) {
             throw new IllegalStateException("Check-in denied by guard or invalid state for booking " + bookingId);
         }
-        
+
         booking.setState(BookingState.ATTENDED);
         // Additional ticket-level check-in logic would go here
         bookingRepository.save(booking);

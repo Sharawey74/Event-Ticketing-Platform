@@ -87,13 +87,22 @@ public class BookingController {
     @Operation(summary = "Check in an attendee", description = "ORGANIZER/ADMIN only. Transitions a CONFIRMED booking to ATTENDED via the booking state machine.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Attendee checked in")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Not authenticated")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Caller is not an ORGANIZER or ADMIN")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Caller is not an ORGANIZER/ADMIN, or does not organize this booking's event")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Booking not found")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Booking is not in a check-in-eligible state")
     @PostMapping("/{bookingId}/check-in")
     @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
-    public ResponseEntity<Void> checkIn(@PathVariable Long bookingId) {
-        bookingService.checkIn(bookingId);
+    public ResponseEntity<Void> checkIn(
+            @PathVariable Long bookingId,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+
+        // Fix 26-checkin: the role check above says the caller may use this endpoint at all; it
+        // says nothing about whether this particular booking is theirs. The service and the state
+        // machine guard settle that, and both need to know who is asking.
+        boolean isAdmin = userDetails.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+
+        bookingService.checkIn(bookingId, userDetails.getId(), isAdmin);
         return ResponseEntity.ok().build();
     }
 
