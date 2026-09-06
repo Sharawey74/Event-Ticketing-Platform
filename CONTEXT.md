@@ -93,7 +93,7 @@ Verified end to end against real Stripe test mode: a genuine purchase (card `424
 
 ## Previously — Day 20 (2026-07-03) — Code Quality + Security Hardening: restricted `/actuator/**` to ADMIN-only (only `/actuator/health` stays public), added Redis-Lua-backed rate limiting on auth/booking endpoints (M-002), added a JWT `jti` + Redis denylist with a new `/logout` endpoint (M-004), fixed a bug where `TicketTier.availableCount` in the database never decremented on reservation and could have permanently leaked inventory if fixed naively (D19-1), and audited/fixed 3 `log.error()` calls that were silently discarding stack traces (CC-1). 191/191 tests passing, 82% INSTRUCTION coverage verified via `./mvnw clean verify`, JaCoCo gate passed.
 
-## Branch: feat/booking-idempotency (local, 11 commits, cut from `main` at PR #45 — **not pushed**). All redesign branches are merged and can be deleted.
+## Branch: feat/booking-idempotency (local, cut from `main` at PR #45 — **not pushed**). All redesign branches are merged and can be deleted.
 
 ## Test Status: 217/217 ALL passing (+15 in Day 26). Coverage 83.8% INSTRUCTION gate-scoped, JaCoCo gate ✅. Frontend: vitest 4/4, `npm run build` clean, lint 9 errors / 4 warnings (unchanged). **NEXT MIGRATION MUST BE: V15__**
 
@@ -485,10 +485,10 @@ This repository has two deployable parts:
 
 ## 10. NEXT SESSION START — DAY 27
 
-**Current Branch:** `feat/booking-idempotency` (local, 13 commits — **not pushed**)
+**Current Branch:** `feat/booking-idempotency` (local — **not pushed**)
 
 **Day 26 is complete.** `Idempotency-Key` is now honoured end to end — see the Day 26 entry at the
-top of this file. Nothing is pushed; the branch holds 13 commits.
+top of this file. Nothing has been pushed.
 
 **First task — push and open the PR.** Then pick from the open items below.
 
