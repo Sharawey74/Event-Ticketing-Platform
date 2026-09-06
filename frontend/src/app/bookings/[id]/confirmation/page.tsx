@@ -29,6 +29,21 @@ interface BookingDetails {
   tickets: Ticket[];
 }
 
+/**
+ * Ticket QR codes are generated asynchronously. Confirming a booking publishes
+ * ticket.generate to RabbitMQ and a consumer writes the codes a few hundred
+ * milliseconds later, so the first read straight after reconciliation normally
+ * lands before they exist.
+ */
+const QR_POLL_INTERVAL_MS = 600;
+const QR_POLL_TIMEOUT_MS = 12_000;
+
+function awaitingQrCodes(booking: BookingDetails | null | undefined): boolean {
+  if (!booking) return false;
+  if (booking.state !== "CONFIRMED" && booking.state !== "ATTENDED") return false;
+  return (booking.tickets ?? []).some((ticket) => !ticket.qrCode);
+}
+
 export default function ConfirmationPage() {
   const params = useParams<{ id: string }>();
   const bookingId = Number(params.id);
@@ -52,6 +67,8 @@ export default function ConfirmationPage() {
     // Zustand localStorage persist is synchronous on the client, so by the time this effect runs,
     // the token is guaranteed to be loaded if it exists.
     if (!isMounted) return;
+
+    let cancelled = false;
 
     async function fetchBooking() {
       if (!token) {
@@ -83,10 +100,26 @@ export default function ConfirmationPage() {
           }
         }
 
-        setBooking(res.data?.data);
+        let data: BookingDetails | null = res.data?.data ?? null;
+        setBooking(data);
+        setIsLoading(false);
 
-        // Simulate QR loading for the shimmer effect
-        setTimeout(() => setQrsLoaded(true), 2000);
+        // Wait for the codes rather than pretending to. This used to be a flat
+        // two-second timer that revealed whatever the single fetch had already
+        // returned — so on a fresh confirmation the tickets rendered with no QR
+        // at all, and only looked right later because a third-party fallback
+        // drew one from the ticket code. That fallback is gone, so the page has
+        // to actually wait for the real image.
+        const deadline = Date.now() + QR_POLL_TIMEOUT_MS;
+        while (!cancelled && awaitingQrCodes(data) && Date.now() < deadline) {
+          await new Promise((resolve) => setTimeout(resolve, QR_POLL_INTERVAL_MS));
+          if (cancelled) return;
+          const retry = await api.get(`/api/v1/bookings/${bookingId}`);
+          data = retry.data?.data ?? null;
+          setBooking(data);
+        }
+
+        if (!cancelled) setQrsLoaded(true);
       } catch (err: unknown) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setError((err as any)?.response?.data?.message || "Failed to load booking details.");
@@ -97,6 +130,9 @@ export default function ConfirmationPage() {
     }
 
     if (bookingId) fetchBooking();
+    return () => {
+      cancelled = true;
+    };
   }, [bookingId, token, isMounted, refreshKey]);
 
   const handleRefreshStatus = () => {
@@ -249,7 +285,7 @@ export default function ConfirmationPage() {
                         // missing, say so rather than leaking it.
                         <div className="flex h-full w-full items-center justify-center rounded border border-dashed border-outline-variant p-2 text-center">
                           <span className="font-caption text-[11px] leading-tight text-on-surface-variant">
-                            QR code not available yet
+                            Still generating — refresh in a moment
                           </span>
                         </div>
                       ) : (
