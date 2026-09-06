@@ -355,7 +355,43 @@ The first availability check (before acquiring the lock) is the fast path for us
 ---
 
 ### Fix 8.2 — Add `CHECK_IN` Guard (Organizer-Only + Event-Scoped)
-**Severity:** 🟡 IMPORTANT  
+**Severity:** 🟡 IMPORTANT → ⚠️ **RE-CLASSIFIED 🔴 CRITICAL (Day 26)**
+**Status:** ⚠️ **PARTIALLY APPLIED — the wiring landed, the guard body did not.**
+
+> **Day 26 audit correction.** This fix was recorded as ✅ Applied. Only half of it is.
+>
+> What exists: `CheckInGuard` is a real `@Component`, it is declared on the
+> `CONFIRMED → ATTENDED` transition, and it *is* evaluated on every check-in. The
+> `@PreAuthorize` on the controller is real (and is `hasAnyRole('ORGANIZER','ADMIN')`,
+> slightly wider than specified below).
+>
+> What does not exist: **the guard body.** In full:
+>
+> ```java
+> @Override
+> public boolean evaluate(StateContext<BookingState, BookingEvent> context) {
+>     log.info("Evaluating CheckInGuard - ensuring valid check-in conditions...");
+>     // Additional business logic for check-in eligibility
+>     return true;
+> }
+> ```
+>
+> It injects nothing, reads nothing, and cannot deny. So the "both are required" claim at the
+> end of this entry describes an intent, not the code: **check-in has one layer, not two.**
+>
+> **Consequence:** any account with `ORGANIZER` can check in **any** `CONFIRMED` booking, for
+> **any** event, on **any** date. This is Broken Object Level Authorization (OWASP API1). On a
+> multi-organizer platform it lets one organizer mark a rival's attendees `ATTENDED`, and since a
+> used ticket is refused at the door, that is a denial-of-entry attack on real customers — not
+> merely an integrity blemish.
+>
+> **Two extra implementation facts the spec below misses**, both discovered while auditing:
+> 1. `BookingService.checkIn()` sets **no extended-state variables at all**, so the guard cannot
+>    read `bookingId` or `currentUserId` today — those must be populated before the guard can work.
+> 2. `Event` exposes `getOrganizer()` (a `User`), not `getOrganizerId()`. The comparison is
+>    `booking.getEvent().getOrganizer().getId()`.
+>
+> Tracked as **Fix 26-checkin** below.  
 **Original Plan Location:** Section 2, Day 8 → State Machine config, `BookingStateMachineConfig`  
 **Affects:** `CHECK_IN` transition, `BookingController`
 
@@ -1310,6 +1346,181 @@ literal); extract chart colours to `chart-theme.ts`; rebuild the chart as
 `SalesChart.tsx` derived from real events, with an explicit empty state so a
 zero-revenue organizer sees "No sales yet" rather than a flat line that reads as
 broken.
+
+---
+
+## DAY 26 — Booking Idempotency + Two Defects Found While Auditing
+
+### Fix 26-idem — Make `Idempotency-Key` Actually Idempotent
+**Severity:** 🟠 HIGH
+**Status:** ✅ **APPLIED**
+**Affects:** `V14__add_booking_idempotency_key.sql`, `Booking`, `BookingRepository`,
+`BookingService`, `BookingIdempotencyService` (new), `BookingController`, `TicketTierSelector.tsx`
+
+**Why:**
+`POST /api/v1/bookings` accepted an `Idempotency-Key` header and ignored its value.
+`RateLimitFilter` rejected a *blank* header and did nothing else with it, and the client minted a
+fresh `crypto.randomUUID()` on every attempt — so a retry carried a different key regardless. The
+header was decorative on both sides. Exposure: a client timeout on a request that had actually
+succeeded, a second browser tab, or an automatic network retry — the failure that charged booking
+562 twice.
+
+**Exact Fix:**
+The guard is a database `UNIQUE` constraint, not an application check. An
+`existsByIdempotencyKey()` test before inserting is a check-then-act race that two concurrent
+duplicates both pass; only the database can arbitrate. Same pattern as Fix 9.2.
+
+```sql
+ALTER TABLE bookings ADD COLUMN idempotency_key VARCHAR(255);
+ALTER TABLE bookings
+    ADD CONSTRAINT uq_bookings_idempotency_key UNIQUE (idempotency_key);
+```
+
+Additive and nullable, so no backfill and no table rewrite. PostgreSQL treats NULLs as distinct
+under `UNIQUE`, so pre-existing rows and un-keyed requests never collide.
+
+The collision handler **cannot** live in `BookingService`: once
+`DataIntegrityViolationException` is raised, that transaction is rollback-only and cannot read the
+winning row, and `@Transactional` is proxy-based so a self-call would not open a new boundary. It
+lives in a separate, deliberately non-transactional `BookingIdempotencyService`, which does a
+fast-path lookup, delegates, and on collision re-reads the row the winner committed.
+
+Keys are scoped to the user who first used one → a mismatch is **409**, never another user's
+booking. A violation with **no** matching key is rethrown, so a genuine constraint bug is never
+reported as a duplicate.
+
+Client-side, the key is minted once per reservation *intent* (keyed on
+`eventId:tierId:quantity`) and reused across retries — changing tier or quantity deliberately
+mints a new one, because replaying the old key would return the original booking and silently
+discard the change.
+
+**Verification:** 217/217, JaCoCo gate ✅ 83.8% INSTRUCTION gate-scoped. Four integration tests
+against real PostgreSQL. ⚠️ One of them is load-bearing and the rest are not: the first version of
+this suite passed while exercising only the fast-path lookup — the replay never reached the
+database, so the constraint could have been absent entirely and the tests would still have been
+green. The added case bypasses the wrapper and calls `BookingService` twice with the same key,
+asserting Postgres itself refuses the second insert.
+
+---
+
+### Fix 26-checkin — `CheckInGuard` Is an Empty Shell (Fix 8.2 Never Finished)
+**Severity:** 🔴 **CRITICAL** — Broken Object Level Authorization (OWASP API1)
+**Status:** ⬜ **OPEN**
+**Affects:** `CheckInGuard.java`, `BookingService.checkIn()`
+
+**Classification:** this is a **code defect**, not a documentation problem. The documentation was
+wrong *because* the code was incomplete — correcting the docs does not reduce the exposure.
+
+**Why:**
+See the Day 26 correction block on Fix 8.2 above. The guard returns `true` unconditionally, so
+the only real control on check-in is the controller's role check. Any `ORGANIZER` can check in any
+`CONFIRMED` booking, for any event, on any date.
+
+**Exact Fix (superseding the Fix 8.2 snippet, which does not compile against the current model):**
+
+```java
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class CheckInGuard implements Guard<BookingState, BookingEvent> {
+
+    private final BookingRepository bookingRepository;
+
+    @Override
+    public boolean evaluate(StateContext<BookingState, BookingEvent> context) {
+        var vars = context.getExtendedState().getVariables();
+        Long bookingId     = (Long) vars.get("bookingId");
+        Long currentUserId = (Long) vars.get("currentUserId");
+
+        if (bookingId == null || currentUserId == null) {
+            log.warn("[guard] CheckInGuard denied: missing bookingId/currentUserId in extended state");
+            return false;   // fail closed
+        }
+
+        return bookingRepository.findById(bookingId)
+                .map(b -> {
+                    boolean owns = b.getEvent().getOrganizer().getId().equals(currentUserId);
+                    if (!owns) {
+                        log.warn("[guard] CheckInGuard denied: user {} does not organize event {}",
+                                currentUserId, b.getEvent().getId());
+                    }
+                    return owns;
+                })
+                .orElse(false);
+    }
+}
+```
+
+**Prerequisite — do not skip.** `BookingService.checkIn()` currently populates **no** extended
+state, so the guard would read two nulls and (with the code above) fail closed, breaking check-in
+entirely. `checkIn` must accept the caller's id and set both variables before sending `CHECK_IN`:
+
+```java
+sm.getExtendedState().getVariables().put("bookingId", bookingId);
+sm.getExtendedState().getVariables().put("currentUserId", currentUserId);
+```
+
+That changes `checkIn(Long)`'s signature — add an overload rather than editing it, per rule 9.
+
+**Open design question, decide before implementing:** an `ADMIN` currently passes the controller's
+`hasAnyRole('ORGANIZER','ADMIN')` but would fail an organizer-ownership check. Either exempt
+`ADMIN` in the guard or narrow the controller to `ORGANIZER`. Do not leave it ambiguous.
+
+**Also unimplemented from the original intent:** the event-is-today window. `00_CRITICAL_CODE_MAP`
+described the guard as "blocks check-in unless the event is happening today" — that has never
+existed either.
+
+**TDD:** the cross-organizer denial test goes Red first, then a same-organizer allow test, then a
+missing-extended-state fail-closed test.
+
+---
+
+### Fix 26-dlq — Dead-Letter Queues Are Declared but Unreachable
+**Severity:** 🟠 HIGH — reliability / availability
+**Status:** ⬜ **OPEN**
+**Affects:** `application-local.yml`, `application-prod.yml` (config only)
+
+**Classification:** a **configuration defect with a runtime consequence**, not a doc problem. The
+DLQ topology in `RabbitMQConfig` is correct; nothing routes to it because the listener never
+rejects without requeue.
+
+**Why:**
+Each working queue declares `x-dead-letter-exchange: ""` + `x-dead-letter-routing-key: <dlq>`,
+which is correct. But dead-lettering only triggers when a message is **rejected without requeue**,
+and this project sets **no** listener retry properties at all. Under Spring Boot's defaults
+(`default-requeue-rejected: true`, `retry.enabled: false`) a listener that throws causes the
+message to be requeued **immediately and indefinitely** — a hot loop that burns CPU, blocks the
+queue head, and floods the logs. The documented "3 attempts then DLQ" behaviour has never
+happened.
+
+This is what `10_rabbitmq.md` and `13_system_workflows.md` describe as the retry ladder; both now
+carry a warning that it is not wired.
+
+**Exact Fix:**
+
+```yaml
+spring:
+  rabbitmq:
+    listener:
+      simple:
+        default-requeue-rejected: false   # reject -> dead-letter instead of requeue
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 3000
+          multiplier: 2
+```
+
+`default-requeue-rejected: false` is the load-bearing line — without it the retry block alone
+still ends in an infinite requeue once attempts are exhausted.
+
+**Verification that actually proves it** (a passing test that never throws proves nothing):
+force a listener to throw, then assert the message lands in the matching `*.dlq` with
+`messages_ready == 1` and that the working queue drains. Testcontainers' `RabbitMQContainer`
+plus the management API can assert this.
+
+**Note:** the DLQs are declared with `new Queue(name)` — **non-durable**. A broker restart
+discards anything parked in them. Worth making durable in the same change.
 
 ---
 
