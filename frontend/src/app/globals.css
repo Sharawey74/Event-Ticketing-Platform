@@ -1194,7 +1194,6 @@ body {
   overflow: hidden;
   pointer-events: none;
   contain: strict;
-  will-change: transform;
   animation: ws-ambient 7s ease-in-out infinite;
 }
 
