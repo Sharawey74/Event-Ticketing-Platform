@@ -316,7 +316,8 @@ export function TicketTierSelector({ eventId, eventTitle, tiers }: TicketTierSel
                       type="button"
                       onClick={(e) => { e.stopPropagation(); handleDecrease(); }}
                       disabled={effectiveQuantity <= 1}
-                      className="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors disabled:opacity-50"
+                      aria-label="Decrease quantity"
+                      className="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-full relative after:absolute after:left-1/2 after:top-1/2 after:h-11 after:w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']"
                     >
                       <Minus className="h-[20px] w-[20px]" aria-hidden="true" />
                     </button>
@@ -327,7 +328,8 @@ export function TicketTierSelector({ eventId, eventTitle, tiers }: TicketTierSel
                       type="button"
                       onClick={(e) => { e.stopPropagation(); handleIncrease(); }}
                       disabled={effectiveQuantity >= maxQuantity}
-                      className="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors disabled:opacity-50"
+                      aria-label="Increase quantity"
+                      className="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-full relative after:absolute after:left-1/2 after:top-1/2 after:h-11 after:w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']"
                     >
                       <Plus className="h-[20px] w-[20px]" aria-hidden="true" />
                     </button>
