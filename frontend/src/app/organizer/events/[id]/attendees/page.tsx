@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useAuthStore } from "@/store/authStore";
 import { api } from "@/lib/api";
 import { BookingStatusBadge } from "@/components/bookings/BookingStatusBadge";
+import { ArrowLeft, Search } from "lucide-react";
 
 
 interface Attendee {
@@ -79,7 +80,7 @@ export default function EventAttendeesPage() {
       {/* Back button */}
       <nav className="mb-stack-md">
         <Link href="/organizer/events" className="inline-flex items-center gap-1 text-primary hover:text-primary-container-variant transition-colors font-label-sm">
-          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+          <ArrowLeft className="h-[18px] w-[18px]" aria-hidden="true" />
           Back to Events
         </Link>
       </nav>
@@ -91,7 +92,7 @@ export default function EventAttendeesPage() {
           <p className="font-body text-body text-on-surface-variant mt-1">Manage guest check-ins for this event.</p>
         </div>
         <div className="relative w-full md:w-80">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant h-[20px] w-[20px]" aria-hidden="true" />
           <input 
             type="text" 
             placeholder="Search by name, email, or ref..." 
