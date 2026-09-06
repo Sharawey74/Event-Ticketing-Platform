@@ -44,7 +44,13 @@ export default function RegisterPage() {
   };
 
   const inputClass =
-    "w-full rounded-xl border border-outline-variant bg-surface py-3 px-4 text-sm text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all [&:-webkit-autofill]:shadow-[inset_0_0_0_1000px_#f8f9ff]";
+    "w-full rounded-xl border border-outline-variant bg-surface py-3 px-4 text-sm text-on-surface placeholder:text-outline-text focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all " +
+    // Chrome paints its own background on an autofilled field and ignores
+    // `background`; an inset shadow the width of the box is the only way to
+    // cover it. It was pinned to a near-white, which is the right colour in
+    // exactly one theme. --color-on-surface has to come with it, or the text
+    // Chrome forces stays dark on the dark mask.
+    "[&:-webkit-autofill]:shadow-[inset_0_0_0_1000px_var(--color-surface)] [&:-webkit-autofill]:[-webkit-text-fill-color:var(--color-on-surface)]";
 
   return (
     <div className="min-h-[calc(100vh-80px)] flex items-center justify-center bg-surface px-4 py-8">

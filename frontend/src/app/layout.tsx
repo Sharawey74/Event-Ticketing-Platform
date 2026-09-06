@@ -4,6 +4,7 @@ import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Navbar } from "@/components/layout/navbar";
 import { ReservationGuard } from "@/components/layout/ReservationGuard";
 import { AppProviders } from "@/components/providers/app-providers";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -20,6 +21,16 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <head>
+        {/* Stamps data-theme on <html> before the first paint. Next hoists its
+            own stylesheet link above this in the emitted head, which does not
+            matter: an inline script with no async/defer executes during head
+            parsing, so it lands before the body exists and therefore before
+            anything is painted. What would matter is deferring it — a
+            component, an effect, or next/script at any strategy paints the
+            default theme first and then flips, which is the flash this exists
+            to avoid. <html> carries suppressHydrationWarning for exactly this
+            attribute. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"

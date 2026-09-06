@@ -28,6 +28,11 @@
   --violet-600: #630ed4;
   --violet-550: #732ee4;
   --violet-500: #7c3aed;
+  /* Used by the hero pointer glow and the glass-button gradient. It was
+     referenced by both before it existed: an undefined var inside
+     color-mix() invalidates the whole declaration, so .aurora-pointer
+     painted nothing at all and the glow has never once shown. */
+  --violet-400: #a855f7;
   --violet-200: #d2bbff;
   --violet-100: #ede0ff;
   --violet-050: #f6f0ff;
@@ -61,15 +66,25 @@
   --paper-500: #d8dadc;
   --paper-inverse: #eff1f3;
 
-  /* status */
+  /* status — the -200/-900 tones are the dark-theme side of each pair. A
+     status colour cannot simply be reused across themes: #ba1a1a on a
+     near-black surface is 2.9:1, so dark needs its own light tone and a
+     correspondingly dark on-colour. */
   --red-600: #ba1a1a;
   --red-700: #93000a;
+  --red-200: #ffb4ab;
   --red-100: #ffdad6;
+  --red-900: #690005;
   --green-700: #137333;
   --green-800: #0b5222;
+  --green-200: #7fe0a2;
   --green-100: #e6f4ea;
+  --green-900: #00391a;
   --amber-800: #7a4b00;
+  --amber-200: #ffb951;
   --amber-100: #ffe6c4;
+  --amber-900: #452b00;
+  --indigo-200: #c0c1ff;
 
   /* night / mist — dark-theme ramps. Declared now so Phase 7 is a pure L2
      remap; nothing references them yet. */
@@ -161,6 +176,86 @@
   --sem-on-background: var(--ink-900);
 }
 
+/* ---------- L2 · SEMANTIC, dark -------------------------------------------
+   The entire theme is this one block. Nothing below L2 is redeclared: because
+   the Tailwind namespace was mapped with `@theme inline`, every utility already
+   compiles to `var(--sem-…)`, so reassigning the semantic layer re-themes the
+   whole app without regenerating a single class. L3 follows for free, since
+   every component token is itself a reference into L2.
+
+   Two roles are deliberately absent:
+
+   · The `-fixed` family. That is the definition of a fixed role in Material 3 —
+     a tone that stays put across themes — and it is what keeps the ten booking
+     status chips reading the same at a venue door under either setting.
+   · `--card-radius` and friends, which are not colours.
+   ------------------------------------------------------------------------ */
+[data-theme="dark"] {
+  --sem-surface: var(--night-050);
+  --sem-surface-dim: var(--night-000);
+  --sem-surface-bright: var(--night-400);
+  --sem-surface-container-lowest: var(--night-000);
+  --sem-surface-container-low: var(--night-100);
+  --sem-surface-container: var(--night-200);
+  --sem-surface-container-high: var(--night-300);
+  --sem-surface-container-highest: var(--night-400);
+
+  --sem-on-surface: var(--mist-100);
+  --sem-on-surface-variant: var(--mist-300);
+
+  --sem-inverse-surface: var(--mist-100);
+  --sem-inverse-on-surface: var(--night-100);
+
+  --sem-outline: var(--mist-400);
+  --sem-outline-variant: var(--night-500);
+  --sem-outline-text: var(--mist-300);
+
+  /* Brand tones invert: a 4.9:1 violet on white is a 2.4:1 violet on near
+     black. The light ramp becomes the foreground and the dark ramp the fill. */
+  --sem-surface-tint: var(--violet-200);
+  --sem-primary: var(--violet-200);
+  --sem-on-primary: var(--violet-900);
+  --sem-primary-container: var(--violet-700);
+  --sem-on-primary-container: var(--violet-100);
+  --sem-inverse-primary: var(--violet-600);
+  --sem-primary-soft: var(--night-300);
+  --sem-on-primary-soft: var(--violet-200);
+
+  --sem-secondary: var(--indigo-200);
+  --sem-on-secondary: var(--navy-900);
+  --sem-secondary-container: var(--indigo-600);
+  --sem-on-secondary-container: var(--indigo-050);
+
+  --sem-tertiary: var(--slate-100);
+  --sem-on-tertiary: var(--navy-900);
+  --sem-tertiary-container: var(--ink-700);
+  --sem-on-tertiary-container: var(--slate-100);
+
+  --sem-error: var(--red-200);
+  --sem-on-error: var(--red-900);
+  --sem-error-container: var(--red-700);
+  --sem-on-error-container: var(--red-100);
+
+  --sem-success: var(--green-200);
+  --sem-on-success: var(--green-900);
+  --sem-success-container: var(--green-800);
+  --sem-on-success-container: var(--green-100);
+
+  --sem-warning: var(--amber-200);
+  --sem-on-warning: var(--amber-900);
+  --sem-warning-container: var(--amber-800);
+  --sem-on-warning-container: var(--amber-100);
+
+  --sem-background: var(--night-050);
+  --sem-on-background: var(--mist-100);
+}
+
+/* Native widgets — the date picker on the hero, scrollbars, form control
+   chrome — are painted by the browser, not by us. Without this they stay light
+   on a dark page and there is no CSS that can reach inside them. */
+:root { color-scheme: light; }
+[data-theme="dark"] { color-scheme: dark; }
+
 /* ---------- L3 · COMPONENT ------------------------------------------------- */
 :root {
   --btn-bg: var(--sem-primary);
@@ -188,6 +283,20 @@
   --band-fg: var(--sem-on-primary);
   --band-alt-bg: var(--sem-inverse-surface);
   --band-alt-fg: var(--sem-inverse-on-surface);
+
+  /* Controls whose own fill is brand violet in both themes: the hero and
+     organizer CTAs, which sit on bands that are near-black either way, and the
+     gradient pill in the navbar, whose fill is painted by .btn-glass rather
+     than inherited from the surface behind it.
+
+     "fixed" in the Material 3 sense — a tone that does not move with the theme.
+     --sem-primary lightens for dark, which is right everywhere else and wrong
+     here: it would put pale violet text on a pale violet fill. Declared once,
+     never overridden in the dark block. */
+  --fixed-cta-bg: var(--violet-600);
+  --fixed-cta-fg: var(--paper-000);
+  --fixed-cta-bg-hover: var(--violet-550);
+  --fixed-cta-on-light: var(--violet-700);
 
   --nav-bg: var(--sem-surface-container-lowest);
   --nav-fg: var(--sem-on-surface);
@@ -396,6 +505,18 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
+/* Frosting is a tint of what is behind it. A white pane over a near-black page
+   is not frosted glass, it is a white box. */
+[data-theme="dark"] .glass-panel {
+  background: rgba(38, 32, 50, 0.7);
+  border-color: rgba(234, 229, 241, 0.12);
+}
+
+[data-theme="dark"] .btn-glass-ghost {
+  background: rgba(38, 32, 50, 0.55);
+  box-shadow: inset 0 1px 0 0 rgba(234, 229, 241, 0.12);
+}
+
 /* Gradients */
 .gradient-text {
   background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
@@ -549,7 +670,7 @@ body {
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
-  scrollbar-color: rgba(99, 14, 212, 0.35) transparent;
+  scrollbar-color: color-mix(in srgb, var(--color-primary) 45%, transparent) transparent;
   scroll-behavior: smooth;
   scroll-snap-type: x proximity;
   overscroll-behavior-x: contain;
@@ -729,12 +850,16 @@ body {
   position: absolute;
   inset: 0;
   z-index: -1;
+  /* Primitives, not semantic tokens. This gradient is the button's own
+     background, not a tint of the page, so it must read the same in both
+     themes — --color-primary here would go pale in dark and collide with the
+     label, which is pinned to --fixed-cta-fg for the same reason. */
   background: linear-gradient(
     115deg,
-    var(--color-primary),
-    var(--color-secondary-container),
-    #a855f7,
-    var(--color-primary)
+    var(--violet-600),
+    var(--indigo-500),
+    var(--violet-400),
+    var(--violet-600)
   );
   background-size: 300% 300%;
   animation: ev-gradient-pan 9s ease infinite;
@@ -815,9 +940,18 @@ body {
   border-radius: 6px;
 }
 
+/* Tokenised rather than fixed greys: a skeleton is a stand-in for the surface
+   it will become, so it has to be that surface's colour in whichever theme is
+   active. The two literals here were the last raw hex in the file. */
 .shimmer {
-  background: #f6f7f8;
-  background-image: linear-gradient(to right, #f6f7f8 0%, #edeef1 20%, #f6f7f8 40%, #f6f7f8 100%);
+  background: var(--color-surface-container-low);
+  background-image: linear-gradient(
+    to right,
+    var(--color-surface-container-low) 0%,
+    var(--color-surface-container-high) 20%,
+    var(--color-surface-container-low) 40%,
+    var(--color-surface-container-low) 100%
+  );
   background-repeat: no-repeat;
   background-size: 800px 100%; 
   animation-duration: 1.5s;
@@ -1006,6 +1140,222 @@ body {
    or the extra paint layer. */
 @media (hover: none), (pointer: coarse) {
   .aurora-pointer { display: none; }
+}
+
+/* ===========================================================================
+   WELCOME SCENE
+   ---------------------------------------------------------------------------
+   The /welcome entry page: a midnight-violet ground, three organic light
+   fields that morph and drift, a vignette, and a canvas particle field on top.
+
+   Its palette is scoped to .welcome-scene rather than added to L1. These
+   colours belong to one page and mean nothing anywhere else, and the scene is
+   fixed-dark in both themes — putting them in the primitive layer would invite
+   exactly the reuse that would then have to be undone.
+
+   The morph is on border-radius, which is not a compositor-friendly property:
+   it repaints. That is affordable here and nowhere else because each blob is
+   behind a 90–150px blur, so the repaint is of a shape nobody can resolve —
+   and the whole layer is `contain: strict`, so it never invalidates the page.
+   =========================================================================== */
+
+.welcome-scene {
+  --ws-ink: #05030a;
+  --ws-core: #1a0e33;
+  --ws-mid: #0d071c;
+
+  --ws-purple-a: #b05cff;
+  --ws-purple-b: #9333ea;
+  --ws-purple-c: #7c3aed;
+
+  --ws-magenta-a: #d946ef;
+  --ws-magenta-b: #a855f7;
+  --ws-magenta-c: #e879f9;
+
+  --ws-indigo-a: #4318ff;
+  --ws-indigo-b: #6366f1;
+  --ws-indigo-c: #7e22ce;
+
+  background: radial-gradient(
+    140% 120% at 50% 42%,
+    var(--ws-core) 0%,
+    var(--ws-mid) 50%,
+    var(--ws-ink) 100%
+  );
+}
+
+/* isolate: mix-blend-screen blends against the nearest stacking context. With
+   no isolation the blobs would reach past the scene and screen against the
+   page behind it. */
+.ws-fields {
+  position: absolute;
+  inset: 0;
+  isolation: isolate;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+  will-change: transform;
+  animation: ws-ambient 7s ease-in-out infinite;
+}
+
+.ws-blob {
+  position: absolute;
+  mix-blend-mode: screen;
+  will-change: transform, border-radius;
+}
+
+.ws-blob-purple {
+  background: linear-gradient(
+    to bottom right,
+    color-mix(in srgb, var(--ws-purple-a) 55%, transparent),
+    color-mix(in srgb, var(--ws-purple-b) 45%, transparent),
+    color-mix(in srgb, var(--ws-purple-c) 35%, transparent)
+  );
+  border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+  animation: ws-drift-purple 12s ease-in-out infinite;
+}
+
+.ws-blob-magenta {
+  background: linear-gradient(
+    to top right,
+    color-mix(in srgb, var(--ws-magenta-a) 45%, transparent),
+    color-mix(in srgb, var(--ws-magenta-b) 40%, transparent),
+    color-mix(in srgb, var(--ws-magenta-c) 30%, transparent)
+  );
+  border-radius: 50% 50% 40% 60% / 60% 40% 50% 50%;
+  animation: ws-drift-magenta 15s ease-in-out infinite;
+}
+
+.ws-blob-indigo {
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--ws-indigo-a) 50%, transparent),
+    color-mix(in srgb, var(--ws-indigo-b) 40%, transparent),
+    color-mix(in srgb, var(--ws-indigo-c) 35%, transparent)
+  );
+  border-radius: 60% 40% 50% 50% / 50% 60% 40% 50%;
+  animation: ws-drift-indigo 13s ease-in-out infinite;
+}
+
+/* Peripheral falloff. The blobs drift, so the headline needs a floor that does
+   not depend on where they happen to be. */
+.ws-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 45%,
+    transparent 42%,
+    color-mix(in srgb, var(--ws-ink) 68%, transparent) 92%
+  );
+}
+
+@keyframes ws-drift-purple {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+    border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+  }
+  25% {
+    transform: translate3d(60px, -45px, 0) scale(1.16) rotate(8deg);
+    border-radius: 58% 42% 64% 36% / 44% 66% 34% 56%;
+  }
+  50% {
+    transform: translate3d(-35px, 30px, 0) scale(0.92) rotate(-6deg);
+    border-radius: 35% 65% 40% 60% / 62% 38% 58% 42%;
+  }
+  75% {
+    transform: translate3d(40px, 20px, 0) scale(1.12) rotate(5deg);
+    border-radius: 60% 40% 55% 45% / 50% 60% 40% 50%;
+  }
+}
+
+@keyframes ws-drift-magenta {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+    border-radius: 50% 50% 40% 60% / 60% 40% 50% 50%;
+  }
+  33% {
+    transform: translate3d(-65px, -50px, 0) scale(1.15) rotate(-9deg);
+    border-radius: 68% 32% 60% 40% / 40% 60% 40% 60%;
+  }
+  66% {
+    transform: translate3d(50px, 35px, 0) scale(0.94) rotate(7deg);
+    border-radius: 42% 58% 48% 52% / 58% 42% 62% 38%;
+  }
+}
+
+@keyframes ws-drift-indigo {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+    border-radius: 60% 40% 50% 50% / 50% 60% 40% 50%;
+  }
+  40% {
+    transform: translate3d(55px, 50px, 0) scale(1.22) rotate(6deg);
+    border-radius: 42% 58% 65% 35% / 38% 55% 62% 45%;
+  }
+  80% {
+    transform: translate3d(-45px, -25px, 0) scale(0.95) rotate(-5deg);
+    border-radius: 58% 42% 45% 55% / 55% 45% 50% 50%;
+  }
+}
+
+/* The reference peaked at brightness(1.25) saturate(1.35). Measured against a
+   reconstruction of the composited ground, that swung the surface under the
+   copy from #7740b5 to #b655cf across the 7s cycle, taking the tagline from
+   4.59:1 down to 2.94:1 — i.e. below AA for most of every breath. The pulse is
+   kept, its peak is not: the breathing still reads, the floor holds. */
+@keyframes ws-ambient {
+  0%,
+  100% {
+    opacity: 0.85;
+    filter: brightness(1) saturate(1.1);
+  }
+  50% {
+    opacity: 0.97;
+    filter: brightness(1.08) saturate(1.18);
+  }
+}
+
+/* Short viewports.
+   The page is pinned to the viewport with both overflow axes hidden, so unlike
+   an ordinary page there is no "below the fold" here — anything that does not
+   fit is unreachable, not merely further down. A phone in landscape is ~375px
+   tall, where the reference's vertical rhythm put the CTA at y=439. The scene
+   is unchanged; only the spacing and the headline step down. */
+@media (max-height: 620px) {
+  .ws-header {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+  .ws-stack {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+  .ws-title {
+    font-size: clamp(2.25rem, 9vh, 3.75rem);
+    margin-bottom: 0.75rem;
+  }
+  .ws-tagline {
+    font-size: 1rem;
+    line-height: 1.45;
+    margin-bottom: 1.25rem;
+  }
+  .ws-spacer {
+    display: none;
+  }
+}
+
+/* Stop, do not shorten — same rule as the hero. A still scene is still a good
+   looking one; the particle field freezes itself in the component. */
+@media (prefers-reduced-motion: reduce) {
+  .ws-fields,
+  .ws-blob-purple,
+  .ws-blob-magenta,
+  .ws-blob-indigo {
+    animation: none !important;
+  }
 }
 
 /* --- hero headline word stagger --------------------------------------- */

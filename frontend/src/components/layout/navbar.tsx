@@ -21,6 +21,7 @@ import { buildSearchHref } from "@/lib/search";
 import { useAuthStore } from "@/store/authStore";
 import { useReservationStore } from "@/store/reservationStore";
 import { api } from "@/lib/api";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { SearchDropdown } from "./SearchDropdown";
 import { CartDrawer } from "./CartDrawer";
 import type { EventResponse, VenueResponse } from "@/types/event";
@@ -262,6 +263,8 @@ export function Navbar() {
               ))}
             </div>
 
+            <ThemeToggle />
+
             {/* Cart button — hidden on auth pages */}
             {!isAuthPage && (
               <button
@@ -352,7 +355,7 @@ export function Navbar() {
                   Log in
                 </Link>
                 <Link
-                  className="btn-glass inline-flex min-h-11 items-center whitespace-nowrap px-4 py-2 font-label-sm text-on-primary outline-none focus-visible:ring-2 focus-visible:ring-primary/50 sm:px-5"
+                  className="btn-glass inline-flex min-h-11 items-center whitespace-nowrap px-4 py-2 font-label-sm text-[var(--fixed-cta-fg)] outline-none focus-visible:ring-2 focus-visible:ring-primary/50 sm:px-5"
                   href="/auth/register"
                 >
                   Sign up
