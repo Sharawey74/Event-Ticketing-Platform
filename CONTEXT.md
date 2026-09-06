@@ -1,6 +1,59 @@
 # CONTEXT SNAPSHOT — Event Ticketing Platform
 
-## Last Updated: Day 25 (2026-09-06) — UI Redesign v2 (Phases 1–8) merged, and a booking-idempotency gap found while auditing it.
+## Last Updated: Day 26 (2026-09-06) — Booking idempotency closed, and the docs/Core study path rebuilt against the source.
+
+**Day 26 — `Idempotency-Key` now means something.** It was a doorman who checked you had a ticket
+without ever reading it: `RateLimitFilter` rejected a blank header and did nothing with the value,
+and the client minted a fresh `crypto.randomUUID()` per attempt, so a retry carried a different key
+regardless. Both halves are fixed.
+
+**Backend.** `V14__add_booking_idempotency_key.sql` adds `bookings.idempotency_key` with
+`uq_bookings_idempotency_key`. The constraint is the guard — same shape as Fix 9.2's
+`processed_stripe_events` — because an application-level "have I seen this key?" test is a
+check-then-act race that two concurrent duplicates both pass. `BookingService` gained a **5-arg
+overload** (not a signature change: ~15 existing test call sites keep working) that stamps the key.
+
+The catch could not live in `BookingService`: by the time `DataIntegrityViolationException` is
+raised that transaction is rollback-only, so it cannot read the winning row, and `@Transactional` is
+proxy-based so a self-call would not create a new boundary. Hence `BookingIdempotencyService` — a
+deliberately non-transactional bean that does a fast-path lookup, delegates, and on collision
+re-reads the row the winner committed. A key is scoped to its user; a mismatch is **409**, never
+someone else's booking. A violation with no matching key is **rethrown**, so a genuine constraint
+bug is never reported as a duplicate.
+
+**Frontend.** `TicketTierSelector` holds the key in a ref keyed by `eventId:tierId:quantity`, reuses
+it across retries of the same intent, and clears it on success. Changing tier or quantity mints a
+new key on purpose — replaying the old one would return the *original* booking and silently discard
+the change the user just made.
+
+⚠️ **The test that nearly shipped measuring nothing.** The first integration test passed while
+proving only the fast-path lookup: the replay never reached the database, so the constraint could
+have been absent entirely and everything would still have been green. There is now a case that
+bypasses the wrapper and calls `BookingService` twice with the same key, asserting Postgres itself
+refuses the second insert. **That one is the guarantee; the lookup is only speed.**
+
+**Verification.** 217/217 (from 202: +7 unit on the guard, +4 integration on real PostgreSQL, +2 on
+key stamping, +2 on the controller header). JaCoCo gate ✅ 83.8% INSTRUCTION gate-scoped. Because the
+integration tests boot the full context under `ddl-auto: validate`, Flyway genuinely applied V1→V14
+and Hibernate verified the column exists — the migration is proven, not assumed. Frontend: vitest
+4/4, `npm run build` clean, lint unchanged at 9 errors / 4 warnings (all pre-existing, none in the
+touched file).
+
+**Docs.** The whole `docs/Core` study path was rebuilt against the source. The first two passes had
+only checked facts (ports, versions, counts); this one checked the *code*, and ~110 fabricated or
+incorrect identifiers were corrected — wrong Redis keys, wrong RabbitMQ exchange and queue names, a
+state-machine doc describing six transitions and four classes that do not exist, `ApiResponse` fields
+that are never returned, "all DTOs are records" in a codebase containing zero records. Every
+technology doc also gained a vendor-neutral **What it is** definition above its project role, plus an
+annotation reference in `05` and a table-to-entity walkthrough in `07`. `docs/` is gitignored, so
+none of that appears in this branch's diff.
+
+⚠️ **Two code gaps the docs audit found and documented rather than fixed** — both still open:
+`CheckInGuard` is a stub returning `true` (so check-in has one real layer, not the two Fix 8.2
+claims), and the RabbitMQ retry/DLQ ladder is unconfigured, so a throwing listener requeues in a
+tight loop and never dead-letters.
+
+## Previously — Day 25 (2026-09-06) — UI Redesign v2 (Phases 1–8) merged, and a booking-idempotency gap found while auditing it.
 
 **Shipped.** The full `design_tasks.md` redesign, 71 commits across eight phase branches, merged to `main` as PRs #37–#45. Phase 1 restructured colour into three layers — primitive → semantic → component — and mapped Tailwind's `--color-*` namespace onto the semantic layer with **`@theme inline`**, which is the load-bearing detail: `inline` compiles each utility to `var(--sem-…)` rather than a frozen value, so Phase 7's dark mode is one `[data-theme="dark"]` block reassigning that layer, with no utility, component token or markup touched. Phase 1 was proven byte-identical on the built output before anything was built on it.
 
@@ -40,9 +93,9 @@ Verified end to end against real Stripe test mode: a genuine purchase (card `424
 
 ## Previously — Day 20 (2026-07-03) — Code Quality + Security Hardening: restricted `/actuator/**` to ADMIN-only (only `/actuator/health` stays public), added Redis-Lua-backed rate limiting on auth/booking endpoints (M-002), added a JWT `jti` + Redis denylist with a new `/logout` endpoint (M-004), fixed a bug where `TicketTier.availableCount` in the database never decremented on reservation and could have permanently leaked inventory if fixed naively (D19-1), and audited/fixed 3 `log.error()` calls that were silently discarding stack traces (CC-1). 191/191 tests passing, 82% INSTRUCTION coverage verified via `./mvnw clean verify`, JaCoCo gate passed.
 
-## Branch: feat/booking-idempotency (local, cut from `main` at PR #45 — not pushed). All redesign branches are merged and can be deleted.
+## Branch: feat/booking-idempotency (local, 11 commits, cut from `main` at PR #45 — **not pushed**). All redesign branches are merged and can be deleted.
 
-## Test Status: 202/202 ALL passing (unchanged — Day 25 was frontend-only). Frontend: vitest 4/4, `npm run build` clean, lint 9 errors / 4 warnings. **NEXT MIGRATION MUST BE: V14__**
+## Test Status: 217/217 ALL passing (+15 in Day 26). Coverage 83.8% INSTRUCTION gate-scoped, JaCoCo gate ✅. Frontend: vitest 4/4, `npm run build` clean, lint 9 errors / 4 warnings (unchanged). **NEXT MIGRATION MUST BE: V15__**
 
 ## 1. NON-NEGOTIABLE RULES (From instructions.txt + Overlay)
 
@@ -100,8 +153,9 @@ Every agent session must enforce these without exception:
 | V11__add_waitlist_and_refund_reason.sql | waitlist_entries table + bookings.refund_denial_reason | IMMUTABLE |
 | V12__add_egyptian_venues.sql | Additional real Egyptian tourism-city venues (Giza, Alexandria, Luxor, Aswan, Hurghada, Sharm El Sheikh, Dahab) | IMMUTABLE |
 | V13__seed_egypt_private_events.sql | 1 new category (Conference), 2 new ORGANIZER users, 15 PUBLISHED Egyptian private events + 30 ticket tiers | IMMUTABLE |
+| V14__add_booking_idempotency_key.sql | `bookings.idempotency_key` + `uq_bookings_idempotency_key` (Fix 26-idem) | IMMUTABLE |
 
-**NEXT MIGRATION MUST BE: V14__...**
+**NEXT MIGRATION MUST BE: V15__...**
 
 ---
 
@@ -244,7 +298,9 @@ class YourControllerTest {
 | **25-contrast** | Three controls flipped their fill with the theme while their label did not: `.btn-gradient` at **1.71:1** in dark (sign-in / create-account), `.btn-glass`, and the confirmation panel's "Total Paid" label at **1.36:1**. ⚠️ The dark-mode sweep missed all three because it reads `background-color` and a gradient is a `background-image` — a known blind spot for any future audit | Frontend | ✅ Applied | auth/login, auth/register, confirmation/page.tsx, globals.css |
 | **25-violet400** | `--violet-400` was referenced by `.aurora-pointer` and never defined. An undefined var inside `color-mix()` invalidates the entire declaration, so the hero pointer glow had never once painted | Frontend | ✅ Applied | globals.css |
 | **25-welcome** | `/welcome` rebuilt full-bleed on a new scene (morphing light fields, canvas particle field). Pinned to the viewport — `overflow-x-hidden` alone had made it its own scroll container, since a box that is not `visible` on one axis computes to `auto` on the other. No cursor-driven motion. Ambient pulse peak lowered after measuring the composited ground swing to #b655cf, which took the tagline to 2.94:1 | Frontend | ✅ Applied | welcome/page.tsx, welcome/ParticleField.tsx, globals.css |
-| **26-idem** (Day 26) | ⚠️ **OPEN.** `Idempotency-Key` is sent on booking creation but provides no idempotency: `RateLimitFilter` only checks the header is present, never storing or comparing it, and the client mints a fresh UUID per attempt. Double-click is already blocked by `disabled={isSubmitting}`, so exposure is a client timeout on a succeeded request, two tabs, or a network retry — the failure that charged booking 562 twice. To be closed with the `processed_stripe_events` pattern: UNIQUE constraint + catch `DataIntegrityViolationException` | Booking | ⬜ In progress | RateLimitFilter.java:83, TicketTierSelector.tsx:118 |
+| **26-idem** (Day 26) | **CLOSED.** `bookings.idempotency_key` + `uq_bookings_idempotency_key` (V14) is the guard; `BookingIdempotencyService` sits outside the transaction (it must — the exception leaves the tx rollback-only, and `@Transactional` is proxy-based) and returns the booking the key already created. Keys are user-scoped: a mismatch is 409. A violation with no matching key is rethrown, so a real constraint bug is never masked as a duplicate. The client reuses one key per intent, keyed on `eventId:tierId:quantity`. Proven end to end against real PostgreSQL, including a case that bypasses the fast path so the constraint itself is what refuses the duplicate | Booking | ✅ Applied | V14 migration, Booking.java, BookingRepository.java, BookingService.java, BookingIdempotencyService.java, BookingController.java, TicketTierSelector.tsx |
+| **26-checkin** | ⚠️ **OPEN — found during the Day 26 docs audit.** `CheckInGuard.evaluate()` is a stub that logs and returns `true`. No event-date check, no organizer-ownership check — so Fix 8.2's "CHECK_IN dual-guard" is one layer, not two: any ORGANIZER can check in any CONFIRMED booking on any date. The hook is wired correctly and *is* consulted; only the body is missing | Booking | ⬜ Open | CheckInGuard.java |
+| **26-dlq** | ⚠️ **OPEN — found during the Day 26 docs audit.** The RabbitMQ dead-letter queues are declared, but no listener retry properties exist (`spring.rabbitmq.listener.simple.retry.*`, `default-requeue-rejected`). Under Spring Boot's defaults a throwing listener requeues in a tight loop and never reaches a DLQ, so the documented "3 retries then DLQ" behaviour does not happen | Infra | ⬜ Open | application-*.yml, RabbitMQConfig.java |
 
 ---
 
