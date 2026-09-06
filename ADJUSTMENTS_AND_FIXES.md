@@ -1405,7 +1405,7 @@ asserting Postgres itself refuses the second insert.
 
 ### Fix 26-checkin — `CheckInGuard` Is an Empty Shell (Fix 8.2 Never Finished)
 **Severity:** 🔴 **CRITICAL** — Broken Object Level Authorization (OWASP API1)
-**Status:** ⬜ **OPEN**
+**Status:** ✅ **APPLIED**
 **Affects:** `CheckInGuard.java`, `BookingService.checkIn()`
 
 **Classification:** this is a **code defect**, not a documentation problem. The documentation was
@@ -1462,13 +1462,20 @@ sm.getExtendedState().getVariables().put("currentUserId", currentUserId);
 
 That changes `checkIn(Long)`'s signature — add an overload rather than editing it, per rule 9.
 
-**Open design question, decide before implementing:** an `ADMIN` currently passes the controller's
-`hasAnyRole('ORGANIZER','ADMIN')` but would fail an organizer-ownership check. Either exempt
-`ADMIN` in the guard or narrow the controller to `ORGANIZER`. Do not leave it ambiguous.
+**Design question, resolved:** `ADMIN` is exempt from the ownership rule. The controller already
+grants them the endpoint, and the rule exists to separate organizers from each other, not to
+restrict platform operators. The flag is passed explicitly rather than re-derived in the guard.
 
-**Also unimplemented from the original intent:** the event-is-today window. `00_CRITICAL_CODE_MAP`
-described the guard as "blocks check-in unless the event is happening today" — that has never
-existed either.
+**Also resolved:** ownership is checked in *both* the service and the guard. A guard returns only
+true or false, so a denial reaching the state machine would be reported as **409**; the service
+check produces the correct **403**, and the guard keeps the transition safe for callers that do not
+go through the service.
+
+⚠️ **Still not implemented — the event-is-today window.** `00_CRITICAL_CODE_MAP` described the guard
+as "blocks check-in unless the event is happening today"; that has never existed and is *not* part
+of this fix. It needs a product decision first (which timezone, and how long before and after the
+start time check-in stays open), and unlike ownership it is not a security boundary. Tracked
+separately rather than guessed at.
 
 **TDD:** the cross-organizer denial test goes Red first, then a same-organizer allow test, then a
 missing-extended-state fail-closed test.
@@ -1528,7 +1535,7 @@ actual declared beans rather than assuming it either way.
 
 ### Fix 26-hydration — Protected Pages Bounce Signed-In Users to Login on a Cold Load
 **Severity:** 🟠 HIGH — availability / usability (no data exposure)
-**Status:** ⬜ **OPEN**
+**Status:** ✅ **APPLIED**
 **Affects:** `dashboard/bookings/[id]/page.tsx`, `organizer/events/[id]/attendees/page.tsx`,
 `organizer/events/new/page.tsx`
 
