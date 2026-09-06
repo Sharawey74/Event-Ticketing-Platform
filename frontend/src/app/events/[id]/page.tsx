@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { TicketTierSelector } from "@/components/events/TicketTierSelector";
 import { EventDetailResponse } from "@/types/event";
+import { CalendarDays, ChevronRight, MapPin } from "lucide-react";
 
 async function getEventDetails(id: string): Promise<EventDetailResponse | null> {
   const url = `${process.env.NEXT_PUBLIC_API_URL}/api/events/${id}`;
@@ -71,7 +72,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             </li>
             <li>
               <div className="flex items-center">
-                <span className="material-symbols-outlined text-[16px] mx-1">chevron_right</span>
+                <ChevronRight className="h-[16px] w-[16px] mx-1" aria-hidden="true" />
                 <Link className="hover:text-primary transition-colors" href={`/search?categoryId=${event.category?.id || ""}`}>
                   {event.category?.name || "Category"}
                 </Link>
@@ -79,7 +80,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             </li>
             <li aria-current="page">
               <div className="flex items-center">
-                <span className="material-symbols-outlined text-[16px] mx-1">chevron_right</span>
+                <ChevronRight className="h-[16px] w-[16px] mx-1" aria-hidden="true" />
                 <span className="text-primary font-medium">{event.title}</span>
               </div>
             </li>
@@ -117,7 +118,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-stack-md bg-surface-container-lowest p-6 rounded-xl shadow-md border border-outline-variant/10">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-primary">calendar_month</span>
+                  <CalendarDays className="h-4 w-4 text-primary" aria-hidden="true" />
                 </div>
                 <div>
                   <h3 className="font-label-sm text-label-sm text-on-surface mb-1">Date & Time</h3>
@@ -131,7 +132,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
               
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-primary">location_on</span>
+                  <MapPin className="h-4 w-4 text-primary" aria-hidden="true" />
                 </div>
                 <div>
                   <h3 className="font-label-sm text-label-sm text-on-surface mb-1">Venue</h3>
