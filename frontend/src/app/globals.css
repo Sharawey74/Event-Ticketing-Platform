@@ -1318,6 +1318,35 @@ body {
   }
 }
 
+/* Short viewports.
+   The page is pinned to the viewport with both overflow axes hidden, so unlike
+   an ordinary page there is no "below the fold" here — anything that does not
+   fit is unreachable, not merely further down. A phone in landscape is ~375px
+   tall, where the reference's vertical rhythm put the CTA at y=439. The scene
+   is unchanged; only the spacing and the headline step down. */
+@media (max-height: 620px) {
+  .ws-header {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+  .ws-stack {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+  .ws-title {
+    font-size: clamp(2.25rem, 9vh, 3.75rem);
+    margin-bottom: 0.75rem;
+  }
+  .ws-tagline {
+    font-size: 1rem;
+    line-height: 1.45;
+    margin-bottom: 1.25rem;
+  }
+  .ws-spacer {
+    display: none;
+  }
+}
+
 /* Stop, do not shorten — same rule as the hero. A still scene is still a good
    looking one; the particle field freezes itself in the component. */
 @media (prefers-reduced-motion: reduce) {
