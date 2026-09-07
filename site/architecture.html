@@ -331,19 +331,65 @@
     <div class="wrap">
       <div class="section-head">
         <h2>Performance</h2>
+        <p class="lede">Every figure below was measured, not estimated. The ceilings were found by ramping
+          <em>arrival rate</em> until p95 crossed a 500ms budget — ramping virtual users cannot find a limit,
+          because a slowing server makes each user send fewer requests and the test quietly throttles its own
+          input.</p>
       </div>
+
+      <h3>Capacity ceilings</h3>
+      <p>Measured in a container constrained to the production shape — <b>1 CPU, 512MB, <code>prod</code> profile,
+        5-connection Hikari pool</b> — with the load generator in its own CPU-budgeted container so it could not
+        steal cores from the thing it was measuring.</p>
       <div class="table-scroll">
         <table>
           <thead>
             <tr><th>Scenario</th><th>Result</th></tr>
           </thead>
           <tbody>
-            <tr><td><b>Baseline read path (50 VUs)</b></td><td>p95 15.9ms, 0.00% error rate, 74.4 req/s</td></tr>
-            <tr><td><b>Booking creation under contention (20 VUs)</b></td><td>p95 55.4ms, 0 server errors, floor guard held at exactly the tier's true capacity</td></tr>
-            <tr><td><b>Inventory-pressure burst (100 VUs vs. 8-seat tier)</b></td><td>Up to 270 req/s, 99.9%+ correctly rejected with 409, zero oversell, zero 5xx</td></tr>
-            <tr><td><b>Capacity ramp — live Railway, 10→200 VUs over 16 min</b></td><td>32,577 requests, 0 failed, 0 server errors, read-path p95 held at 394ms at peak</td></tr>
+            <tr><td><b>Read-path ceiling, 1 replica</b></td><td><b>660 req/s</b> sustained before p95 crossed the budget — 107,839 requests, median <b>2.40ms</b>, p95 511ms, <b>0 errors</b></td></tr>
+            <tr><td><b>Read-path ceiling, 2 replicas</b></td><td><b>870 req/s</b> — 133,383 requests, <b>0 errors</b>. Scaling factor <b>1.32×</b></td></tr>
+            <tr><td><b>Latency under horizontal scale</b></td><td>At <b>800 req/s</b> two replicas held <b>p95 9.0ms</b> using only 55 of 4,000 virtual users — the same workload needed 952 VUs on one replica</td></tr>
+            <tr><td><b>Reliability across the exercise</b></td><td><b>569,066 requests, 0 failed, 0 server errors</b> across five valid runs</td></tr>
+            <tr><td><b>Bottleneck identified</b></td><td>Both replicas saturated their own 1.0-CPU budget (105%) while Postgres, Redis, the connection pool and the host all had headroom — the read path is <b>CPU-bound, not database-bound</b></td></tr>
           </tbody>
         </table>
+      </div>
+
+      <h3>Correctness under concurrency</h3>
+      <p>Behavioural guarantees rather than speed figures — these are the numbers that matter for a ticketing
+        system, because a fast oversell is still an oversell.</p>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>Scenario</th><th>Result</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>Inventory-pressure burst (100 VUs vs. 8-seat tier)</b></td><td>Up to 270 req/s, 99.9%+ correctly rejected with 409, zero oversell, zero 5xx</td></tr>
+            <tr><td><b>Booking creation under contention (20 VUs)</b></td><td>p95 55.4ms, 0 server errors, floor guard held at exactly the tier's true capacity</td></tr>
+            <tr><td><b>100 threads vs. a 50-seat tier, full reservation path</b></td><td>Exactly 50 succeed, every time — not just the Redis script, but the lock, the Lua guard and the conditional SQL <code>UPDATE</code> together</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Against live production</h3>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>Scenario</th><th>Result</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>Capacity ramp — live Railway, 10→200 VUs over 16 min</b></td><td>32,577 requests, 0 failed, 0 server errors, read-path p95 held at 394ms at peak (single replica, read-only journeys)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <p><strong>What these numbers are not.</strong> The ceilings are <b>local</b> measurements in a
+          production-<em>shaped</em> container, not production measurements: there is no network round trip and the
+          database sits on the same host. They establish <em>which resource saturates first</em> — a structural
+          property that transfers to any deployment — not a “we serve N users” number. P99 was not captured, and
+          the write path has not been load-tested above 20 VUs.</p>
       </div>
     </div>
   </section>

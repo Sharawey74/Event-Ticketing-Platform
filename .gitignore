@@ -85,3 +85,6 @@ logging-pretty.json
 !/frontend/README.md
 !/frontend/ARCHITECTURE.md
 !/frontend/DESIGN.md
+
+# k6 performance-harness run output (JSON summaries, regenerated per run)
+perf-results/
