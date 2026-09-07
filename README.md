@@ -356,10 +356,23 @@ pool**) with the load generator in its own CPU-budgeted container:
 **Against live production** (single Railway replica, read-only journeys): capacity ramp 10→200 VUs
 over 16 min — 32,577 requests, **0 failed, 0 server errors**, p95 held at **394ms** at peak.
 
-> Ceiling figures are **local** measurements in a production-*shaped* container, not production
-> measurements: there is no network RTT and the database is on the same host. They establish which
-> resource saturates first — a structural property that transfers — not a "we serve N users"
-> number. P99 was not captured; the write path has not been load-tested above 20 VUs.
+**What transfers, and what doesn't.** The three groups above have deliberately different reach:
+
+- **Correctness transfers completely**, and holds *harder* here than in production. No network
+  latency means concurrent requests genuinely collide rather than arriving spread out, and a single
+  CPU forces thread interleaving. Both make races more likely to surface — this environment is a
+  stricter test of the invariant than a real deployment, not a weaker one.
+- **The bottleneck finding transfers.** The read path saturates CPU before it saturates the
+  5-connection pool, Redis or Postgres. That is a structural property of the code and the pool size,
+  measured with every container's CPU captured at once, and it holds wherever this is deployed.
+- **The absolute req/s belongs to this environment.** Quote 660 req/s as "on 1 CPU with a
+  5-connection pool", not as a production capacity number — real infrastructure moves it in both
+  directions at once, since network round trips slow each client down while a managed database over
+  the network slows each query.
+
+Known gaps, stated rather than papered over: **P99 was never captured** (k6's default summary
+reports p90/p95 only), and **the write path has not been load-tested above 20 VUs** — it is the path
+with the distributed lock, the Lua guard and two inserts, where the pool should bind hardest.
 
 ---
 
