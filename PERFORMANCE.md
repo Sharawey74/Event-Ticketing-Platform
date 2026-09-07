@@ -325,6 +325,17 @@ not — every one of them passed, so each remains a **lower bound on capacity**,
 lock, the Lua script, the conditional `UPDATE` and two inserts — the one where the 5-connection
 pool should bind hardest — and it is the largest remaining gap.
 
+### What transfers to another deployment
+
+The results are not all equally environment-bound, and treating them as one undifferentiated
+"local, therefore weaker" block understates two of them and overstates the third.
+
+| Result | Reach | Why |
+|---|---|---|
+| **Correctness** — zero oversell, exactly 50 of 100 threads succeed, the floor guard cutting off at exactly the tier size | **Transfers completely, and is stronger here** | No network latency means concurrent requests genuinely collide instead of arriving spread out; a single CPU forces thread interleaving. Both make races *more* likely to surface. This environment is a stricter test of the invariant than production, not a weaker one. |
+| **Bottleneck identification** — the read path saturates CPU before the 5-connection pool, Redis or Postgres | **Transfers** | It is a property of the code and the pool size, established by capturing every container's CPU simultaneously rather than inferred from the app alone. The absolute numbers would shift; the ordering would not. |
+| **Absolute throughput** — 660 / 870 req/s | **Belongs to this environment** | Real infrastructure pulls in both directions at once and the two do not cancel: network round trips make each client slower (lowering offered load), while a managed database over the network makes each query slower (lowering throughput). Quote it as "on 1 CPU with a 5-connection pool". |
+
 ### Why the earlier runs could not find a ceiling
 
 Not because the app is limitless. Because of how they generate load.
