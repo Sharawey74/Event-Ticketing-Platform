@@ -1,0 +1,124 @@
+# ============================================================
+# PERFORMANCE OVERLAY — production-shaped local stack
+#
+# Layers on top of docker-compose.yml; it does NOT replace it:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.perf.yml up -d --build
+#
+# WHAT THIS BUYS YOU, AND WHAT IT DOES NOT
+# ----------------------------------------
+# Buys you: the resource envelope and connection-pool size the app actually runs under in
+# production, so you find WHICH RESOURCE saturates first. That is a structural fact about the
+# system and it transfers to any deployment.
+#
+# Does NOT buy you: a publishable "we serve N users" number. Two differences pull in opposite
+# directions and do not cancel out:
+#   - No network RTT (prod is ~200ms). Each VU loops faster here, so local load is HARSHER.
+#   - Postgres/Redis are on the same host, not a managed service over the network, so every
+#     query is faster here, which flatters throughput.
+# Report anything measured here as "local, 1 CPU / 512MB, 5-connection pool" — never as prod.
+#
+# For CORRECTNESS tests (inventory-pressure.js, and the no-oversell assertions in
+# booking-reservation.js) this environment is not a compromise — it is BETTER than production.
+# No network latency means requests genuinely collide, and a single CPU forces thread
+# interleaving. Both make races more likely to surface, which is the whole point.
+#
+# ⚠️ GIT BASH / MSYS ON WINDOWS
+# Prefix every `docker compose run` with MSYS_NO_PATHCONV=1. Git Bash rewrites any argument
+# that looks like a Unix path, so `/scripts/ceiling-probe.js` is silently turned into
+# `C:/Program Files/Git/scripts/ceiling-probe.js` before Docker ever sees it, and k6 fails with
+# "moduleSpecifier couldn't be found on local disk". PowerShell and CMD are unaffected.
+#
+# ============================================================
+
+services:
+  # ----------------------------------------------------------------
+  # The app, constrained to Railway's shape and running the prod profile.
+  # ----------------------------------------------------------------
+  app:
+    environment:
+      # The prod profile is what gives us maximum-pool-size: 5 (local defaults to Hikari's 10).
+      # That pool is the most likely first bottleneck, so testing against 10 would measure a
+      # system that does not exist.
+      SPRING_PROFILES_ACTIVE: prod
+
+      # application-prod.yml builds the JDBC URL from these five, NOT from SPRING_DATASOURCE_URL.
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: ${POSTGRES_DB:-ticketing_db}
+      PGUSER: ${POSTGRES_USER:-ticketing}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-ticketing}
+
+      # Prod binds these as single URLs rather than host/port pairs.
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-ticketing}:${RABBITMQ_PASSWORD:-ticketing}@rabbitmq:5672
+
+      # ⚠️ LOAD-BEARING. application-prod.yml hardcodes app.rate-limit.enabled: true, which caps
+      # booking creation at 5 requests/minute/user and auth at 10/minute/IP. Leave it on and a
+      # load test measures the RATE LIMITER, not the application — you would get a flat wall at
+      # a trivially low number and mistake it for a capacity ceiling.
+      #
+      # Spring relaxed binding maps this env var onto app.rate-limit.enabled, and environment
+      # variables outrank application-{profile}.yml in the property precedence order.
+      APP_RATELIMIT_ENABLED: "false"
+
+      JWT_SECRET: ${JWT_SECRET:-ZmFrZS1qc3ctc2VjcmV0LWtleS1mb3ItbG9jYWwtZGV2LTAwMDAwMDAwMDA=}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      STRIPE_PUBLIC_KEY: ${STRIPE_PUBLIC_KEY:-pk_test_placeholder}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+
+      # Keep logging out of the measurement. INFO-per-request I/O is a real cost at high rates
+      # and would show up as latency that production (shipping logs off-box) does not pay here.
+      LOGGING_LEVEL_COM_TICKETING: WARN
+
+    deploy:
+      resources:
+        limits:
+          # Railway's shape. The Dockerfile sets -XX:MaxRAMPercentage=75.0, so the heap lands at
+          # ~384MB of this 512MB — the same squeeze production gets.
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "1.0"
+          memory: 512M
+
+  # ----------------------------------------------------------------
+  # k6 in its own container, with its own CPU budget.
+  #
+  # This is not tidiness. Run k6 on the host unconstrained and it competes with the app for the
+  # same cores — you throttle the thing you are measuring and record the result as the app's
+  # limit. Giving k6 a separate, explicit budget keeps the two from stealing from each other.
+  #
+  # Not started by default (profile: perf) so a normal `docker compose up` is unaffected:
+  #   docker compose -f docker-compose.yml -f docker-compose.perf.yml \
+  #     run --rm k6 run /scripts/ceiling-probe.js
+  # ----------------------------------------------------------------
+  k6:
+    image: grafana/k6:latest
+    profiles: ["perf"]
+    volumes:
+      - ./src/test/k6:/scripts:ro
+      - ./perf-results:/results
+    environment:
+      # Container-to-container, so no host port mapping and no localhost round trip.
+      BASE_URL: http://app:8088
+      K6_SUMMARY_TIME_UNIT: ms
+    depends_on:
+      app:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+
+  # ----------------------------------------------------------------
+  # Dev-only tooling, off during a measurement run — pgadmin and redis-commander both poll their
+  # backends on a timer, which is measurable noise on a 1-CPU host.
+  # ----------------------------------------------------------------
+  pgadmin:
+    profiles: ["dev-tools"]
+
+  redis-commander:
+    profiles: ["dev-tools"]
