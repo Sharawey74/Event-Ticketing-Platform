@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, ChevronRight, ChevronLeft, CheckCircle } from "lucide-react";
-import { useAuthStore } from "@/store/authStore";
+import { useAuthStore, useAuthHydrated } from "@/store/authStore";
 import { api } from "@/lib/api";
 
 type Category = { id: number; name: string };
@@ -56,6 +56,12 @@ export default function CreateEventPage() {
   const { token, userRole } = useAuthStore();
 
   const [step, setStep] = useState(1);
+  // Fix 26-hydration: Zustand's `persist` middleware rehydrates from localStorage AFTER the first
+  // client render, so `token` is null on that render even for a signed-in user. Acting on it
+  // immediately bounced people to /auth/login on any cold load -- a bookmark, a shared link, or
+  // simply pressing refresh. Wait until hydration has actually finished before judging.
+  const hasHydrated = useAuthHydrated();
+
   const [categories, setCategories] = useState<Category[]>([]);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -82,6 +88,7 @@ export default function CreateEventPage() {
   });
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!token || userRole !== "ORGANIZER") {
       router.push("/auth/login");
       return;
@@ -92,7 +99,7 @@ export default function CreateEventPage() {
     api.get("/api/venues", { params: { page: 0, size: 100 } })
       .then((r) => setVenues(r.data?.data?.content ?? []))
       .catch(() => {});
-  }, [token, userRole, router]);
+  }, [hasHydrated, token, userRole, router]);
 
   const set = (field: keyof Omit<FormData, "ticketTiers">, value: string) =>
     setForm((f) => ({ ...f, [field]: value }));

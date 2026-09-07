@@ -10,7 +10,7 @@ Load testing uses [k6](https://k6.io/) (standalone CLI, not wired into CI). Scri
 | `load-test.js` | Baseline read-path load: public `GET /api/events` + `GET /api/events/{id}`. No auth required. |
 | `booking-reservation.js` | Authenticated booking creation (`POST /api/v1/bookings`) under moderate concurrency. |
 | `inventory-pressure.js` | High-concurrency burst against a low-capacity tier — verifies the Redis Lua floor guard degrades to clean 409s under oversell pressure instead of overselling or 500ing. |
-| `capacity-ramp.js` | Staged VU ramp (10→25→50→100→200) against a weighted, realistic journey mix (40% browse, 20% search, 25% reserve, 15% check own bookings) — establishes a real capacity number for the actual live deployment (1 Railway replica, 5-connection Hikari pool), not a local dev-machine baseline. Defaults `BASE_URL` to the Railway URL, unlike the other 3 scripts. |
+| `capacity-ramp.js` | Staged VU ramp — **10→25→50→100→200→500→1000 over 22 min** against a weighted, realistic journey mix (40% browse, 20% search, 25% reserve, 15% check own bookings) — establishes a real capacity number for the actual live deployment (1 Railway replica, 5-connection Hikari pool), not a local dev-machine baseline. Defaults `BASE_URL` to the Railway URL, unlike the other 3 scripts. |
 
 ## How to run
 
@@ -207,8 +207,9 @@ size, which is somewhat arbitrary for this scenario) — it's that **zero reques
 Run against local `http://localhost:8088`, `TIER_ID=27` ("LowCapacity" tier, `totalCapacity=8`),
 burst to 100 VUs over 40s (per the script's `10s→100 / 20s hold / 10s ramp-down` stages).
 
-**Important caveat discovered while verifying this run:** the public `GET /api/events/{id}`
-response's `ticketTiers[].availableCount` field is **not a reliable way to verify no-oversell**.
+**Important caveat discovered while verifying this run — ✅ since fixed, see the note at the end of
+this paragraph:** the public `GET /api/events/{id}`
+response's `ticketTiers[].availableCount` field was **not a reliable way to verify no-oversell**.
 Tracing `BookingService.reserveTickets()` shows it only decrements Redis inventory
 (`InventoryService.reserveSeat()`); the database's `ticket_tiers.available_count` column is only
 ever *incremented* — on cancel (`BookingService.cancelBooking()`) or expiry
@@ -221,6 +222,14 @@ is a real gap worth fixing separately from load testing, but it means the *corre
 ```bash
 docker exec <redis-container-name> redis-cli GET "inventory:tier:<tierId>:available"
 ```
+
+✅ **Fixed in Day 20 (Fix D19-1).** `BookingService.reserveTickets()` now decrements the DB column
+too, via an atomic conditional `UPDATE` (`TicketTierRepository.decrementAvailableCount`), and every
+release path — cancel, payment-pending expiry, **and** reserved-hold expiry — increments it back
+symmetrically. The API field is therefore no longer stale, and either source can be used to verify.
+Reading Redis directly is still the more direct check, so the instruction above stands; the reason
+for it no longer does. This paragraph is kept because the reasoning is the useful part: **verify an
+invariant at the layer that enforces it, not at a layer that merely reports it.**
 
 **Run 1 (fresh tier, 8 seats available):**
 
@@ -250,6 +259,12 @@ correctly degraded to clean 409s both while draining the last few seats (Run 1) 
 sold out (Run 2).
 
 ### Capacity Ramp — Railway (`capacity-ramp.js`)
+
+⚠️ **This result is from an earlier version of the script.** On 2026-07-04 `capacity-ramp.js`
+topped out at 200 VUs (6 stages, 16 min). On 2026-07-15 the stages `500` and `1000` were appended
+(commit `5aac1ea`), making it an 8-stage / 22-minute ramp. **No run of the extended script has ever
+been recorded here.** So the numbers below establish a *floor* — "at least 200 VUs, clean" — not
+the ceiling, and any recollection of a higher-VU run that degraded is not evidenced in this repo.
 
 Run 2026-07-04 against the live Railway backend, full 6-stage ramp (10→25→50→100→200→0 VUs over
 16m00s). **Run scope was deliberately read-only**: no `AUTH_TOKEN`/`EVENT_ID`/`TIER_ID` were
@@ -289,6 +304,24 @@ VU count (50, not 200).
   explicitly tagged by stage and analyzed from the raw JSON output (`--out json=...`), which this
   run did not enable.
 - Booking-creation (`reserve`) and authenticated (`my-bookings`) journey numbers at scale.
+
+## What the numbers do and do not establish
+
+⚠️ **No breaking point has ever been measured.** Every recorded run in this file passed every
+threshold, with `0` server errors. That means each figure is a **lower bound on capacity**, not a
+limit:
+
+| Scenario | Highest VU recorded | Outcome | Ceiling found? |
+|---|---:|---|---|
+| `load-test.js` (local read path) | 50 | p95 15.9ms, 0% errors | No |
+| `booking-reservation.js` (local) | 20 | p95 55.4ms, 0 5xx | No |
+| `inventory-pressure.js` (local) | 100 | 0 5xx, 0 oversell | No |
+| `capacity-ramp.js` (Railway, read-only) | 200 | p95 394ms, 0 failed | No |
+
+To find an actual ceiling you need a run that **fails** — ramp until p95 crosses the threshold or
+errors appear, and record the VU count at which it happened. Until then, "the app handles N users"
+is only defensible for N ≤ 200 on the read path against a single Railway replica, and ≤ 100 on the
+booking path locally.
 
 ## Known limitations
 

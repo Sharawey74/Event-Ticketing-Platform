@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuthStore } from "@/store/authStore";
+import { useAuthStore, useAuthHydrated } from "@/store/authStore";
 import { useReservationStore } from "@/store/reservationStore";
 import { api } from "@/lib/api";
 import { BookingStatusBadge } from "@/components/bookings/BookingStatusBadge";
@@ -95,6 +95,12 @@ export default function BookingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { token } = useAuthStore();
+  // Fix 26-hydration: Zustand's `persist` middleware rehydrates from localStorage AFTER the first
+  // client render, so `token` is null on that render even for a signed-in user. Acting on it
+  // immediately bounced people to /auth/login on any cold load -- a bookmark, a shared link, or
+  // simply pressing refresh. Wait until hydration has actually finished before judging.
+  const hasHydrated = useAuthHydrated();
+
   
   const queryClient = useQueryClient();
   const [refundStatus, setRefundStatus] = useState<{message: string, isError: boolean} | null>(null);
@@ -104,10 +110,11 @@ export default function BookingDetailPage() {
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!token) {
       router.push("/auth/login");
     }
-  }, [token, router]);
+  }, [hasHydrated, token, router]);
 
   // Returning from a cancelled Stripe checkout: drop the in-memory hold.
   useEffect(() => {

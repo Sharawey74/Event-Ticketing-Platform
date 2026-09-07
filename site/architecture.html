@@ -236,7 +236,7 @@
         <div class="spec-card">
           <h4>Data &amp; messaging</h4>
           <dl class="spec-list">
-            <div><dt>Primary datastore</dt><dd>PostgreSQL 17 · Flyway (13 migrations)</dd></div>
+            <div><dt>Primary datastore</dt><dd>PostgreSQL 17 · Flyway (14 migrations)</dd></div>
             <div><dt>Cache / locking</dt><dd>Redis 7 (Lettuce client)</dd></div>
             <div><dt>Async messaging</dt><dd>RabbitMQ 4</dd></div>
           </dl>
@@ -295,7 +295,7 @@
             <tr><td><b>Role-restricted endpoints (@PreAuthorize)</b></td><td>18</td></tr>
             <tr><td><b>Domain services</b></td><td>21</td></tr>
             <tr><td><b>API-boundary DTOs</b></td><td>25 (JPA entities never exposed)</td></tr>
-            <tr><td><b>Database migrations</b></td><td>13 (Flyway, immutable once applied)</td></tr>
+            <tr><td><b>Database migrations</b></td><td>14 (Flyway, immutable once applied)</td></tr>
           </tbody>
         </table>
       </div>
@@ -313,7 +313,7 @@
             <tr><th>Metric</th><th>Result</th></tr>
           </thead>
           <tbody>
-            <tr><td><b>Backend test suite</b></td><td>194 / 194 passing</td></tr>
+            <tr><td><b>Backend test suite</b></td><td>228 / 228 passing</td></tr>
             <tr><td><b>Instruction coverage (JaCoCo)</b></td><td>83% (gate: 80% minimum)</td></tr>
             <tr><td><b>Dedicated concurrency tests</b></td><td>2 — a 100-thread Redis floor-guard proof, plus a full
               end-to-end reservation-path test (DB write included)</td></tr>

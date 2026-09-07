@@ -156,8 +156,9 @@
 | Fix 25-violet400 | MEDIUM | 25 | ✅ | `--violet-400` referenced by `.aurora-pointer` but never defined; an undefined var inside `color-mix()` invalidates the declaration, so the hero pointer glow had never once painted |
 | Fix 25-a11y | A11Y | 25 | ✅ | Touch targets raised to 44px across shell, hero, tier selector and organizer rows; six controls that suppressed their focus outline with nothing in its place; heading-order skips on `/` and `/events/[id]`; contact addresses on `/terms` and `/privacy` that were spans styled as links; a bookings-list filter button with no handler behind it, removed rather than labelled |
 | Fix 26-idem | HIGH | 26 | ✅ | `bookings.idempotency_key` + `uq_bookings_idempotency_key` (V14). `BookingIdempotencyService` catches the violation **outside** the transaction (inside, the tx is rollback-only and cannot read the winner) and returns the booking the key already created. User-scoped keys → 409 on mismatch; unmatched violations rethrown. Client reuses one key per intent. Proven against real PostgreSQL incl. a fast-path-bypass case — V14, Booking.java, BookingRepository.java, BookingService.java, BookingIdempotencyService.java, BookingController.java, TicketTierSelector.tsx |
-| Fix 26-checkin | HIGH | 26 | ⬜ | **Open.** `CheckInGuard.evaluate()` logs and returns `true` — no date check, no ownership check. Fix 8.2's "CHECK_IN dual-guard" is one layer, not two: any ORGANIZER can check in any CONFIRMED booking on any date. Found during the Day 26 docs audit — CheckInGuard.java |
-| Fix 26-dlq | MEDIUM | 26 | ⬜ | **Open.** DLQs are declared but no listener retry properties exist, so under Spring Boot defaults a throwing listener requeues in a tight loop and never dead-letters. The documented "3 retries then DLQ" does not happen. Found during the Day 26 docs audit — application-*.yml |
+| Fix 26-checkin | **CRITICAL** | 26 | ✅ | **Fixed.** `CheckInGuard.evaluate()` logs and returns `true` — no date check, no ownership check. Fix 8.2's "CHECK_IN dual-guard" is one layer, not two: any ORGANIZER can check in any CONFIRMED booking on any date. Found during the Day 26 docs audit — CheckInGuard.java |
+| Fix 26-hydration | HIGH | 26 | ✅ | **Fixed.** Three protected pages redirect a signed-in user to `/auth/login` on a **cold load** (bookmark, shared link, refresh) because their auth guard runs before Zustand's `persist` middleware rehydrates the token. Server-side authorization is unaffected — client routing only. `organizer/events` and `.../edit` already gate this behind `isClient` and are safe. Found while recapturing the site screenshots — dashboard/bookings/[id], organizer/events/[id]/attendees, organizer/events/new |
+| Fix 26-dlq | HIGH | 26 | ✅ | **Fixed.** DLQs are declared but no listener retry properties exist, so under Spring Boot defaults a throwing listener requeues in a tight loop and never dead-letters. The documented "3 retries then DLQ" does not happen. Found during the Day 26 docs audit — application-*.yml |
 | Fix 26-docs | GOOD | 26 | ✅ | `docs/Core` rebuilt against the source: ~110 fabricated/incorrect identifiers corrected across 15 files (Redis keys, RabbitMQ topology, state-machine transitions and classes, `ApiResponse` fields, "DTOs are records" in a codebase with zero records), plus a vendor-neutral definition on every technology doc, an annotation reference in `05`, and a table-to-entity walkthrough in `07`. Gitignored — local only |
 
 ---
@@ -166,8 +167,8 @@
 
 | Metric | Current | Target |
 | :--- | :--- | :--- |
-| `./mvnw test` passing | 217 / 217 passing (all tests including Docker-based integration tests) | 100% |
-| Test coverage | 83.8% INSTRUCTION gate-scoped — JaCoCo gate ✅ PASSED via `./mvnw clean verify` | 80%+ |
+| `./mvnw test` passing | 228 / 228 passing (all tests including Docker-based integration tests) | 100% |
+| Test coverage | 84.1% INSTRUCTION gate-scoped — JaCoCo gate ✅ PASSED via `./mvnw clean verify` | 80%+ |
 | Active @Autowired usages | 0 | 0 |
 | Active LocalDateTime usages | 0 | 0 |
 | Magic numbers in code | 0 | 0 |
