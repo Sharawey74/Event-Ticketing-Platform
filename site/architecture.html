@@ -385,11 +385,21 @@
       </div>
 
       <div class="note">
-        <p><strong>What these numbers are not.</strong> The ceilings are <b>local</b> measurements in a
-          production-<em>shaped</em> container, not production measurements: there is no network round trip and the
-          database sits on the same host. They establish <em>which resource saturates first</em> — a structural
-          property that transfers to any deployment — not a “we serve N users” number. P99 was not captured, and
-          the write path has not been load-tested above 20 VUs.</p>
+        <p><strong>What transfers, and what doesn't.</strong> The three groups above have deliberately different
+          reach.</p>
+        <p><b>Correctness transfers completely</b>, and holds <em>harder</em> here than in production. No network
+          latency means concurrent requests genuinely collide rather than arriving spread out, and a single CPU
+          forces thread interleaving — so this environment is a <em>stricter</em> test of the no-oversell invariant
+          than a real deployment, not a weaker one.</p>
+        <p><b>The bottleneck finding transfers.</b> The read path saturates CPU before it saturates the
+          5-connection pool, Redis or Postgres — a structural property of the code and the pool size, measured with
+          every container's CPU captured at once, and true wherever this is deployed.</p>
+        <p><b>The absolute req/s belongs to this environment.</b> 660 req/s is “on 1 CPU with a 5-connection
+          pool”, not a production capacity number: real infrastructure moves it in both directions at once, since
+          network round trips slow each client down while a managed database over the network slows each query.</p>
+        <p>Gaps, stated rather than papered over: <b>P99 was never captured</b>, and <b>the write path has not been
+          load-tested above 20 VUs</b> — the path with the distributed lock, the Lua guard and two inserts, where
+          the pool should bind hardest.</p>
       </div>
     </div>
   </section>
