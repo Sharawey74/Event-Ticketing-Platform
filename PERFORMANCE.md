@@ -10,6 +10,8 @@ Load testing uses [k6](https://k6.io/) (standalone CLI, not wired into CI). Scri
 | `load-test.js` | Baseline read-path load: public `GET /api/events` + `GET /api/events/{id}`. No auth required. |
 | `booking-reservation.js` | Authenticated booking creation (`POST /api/v1/bookings`) under moderate concurrency. |
 | `inventory-pressure.js` | High-concurrency burst against a low-capacity tier — verifies the Redis Lua floor guard degrades to clean 409s under oversell pressure instead of overselling or 500ing. |
+| `ceiling-probe.js` | **Finds a limit rather than confirming its absence.** Ramps *arrival rate* (requests/second) instead of VUs and aborts the moment a threshold breaks, so the stopping point is the measurement. Read mode (`GET /api/events`) needs no auth; write mode needs a JWT and a large tier. `PEAK_RATE` and `MAX_VUS` are env-overridable. |
+| `scale-probe.js` | Holds load **constant** while the replica count changes, so the only variable is the number of instances. Run once per replica count and compare achieved throughput. |
 | `capacity-ramp.js` | Staged VU ramp — **10→25→50→100→200→500→1000 over 22 min** against a weighted, realistic journey mix (40% browse, 20% search, 25% reserve, 15% check own bookings) — establishes a real capacity number for the actual live deployment (1 Railway replica, 5-connection Hikari pool), not a local dev-machine baseline. Defaults `BASE_URL` to the Railway URL, unlike the other 3 scripts. |
 
 ## How to run
@@ -307,24 +309,174 @@ VU count (50, not 200).
 
 ## What the numbers do and do not establish
 
-⚠️ **No breaking point has ever been measured.** Every recorded run in this file passed every
-threshold, with `0` server errors. That means each figure is a **lower bound on capacity**, not a
-limit:
+**The read path now has a measured ceiling** (Day 27, below). The other three scenarios still do
+not — every one of them passed, so each remains a **lower bound on capacity**, not a limit:
 
-| Scenario | Highest VU recorded | Outcome | Ceiling found? |
+| Scenario | Highest load recorded | Outcome | Ceiling found? |
 |---|---:|---|---|
-| `load-test.js` (local read path) | 50 | p95 15.9ms, 0% errors | No |
-| `booking-reservation.js` (local) | 20 | p95 55.4ms, 0 5xx | No |
-| `inventory-pressure.js` (local) | 100 | 0 5xx, 0 oversell | No |
-| `capacity-ramp.js` (Railway, read-only) | 200 | p95 394ms, 0 failed | No |
+| `ceiling-probe.js` (local read path, 1 replica) | **660 req/s** | p95 crossed 500ms | ✅ **Yes** |
+| `ceiling-probe.js` (local read path, 2 replicas) | **870 req/s** | p95 crossed 500ms | ✅ **Yes** |
+| `load-test.js` (local read path) | 50 VUs | p95 15.9ms, 0% errors | No |
+| `booking-reservation.js` (local) | 20 VUs | p95 55.4ms, 0 5xx | No |
+| `inventory-pressure.js` (local) | 100 VUs | 0 5xx, 0 oversell | No — and not applicable; it is a correctness test |
+| `capacity-ramp.js` (Railway, read-only) | 200 VUs | p95 394ms, 0 failed | No |
 
-To find an actual ceiling you need a run that **fails** — ramp until p95 crosses the threshold or
-errors appear, and record the VU count at which it happened. Until then, "the app handles N users"
-is only defensible for N ≤ 200 on the read path against a single Railway replica, and ≤ 100 on the
-booking path locally.
+⚠️ **The write path has never been tested above 20 VUs.** It is the path with the distributed
+lock, the Lua script, the conditional `UPDATE` and two inserts — the one where the 5-connection
+pool should bind hardest — and it is the largest remaining gap.
+
+### Why the earlier runs could not find a ceiling
+
+Not because the app is limitless. Because of how they generate load.
+
+`load-test.js`, `booking-reservation.js`, `inventory-pressure.js` and `capacity-ramp.js` all ramp
+**virtual users**. A VU is a closed loop: send → wait for the reply → sleep → repeat. When the
+server slows from 50ms to 2s, that VU's request rate drops 40×. **The offered load falls as the
+server degrades** — the test throttles its own input at exactly the moment things get interesting,
+and the latency curve looks gracefully flat right up until it isn't.
+
+`ceiling-probe.js` ramps **arrival rate** instead: k6 keeps issuing requests on schedule no matter
+how slow the replies get, allocating more VUs to hold the rate. The queue actually builds, and the
+cliff becomes visible.
+
+## Day 27 — Ceiling and scaling under production-shaped constraints (2026-09-07)
+
+First runs in this project to **find a limit** rather than confirm the absence of failure.
+
+### Environment
+
+Deliberately constrained to Railway's container shape via `docker-compose.perf.yml`, so the number
+reflects the deployment rather than a dev laptop.
+
+| Setting | Value | Why |
+|---|---|---|
+| Spring profile | `prod` | Gives the real Hikari `maximum-pool-size: 5` (local defaults to 10) |
+| CPU (limit **and** reservation) | **1.0** per replica | Railway's shape. Also changes JVM behaviour — GC and ForkJoin pool are sized from `availableProcessors()` |
+| Memory (limit **and** reservation) | **512 MB** | With `-XX:MaxRAMPercentage=75.0` the heap lands ~384 MB |
+| Rate limiting | **disabled** via `APP_RATELIMIT_ENABLED=false` | See the warning below |
+| Load generator | k6 in its own container, 2 CPU / 1 GB | So it cannot steal cores from the app it is measuring |
+| Host | 8 CPUs, 7.6 GB available to Docker | Docker Desktop on Windows |
+| Endpoint | `GET /api/events` | **Uncached** — `EventService.getEvents()` has no `@Cacheable`, so every request is a real query |
+
+⚠️ **`application-prod.yml` hardcodes `app.rate-limit.enabled: true`** — a literal, not an env
+placeholder. Activate the prod profile for the 5-connection pool and you also activate
+`RateLimitFilter`, which caps booking creation at **5 requests/minute/user**. A load test would
+flatline at ~0.08 req/s and that would be recorded as capacity. The env-var override is mandatory;
+environment variables outrank `application-{profile}.yml` in Spring's property precedence.
+
+### Results — 1 replica
+
+| Run | Config | Ceiling | p95 | Requests | Errors | Notes |
+|---|---|---:|---:|---:|---:|---|
+| A | direct, `MAX_VUS=2000` | 586.6 req/s | 594.5ms | 94,332 | **0** | Peak 891/2000 VUs |
+| **B** | **direct, `MAX_VUS=4000`** | **659.96 req/s** | **511.15ms** | **107,839** | **0** | **The baseline.** Peak 952/4000 VUs |
+| C | via nginx, `MAX_VUS=4000` | 579.84 req/s | 637.1ms | 92,964 | **0** | The proxy hop cost ~12% |
+
+**Run B full latency distribution:** avg 71.11ms · **median 2.40ms** · p90 87.40ms ·
+**p95 511.15ms** · min 1.35ms · max 3,470.19ms · **p99 not measured**.
+
+That spread is the signature of **queueing**: half of all requests finished in 2.4ms; a small
+minority waited behind a saturated CPU. It is also why the average is useless here — 71ms describes
+nobody's experience.
+
+**Resource behaviour at the limit:** CPU climbed 4% → **~100–107%** of its 1.0 budget; memory rose
+466 MiB → **511.7 MiB of 512 MiB**. A tight heap means more GC, which itself burns CPU, so the two
+compound at the top end.
+
+### Results — 2 replicas
+
+| Run | Config | Result | p95 | Requests | Errors |
+|---|---|---|---:|---:|---:|
+| G | `PEAK_RATE=800` | ✅ **completed all stages, no abort** at 799.99 req/s | **9.0ms** | 140,548 | **0** |
+| **H** | **`PEAK_RATE=2400`** | **ceiling 869.78 req/s** | 567.6ms | 133,383 | **0** |
+
+Run G used only **55 VUs of 4,000** to push 800 req/s — responses came back so fast that almost
+nothing was ever in flight. Run B needed **952 VUs** for less traffic. That contrast is the
+clearest single indicator of headroom in this whole exercise.
+
+### Scaling
+
+| Replicas | Ceiling | p95 at abort | Per-replica |
+|---|---:|---:|---:|
+| 1 | 660 req/s | 511ms | 660 |
+| 2 | 870 req/s | 568ms | 435 |
+
+**Measured factor: 1.32×** — sub-linear.
+
+The stronger and cleaner comparison is latency: at **800 req/s two replicas held p95 = 9ms**, while
+one replica at *lower* load (660) was at **511ms**.
+
+### Bottleneck identification
+
+Full container CPU captured during a 2-replica ceiling run:
+
+| Container | Peak CPU | Budget | Verdict |
+|---|---:|---:|---|
+| **app-1** | **105.40%** | 100% | **Saturated** |
+| **app-2** | **105.23%** | 100% | **Saturated** |
+| postgres | 106.34% | uncapped | ~1 core, busy but free to take more |
+| k6 | 68.43% | 200% | Not the constraint |
+| nginx (`lb`) | 0.00% | — | Confirmed out of the path |
+| redis | ~0.5% | uncapped | Negligible — not on the read path |
+| **Total observed** | **~370%** | 800% | **Host not saturated** |
+
+✅ **The read path is CPU-bound, not database-bound.** The 5-connection pool never became the
+limit; both replicas saturated their own CPU while the pool, Redis and the host all had headroom.
+
+⚠️ **Open question — why scaling is sub-linear.** Each replica delivered 435 req/s when paired
+versus 660 alone, a ~34% per-replica efficiency loss. Ruled out by the capture above: k6, the host,
+nginx, and the connection pool. Remaining hypothesis, **unproven**: Docker Desktop's virtualised
+network stack — on Windows, packet processing happens in the VM kernel and is attributed to no
+container, so it is invisible in `docker stats`. At 870 req/s across ~1,331 connections that is
+substantial hidden work. If correct it is an artifact of Docker Desktop, not of this application.
+Confirming it requires running k6 on a separate host.
+
+⚠️ **`rabbitmq` showed sporadic CPU spikes** (204%, 323%, 249%, 257%) **uncorrelated with load** —
+they appear while everything else is idle. Most likely its internal management processes or a
+`docker stats` sampling artifact. Not explained, and not treated as meaningful.
+
+### One run discarded
+
+An intended 2-replica run was **invalid** and its numbers must not be used. Two independent causes:
+
+1. **`docker compose run` deleted the second replica** before starting (visible in its output as
+   `Container ...app-2  Removed`). Compose reconciles the project to the scale declared in the
+   file unless `--no-deps` is passed, so the run measured 1 replica while claiming 2.
+2. **nginx produced 223 5xx** (`connection reset by peer`, `EOF`) while the application's own p95
+   was healthy at 483ms. Variable `proxy_pass` — required for per-request DNS re-resolution —
+   forbids upstream keepalive in open-source nginx, so every request opened a fresh TCP connection
+   and the proxy exhausted itself at ~2,000 VUs.
+
+nginx was consequently removed from the default path in favour of Docker's own DNS round-robin,
+which also makes results directly comparable to the pre-proxy baseline.
+
+### Methodology notes worth keeping
+
+1. **A passing load test may prove nothing.** VU-based ramping throttles its own input as the
+   server degrades. Use arrival-rate with `abortOnFail` to find a limit.
+2. **Check the rig before believing the result.** `dropped_iterations` and peak-VU headroom tell
+   you whether you measured the app or the load generator. `ceiling-probe.js` refuses its own
+   output when it was starved.
+3. **Warm the JVM.** Identical 150 req/s load, 2 replicas: a 44-second-old replica gave
+   **p95 831.6ms**; warm, the same run gave **125.1ms**. A 6.6× difference from JIT alone.
+4. **`docker compose run` needs `--no-deps`** or it destroys scaled replicas.
+5. **Watch every container, not just the app.** One capture ruled out four candidate bottlenecks.
+
+### Full reference
+
+Every run, parameter and metric definition is documented in **`PERFORMANCE_TESTING.md`**, including
+the terminology distinctions that cause wrong claims (VUs ≠ RPS, VUs ≠ users, iterations ≠
+requests, average ≠ p95).
 
 ## Known limitations
 
+- **P99 latency is not measured** in any run — k6's default summary reports p90 and p95 only.
+  Add `summaryTrendStats: ['avg','min','med','p(90)','p(95)','p(99)','max']` to capture it.
+- **Hikari pool metrics are not measured.** `/actuator/**` is ADMIN-only under the prod profile
+  (Fix SECURITY-6), so `hikaricp.connections.pending` returns 401. Container CPU was used to
+  distinguish compute-bound from pool-bound instead.
+- **The write path has never been load-tested above 20 VUs**, and never at all under the
+  constrained prod-shaped environment.
 - k6 is not wired into CI (`.github/workflows/main.yml` is test-only; no load-test job).
 - `capacity-ramp.js` has been run against live Railway (2026-07-04, read-only scope — browse/search
   only, see results above), but RabbitMQ queue-depth was not captured during that run — it's a
