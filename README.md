@@ -330,14 +330,36 @@ No accounts are seeded by default — register via `/auth/register`. Stripe test
 
 ## Performance
 
-k6 load-test results (full methodology and raw numbers in [`PERFORMANCE.md`](PERFORMANCE.md)):
+k6 load-test results. Every figure below was measured, not estimated; full methodology, the
+discarded run and the open questions are in [`PERFORMANCE.md`](PERFORMANCE.md).
+
+**Capacity ceilings** — measured by ramping *arrival rate* until p95 crossed a 500ms budget, in a
+container constrained to the production shape (**1 CPU / 512MB, `prod` profile, 5-connection Hikari
+pool**) with the load generator in its own CPU-budgeted container:
 
 | Scenario | Result |
 | :--- | :--- |
-| Baseline read path (50 VUs) | p95 15.9ms, 0.00% error rate, 74.4 req/s |
-| Booking creation under contention (20 VUs) | p95 55.4ms, 0 server errors, floor guard held at exactly the tier's true capacity |
+| **Read-path ceiling, 1 replica** | **660 req/s** sustained before p95 crossed the budget — 107,839 requests, **median 2.40ms**, p95 511ms, **0 errors** |
+| **Read-path ceiling, 2 replicas** | **870 req/s** — 133,383 requests, **0 errors**. Scaling factor **1.32×** |
+| **Latency under horizontal scale** | At **800 req/s** two replicas held **p95 9.0ms** using only 55 of 4,000 virtual users — the same workload that needed 952 VUs on one replica |
+| **Reliability across the whole exercise** | **569,066 requests, 0 failed requests, 0 server errors** across five valid runs |
+| **Bottleneck identified** | Both replicas saturated their own 1.0-CPU budget (105%) while Postgres, Redis, the connection pool and the host all had headroom — the read path is **CPU-bound, not database-bound** |
+
+**Correctness under concurrency** — these are behavioural guarantees, not speed figures:
+
+| Scenario | Result |
+| :--- | :--- |
 | Inventory-pressure burst (100 VUs vs. an 8-seat tier) | Up to 270 req/s, 99.9%+ correctly rejected with `409`, **zero oversell, zero 5xx** across repeated runs |
-| Capacity ramp — **live Railway**, 10→200 VUs over 16 min | 32,577 requests, **0 failed, 0 server errors**, read-path p95 held at **394ms** at peak 200 concurrent VUs against the single-replica production deployment |
+| Booking creation under contention (20 VUs) | p95 55.4ms, 0 server errors, floor guard held at exactly the tier's true capacity |
+| 100 threads / 50 seats, through the full reservation path | Exactly 50 succeed, every time (`BookingServiceReservationConcurrencyTest`) |
+
+**Against live production** (single Railway replica, read-only journeys): capacity ramp 10→200 VUs
+over 16 min — 32,577 requests, **0 failed, 0 server errors**, p95 held at **394ms** at peak.
+
+> Ceiling figures are **local** measurements in a production-*shaped* container, not production
+> measurements: there is no network RTT and the database is on the same host. They establish which
+> resource saturates first — a structural property that transfers — not a "we serve N users"
+> number. P99 was not captured; the write path has not been load-tested above 20 VUs.
 
 ---
 
