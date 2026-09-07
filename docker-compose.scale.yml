@@ -1,0 +1,119 @@
+# ============================================================
+# SCALABILITY OVERLAY — measures whether N replicas do N× the work
+#
+# Stacks on top of BOTH other files, in this order:
+#
+#   docker compose -f docker-compose.yml \
+#                  -f docker-compose.perf.yml \
+#                  -f docker-compose.scale.yml \
+#                  up -d --build --scale app=1
+#
+# CAPACITY vs SCALABILITY — the distinction this file exists for
+# --------------------------------------------------------------
+#   Capacity    = how much can ONE instance handle?      <- every other k6 script here
+#   Scalability = does adding instances MULTIPLY that?   <- only this harness
+#
+# They are different quality attributes and a good score on one says nothing about the other.
+# An app can have excellent capacity and zero scalability (a shared lock that serialises
+# everything), or poor capacity and perfect scalability.
+#
+# WHY THIS PROJECT SPECIFICALLY NEEDS IT
+# --------------------------------------
+# Three design decisions were made explicitly to enable horizontal scaling, and none has ever
+# been run with more than one instance:
+#
+#   - Stateless JWT + SessionCreationPolicy.STATELESS  -> any replica can serve any request
+#   - Redis distributed lock, not JVM `synchronized`   -> locking works ACROSS replicas
+#   - ReservationExpirationJob's single-flight lock    -> only one replica runs the sweep
+#
+# The prediction worth testing: PostgreSQL is the wall, not CPU. The prod profile pins Hikari to
+# maximum-pool-size: 5, so 4 replicas want 20 connections. Throughput should go sub-linear well
+# before the CPUs are busy. If it does, the fix is a pooler (PgBouncer), not more replicas —
+# and that is a conclusion you can only reach by measuring the SHAPE of the curve.
+#
+# HOW TO RUN IT
+# -------------
+# Three runs, identical load, different replica counts:
+#
+#   for N in 1 2 4; do
+#     docker compose -f docker-compose.yml -f docker-compose.perf.yml -f docker-compose.scale.yml \
+#       up -d --scale app=$N
+#     sleep 45                                   # let every replica pass its healthcheck
+#     docker compose -f docker-compose.yml -f docker-compose.perf.yml -f docker-compose.scale.yml \
+#       run --rm --no-deps -e REPLICAS=$N k6 run /scripts/scale-probe.js
+#   done
+#
+# Then compare the achieved throughput. See scale-probe.js for how to read the result.
+#
+# ⚠️ `--no-deps` IS MANDATORY, NOT TIDINESS.
+# Without it, `docker compose run` reconciles the project against the scale declared in these
+# files before starting k6 — and since they declare no `scale:`, it DELETES the extra replicas.
+# You watch `app-2  Removed` scroll past, k6 then measures ONE replica, and the run gets recorded
+# as a 2-replica result. That invalidated a real run here before it was caught.
+# Note also that `--scale` is NOT a valid flag on `docker compose run`; it exists only on `up`.
+# Confirm with `docker compose ps` AFTER the run, not just before it.
+#
+# ⚠️ GIT BASH / MSYS ON WINDOWS
+# Prefix every `docker compose run` with MSYS_NO_PATHCONV=1. Git Bash rewrites any argument
+# that looks like a Unix path, so `/scripts/ceiling-probe.js` is silently turned into
+# `C:/Program Files/Git/scripts/ceiling-probe.js` before Docker ever sees it, and k6 fails with
+# "moduleSpecifier couldn't be found on local disk". PowerShell and CMD are unaffected.
+#
+# ============================================================
+
+services:
+  # ----------------------------------------------------------------
+  # nginx — the load balancer. Without it, `--scale` gives you N containers that nothing
+  # distributes traffic across.
+  # ----------------------------------------------------------------
+  # ⚠️ NOT USED BY DEFAULT — see the note on k6 below. Kept behind a profile because at high
+  # VU counts it became the bottleneck itself: variable proxy_pass forbids upstream keepalive,
+  # so every request opened a fresh TCP connection and nginx started resetting them (223 5xx,
+  # "connection reset by peer") while the app's own p95 was still healthy at 483ms.
+  lb:
+    profiles: ["lb"]
+    image: nginx:1.27-alpine
+    volumes:
+      - ./perf/nginx-scale.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "${SERVER_PORT:-8088}:8088"
+    depends_on:
+      app:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          # Comfortably more than it needs. A starved proxy would cap throughput and get
+          # misread as the app failing to scale.
+          cpus: "2.0"
+          memory: 512M
+
+  app:
+    # !reset clears the base file's fixed host port mapping. Compose MERGES list fields rather
+    # than replacing them, so `ports: []` alone would NOT remove it — and a fixed host port makes
+    # the service unscalable, because replica 2 cannot bind a port replica 1 already holds.
+    # Requires Compose >= 2.24 (you have 2.40).
+    ports: !reset []
+
+    # Each replica keeps the perf overlay's 1 CPU / 512MB. That is the point: we are adding
+    # whole production-shaped instances, not making one instance bigger. Growing a single
+    # instance is VERTICAL scaling and answers a different question.
+    #
+    # ⚠️ Budget your host before running: 4 replicas = 4 CPUs + 2GB for the app alone, plus
+    # Postgres, Redis, RabbitMQ, nginx and k6. On a machine that cannot supply that, the
+    # replicas contend for cores and you measure your laptop, not the architecture.
+
+  k6:
+    environment:
+      # Straight at the scaled service. Docker's embedded DNS returns ALL replica IPs for the
+      # `app` alias in randomised order, so each new connection lands on a different replica --
+      # built-in round-robin with no proxy in the path.
+      #
+      # Two reasons this beats the nginx route:
+      #   1. No proxy to become the bottleneck (which is exactly what happened at 2000+ VUs).
+      #   2. No extra hop, so results are directly comparable to the 1-replica baseline measured
+      #      before any load balancer existed.
+      BASE_URL: http://app:8088
+    depends_on:
+      app:
+        condition: service_healthy
