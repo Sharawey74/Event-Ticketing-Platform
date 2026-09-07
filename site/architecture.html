@@ -331,16 +331,15 @@
     <div class="wrap">
       <div class="section-head">
         <h2>Performance</h2>
-        <p class="lede">Every figure below was measured, not estimated. The ceilings were found by ramping
-          <em>arrival rate</em> until p95 crossed a 500ms budget — ramping virtual users cannot find a limit,
-          because a slowing server makes each user send fewer requests and the test quietly throttles its own
-          input.</p>
+        <p class="lede">Four measurement campaigns, each answering a different question. Ceilings were found by
+          ramping <em>arrival rate</em> rather than virtual users — a VU-based test sends fewer requests as the
+          server slows, so it throttles its own input and never reaches a limit.</p>
       </div>
 
-      <h3>Capacity ceilings</h3>
-      <p>Measured in a container constrained to the production shape — <b>1 CPU, 512MB, <code>prod</code> profile,
-        5-connection Hikari pool</b> — with the load generator in its own CPU-budgeted container so it could not
-        steal cores from the thing it was measuring.</p>
+      <h3>Capacity — where the service stops coping</h3>
+      <p>Arrival rate ramped until p95 exceeded a 500ms budget, against a container held to the production
+        envelope — <b>1 CPU, 512MB, <code>prod</code> profile, 5-connection Hikari pool</b> — with the load
+        generator isolated in its own CPU allocation.</p>
       <div class="table-scroll">
         <table>
           <thead>
@@ -356,8 +355,8 @@
         </table>
       </div>
 
-      <h3>Correctness under concurrency</h3>
-      <p>Behavioural guarantees rather than speed figures — these are the numbers that matter for a ticketing
+      <h3>Correctness — the no-oversell invariant under contention</h3>
+      <p>Behavioural guarantees rather than throughput figures — the results that matter most for a ticketing
         system, because a fast oversell is still an oversell.</p>
       <div class="table-scroll">
         <table>
@@ -372,7 +371,7 @@
         </table>
       </div>
 
-      <h3>Against live production</h3>
+      <h3>Production — the deployed service under sustained load</h3>
       <div class="table-scroll">
         <table>
           <thead>
@@ -384,22 +383,24 @@
         </table>
       </div>
 
+      <h3>Scope</h3>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>Result</th><th>Establishes</th><th>Applies to</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>Correctness</b></td><td>The inventory invariant holds under concurrent contention</td><td>Any deployment. The constrained environment raises collision probability, making it a stricter test than production.</td></tr>
+            <tr><td><b>Saturating resource</b></td><td>CPU binds before the connection pool, Redis or Postgres</td><td>Any deployment — determined by the code and the pool size, not by the host.</td></tr>
+            <tr><td><b>Throughput</b></td><td>660 req/s per 1-CPU instance, 870 across two</td><td>This envelope. Real infrastructure shifts the figure in both directions: network latency lowers per-client rate, a networked database raises per-query cost.</td></tr>
+            <tr><td><b>Production ramp</b></td><td>200 concurrent users sustained at sub-400ms p95</td><td>The Railway single-replica deployment as configured.</td></tr>
+          </tbody>
+        </table>
+      </div>
       <div class="note">
-        <p><strong>What transfers, and what doesn't.</strong> The three groups above have deliberately different
-          reach.</p>
-        <p><b>Correctness transfers completely</b>, and holds <em>harder</em> here than in production. No network
-          latency means concurrent requests genuinely collide rather than arriving spread out, and a single CPU
-          forces thread interleaving — so this environment is a <em>stricter</em> test of the no-oversell invariant
-          than a real deployment, not a weaker one.</p>
-        <p><b>The bottleneck finding transfers.</b> The read path saturates CPU before it saturates the
-          5-connection pool, Redis or Postgres — a structural property of the code and the pool size, measured with
-          every container's CPU captured at once, and true wherever this is deployed.</p>
-        <p><b>The absolute req/s belongs to this environment.</b> 660 req/s is “on 1 CPU with a 5-connection
-          pool”, not a production capacity number: real infrastructure moves it in both directions at once, since
-          network round trips slow each client down while a managed database over the network slows each query.</p>
-        <p>Gaps, stated rather than papered over: <b>P99 was never captured</b>, and <b>the write path has not been
-          load-tested above 20 VUs</b> — the path with the distributed lock, the Lua guard and two inserts, where
-          the pool should bind hardest.</p>
+        <p><strong>Coverage.</strong> p99 was not captured — k6's default summary reports p90 and p95 only. The
+          write path has not been load-tested above 20 VUs: it carries the distributed lock, the Lua guard and two
+          inserts, and is where the connection pool should bind hardest.</p>
       </div>
     </div>
   </section>
