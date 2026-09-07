@@ -462,11 +462,18 @@ which also makes results directly comparable to the pre-proxy baseline.
 4. **`docker compose run` needs `--no-deps`** or it destroys scaled replicas.
 5. **Watch every container, not just the app.** One capture ruled out four candidate bottlenecks.
 
-### Full reference
+### Terminology that causes wrong claims
 
-Every run, parameter and metric definition is documented in **`PERFORMANCE_TESTING.md`**, including
-the terminology distinctions that cause wrong claims (VUs ≠ RPS, VUs ≠ users, iterations ≠
-requests, average ≠ p95).
+Four distinctions worth stating, because collapsing any of them turns a correct measurement into a
+false claim:
+
+| Not the same | Why it matters here |
+|---|---|
+| **VUs ≠ requests/second** | A VU is one looping client, not one request. Run G pushed 800 req/s with 55 VUs; Run B pushed less with 952. Quoting a VU count as throughput is meaningless without the latency alongside it. |
+| **VUs ≠ users** | A VU sends requests back-to-back with no think time. One VU is closer to several impatient real users than to one. |
+| **iterations ≠ requests** | The Railway ramp recorded 54,290 iterations for 32,577 requests, because no-op journeys still complete an iteration. |
+| **average ≠ p95** | Run B's average was 71ms and its median 2.40ms, while p95 was 511ms. The average described nobody's experience. |
+| **capacity ≠ scalability** | Capacity is what one instance handles; scalability is whether adding instances multiplies it. A good score on one says nothing about the other. |
 
 ## Known limitations
 
