@@ -330,49 +330,49 @@ No accounts are seeded by default — register via `/auth/register`. Stripe test
 
 ## Performance
 
-k6 load-test results. Every figure below was measured, not estimated; full methodology, the
-discarded run and the open questions are in [`PERFORMANCE.md`](PERFORMANCE.md).
+Four measurement campaigns, each answering a different question. Per-run data, methodology and
+open items: [`PERFORMANCE.md`](PERFORMANCE.md).
 
-**Capacity ceilings** — measured by ramping *arrival rate* until p95 crossed a 500ms budget, in a
-container constrained to the production shape (**1 CPU / 512MB, `prod` profile, 5-connection Hikari
-pool**) with the load generator in its own CPU-budgeted container:
+### Capacity — where the service stops coping
 
-| Scenario | Result |
+Arrival rate ramped until p95 exceeded a 500 ms budget, against a container held to the production
+envelope (**1 CPU, 512 MB, `prod` profile, 5-connection Hikari pool**), with the load generator
+isolated in its own CPU allocation.
+
+| Measurement | Result |
 | :--- | :--- |
-| **Read-path ceiling, 1 replica** | **660 req/s** sustained before p95 crossed the budget — 107,839 requests, **median 2.40ms**, p95 511ms, **0 errors** |
-| **Read-path ceiling, 2 replicas** | **870 req/s** — 133,383 requests, **0 errors**. Scaling factor **1.32×** |
-| **Latency under horizontal scale** | At **800 req/s** two replicas held **p95 9.0ms** using only 55 of 4,000 virtual users — the same workload that needed 952 VUs on one replica |
-| **Reliability across the whole exercise** | **569,066 requests, 0 failed requests, 0 server errors** across five valid runs |
-| **Bottleneck identified** | Both replicas saturated their own 1.0-CPU budget (105%) while Postgres, Redis, the connection pool and the host all had headroom — the read path is **CPU-bound, not database-bound** |
+| Read-path ceiling, 1 replica | **660 req/s** — 107,839 requests, median **2.40 ms**, p95 511 ms, **0 errors** |
+| Read-path ceiling, 2 replicas | **870 req/s** — 133,383 requests, **0 errors** |
+| Horizontal scaling factor | **1.32×** |
+| Latency headroom at 2 replicas | **800 req/s at p95 9.0 ms**, using 55 of 4,000 virtual users — one replica needed 952 VUs for less traffic |
+| Saturating resource | Both replicas at **105% of their 1-CPU budget** while Postgres, Redis, the connection pool and the host retained headroom — **CPU-bound, not database-bound** |
+| Reliability | **569,066 requests, 0 failed, 0 server errors** across five runs |
 
-**Correctness under concurrency** — these are behavioural guarantees, not speed figures:
+### Correctness — the no-oversell invariant under contention
 
-| Scenario | Result |
+| Measurement | Result |
 | :--- | :--- |
-| Inventory-pressure burst (100 VUs vs. an 8-seat tier) | Up to 270 req/s, 99.9%+ correctly rejected with `409`, **zero oversell, zero 5xx** across repeated runs |
-| Booking creation under contention (20 VUs) | p95 55.4ms, 0 server errors, floor guard held at exactly the tier's true capacity |
-| 100 threads / 50 seats, through the full reservation path | Exactly 50 succeed, every time (`BookingServiceReservationConcurrencyTest`) |
+| Inventory-pressure burst, 100 VUs vs. an 8-seat tier | Up to 270 req/s, 99.9%+ rejected with `409`, **zero oversell, zero 5xx** |
+| Booking creation under contention, 20 VUs | p95 **55.4 ms**, 0 server errors, floor guard cut off at exactly the tier's capacity |
+| 100 threads / 50 seats, full reservation path | **Exactly 50 succeed**, every run |
 
-**Against live production** (single Railway replica, read-only journeys): capacity ramp 10→200 VUs
-over 16 min — 32,577 requests, **0 failed, 0 server errors**, p95 held at **394ms** at peak.
+### Production — the deployed service under sustained load
 
-**What transfers, and what doesn't.** The three groups above have deliberately different reach:
+Live Railway deployment, single replica, browse and search journeys, 10→200 VUs over 16 minutes:
+**32,577 requests, 0 failed, 0 server errors, p95 394 ms** at peak. Minimum latency was 200 ms — the
+public-internet round trip, paid on every request.
 
-- **Correctness transfers completely**, and holds *harder* here than in production. No network
-  latency means concurrent requests genuinely collide rather than arriving spread out, and a single
-  CPU forces thread interleaving. Both make races more likely to surface — this environment is a
-  stricter test of the invariant than a real deployment, not a weaker one.
-- **The bottleneck finding transfers.** The read path saturates CPU before it saturates the
-  5-connection pool, Redis or Postgres. That is a structural property of the code and the pool size,
-  measured with every container's CPU captured at once, and it holds wherever this is deployed.
-- **The absolute req/s belongs to this environment.** Quote 660 req/s as "on 1 CPU with a
-  5-connection pool", not as a production capacity number — real infrastructure moves it in both
-  directions at once, since network round trips slow each client down while a managed database over
-  the network slows each query.
+### Scope
 
-Known gaps, stated rather than papered over: **P99 was never captured** (k6's default summary
-reports p90/p95 only), and **the write path has not been load-tested above 20 VUs** — it is the path
-with the distributed lock, the Lua guard and two inserts, where the pool should bind hardest.
+| Result | Establishes | Applies to |
+| :--- | :--- | :--- |
+| **Correctness** | The inventory invariant holds under concurrent contention | Any deployment. The constrained environment raises collision probability, making it a stricter test than production. |
+| **Saturating resource** | CPU binds before the connection pool, Redis or Postgres | Any deployment — determined by the code and the pool size, not by the host. |
+| **Throughput** | 660 req/s per 1-CPU instance, 870 across two | This envelope. Real infrastructure shifts the figure in both directions: network latency lowers per-client rate, a networked database raises per-query cost. |
+| **Production ramp** | 200 concurrent users sustained at sub-400 ms p95 | The Railway single-replica deployment as configured. |
+
+**Coverage:** p99 not captured — k6's default summary reports p90 and p95 only. Write path not
+load-tested above 20 VUs.
 
 ---
 
